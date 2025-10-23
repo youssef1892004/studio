@@ -1,18 +1,26 @@
 // src/app/login/page.tsx
 'use client';
 
-import { useState, useContext } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useContext, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AuthContext } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
-export default function LoginPage() {
+function LoginComponent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const authContext = useContext(AuthContext);
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const reason = searchParams.get('reason');
+    if (reason === 'unauthorized') {
+      toast.error('يجب تسجيل الدخول أولاً للوصول إلى هذه الصفحة.');
+    }
+  }, [searchParams]);
 
   if (!authContext) {
     throw new Error('AuthContext must be used within an AuthProvider');
@@ -26,11 +34,9 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
-      // [MODIFIED] عرض رسالة النجاح
       toast.success('تم تسجيل الدخول بنجاح!');
       router.push('/'); 
     } catch (err: any) {
-      // [MODIFIED] استخدام toast.error لعرض الخطأ
       toast.error(err.message || 'حدث خطأ غير متوقع أثناء تسجيل الدخول.');
     } finally {
       setIsLoading(false);
@@ -86,5 +92,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LoginComponent />
+    </Suspense>
   );
 }
