@@ -380,36 +380,39 @@ export default function Timeline({ cards, voices, onCardsUpdate, isBlocksProcess
                             <div
                                 key={card.id}
                                 style={{ width: `${segmentWidthPx}px` }} 
-                                className={`h-full border-2 last:border-r-0 relative group rounded-lg overflow-hidden flex-shrink-0 transition-all duration-200 ${
+                                className={`h-full border-2 last:border-r-0 relative group rounded-lg overflow-hidden flex flex-col flex-shrink-0 transition-all duration-200 ${
                                     isCurrentSegment && isPlaying 
                                         ? 'border-green-500 shadow-lg shadow-green-200 bg-green-50' 
                                         : 'border-gray-300 bg-white hover:border-blue-400 hover:shadow-md'
                                 }`}
                             >
-                                
-                                {card.audioUrl && (
-                                    <WaveformSegment
-                                        audioUrl={card.audioUrl}
-                                        duration={segmentDuration}
-                                        isPlaying={isSegmentPlaying}
-                                        color={waveColor}
-                                        progressColor={progressColor}
-                                        zoomLevel={zoomLevel} 
-                                        playbackTime={timeInSegment}
-                                        onSeek={(t: number) => handleSeekFromSegment(t, card.id)}
-                                        onTrim={handleTrim}
-                                        onDelete={handleDelete}
-                                        segmentId={card.id}
-                                    />
-                                )}
-
-                                <div className="absolute inset-0 p-2 flex items-start gap-2 pointer-events-none z-10">
-                                    <div className="flex-shrink-0 flex items-center justify-center w-6 h-6 bg-gradient-to-br from-blue-600 to-blue-700 text-white font-bold rounded-full text-xs shadow-md">
+                                {/* Text part - takes as much space as it needs */}
+                                <div className="p-1 flex items-center gap-1 pointer-events-none">
+                                    <div className="flex-shrink-0 flex items-center justify-center w-5 h-5 bg-gradient-to-br from-blue-600 to-blue-700 text-white font-bold rounded-full text-xs shadow-sm">
                                         {characterInitial}
                                     </div>
-                                    <p className="text-gray-800 text-xs leading-tight line-clamp-2 bg-white/90 backdrop-blur-sm rounded px-2 py-0.5 shadow-sm">
+                                    <p className="text-gray-800 text-xs leading-tight truncate">
                                         {textPreview}
                                     </p>
+                                </div>
+
+                                {/* Waveform part - takes the rest of the space */}
+                                <div className="flex-grow relative w-full h-full">
+                                    {card.audioUrl && (
+                                        <WaveformSegment
+                                            audioUrl={card.audioUrl}
+                                            duration={segmentDuration}
+                                            isPlaying={isSegmentPlaying}
+                                            color={waveColor}
+                                            progressColor={progressColor}
+                                            zoomLevel={zoomLevel} 
+                                            playbackTime={timeInSegment}
+                                            onSeek={(t: number) => handleSeekFromSegment(t, card.id)}
+                                            onTrim={handleTrim}
+                                            onDelete={handleDelete}
+                                            segmentId={card.id}
+                                        />
+                                    )}
                                 </div>
                             </div>
                         )

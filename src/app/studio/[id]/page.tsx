@@ -22,20 +22,21 @@ export async function generateMetadata(
   }
 
   const previousImages = (await parent).openGraph?.images || [];
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001';
 
-  const title = project ? `${project.name} | Studo` : 'Studo Project';
-  const description = project ? project.description || 'Create and share audio content with Studo.' : 'Create and share audio content with Studo.';
-  const imageUrl = `https://ghaymah.systems/logos/logo.png`;
+  const title = project ? `${project.name} | Studio` : 'Studio Project';
+  const description = project ? project.description || 'Create and share audio content with Studio.' : 'Create and share audio content with Studio.';
+  const imageUrl = `${baseUrl}/logos/logo.png`;
 
   return {
     title: title,
     description: description,
-    keywords: ['arabic tts', 'text to speech', 'audio project', project?.name],
+    keywords: ['arabic tts', 'text to speech', 'audio project', project?.name, 'studio project', 'voice over', 'تعليق صوتي', 'مشروع صوتي'],
     openGraph: {
       title: title,
       description: description,
-      url: `https://ghaymah.systems/studio/${id}`,
-      siteName: 'Studo',
+      url: `${baseUrl}/studio/${id}`,
+      siteName: 'Studio',
       images: [
         {
           url: imageUrl,

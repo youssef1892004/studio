@@ -1,13 +1,13 @@
 'use client';
 
 import { AuthContext } from "@/contexts/AuthContext";
-import { getProjectsByUserId, insertProject, deleteProject } from "@/lib/graphql";
-import { FilePlus, LoaderCircle, Trash2, Zap, Users, Image, Video, Mic } from "lucide-react"; 
+import { getProjectsByUserId, insertProject, deleteProject, updateProject } from "@/lib/graphql";
+import { FilePlus, LoaderCircle, Trash2, Edit, Zap, Users, Image, Video, Mic } from "lucide-react"; 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useContext, useEffect, useState, MouseEvent } from "react";
 import toast from "react-hot-toast";
-import { Project } from "@/lib/types"; // Import Project type
+import { Project } from "@/lib/types";
 
 const upcomingFeatures = [
     {
@@ -40,10 +40,11 @@ const upcomingFeatures = [
 export default function ProjectsClient() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isCreating, setIsCreating] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [newProjectName, setNewProjectName] = useState("");
     const [newProjectDescription, setNewProjectDescription] = useState("");
-    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [showCreateOrEditModal, setShowCreateOrEditModal] = useState(false);
+    const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
     
     const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -62,15 +63,30 @@ export default function ProjectsClient() {
                 })
                 .finally(() => setIsLoading(false));
         } else if (!authContext?.isLoading) {
-            // If there's no user and auth is not loading, stop loading the projects page.
             setIsLoading(false);
         }
     }, [authContext]);
+
+    const openCreateModal = () => {
+        setProjectToEdit(null);
+        setNewProjectName("");
+        setNewProjectDescription("");
+        setShowCreateOrEditModal(true);
+    };
+
+    const handleEditClick = (project: Project, e: MouseEvent) => {
+        e.preventDefault(); 
+        e.stopPropagation();
+        setProjectToEdit(project);
+        setNewProjectName(project.name);
+        setNewProjectDescription(project.description || "");
+        setShowCreateOrEditModal(true);
+    };
     
     const handleCreateProject = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newProjectName.trim() || !authContext?.user?.id) return;
-        setIsCreating(true);
+        setIsSubmitting(true);
         try {
             const newProject = await insertProject(authContext.user.id, newProjectName, newProjectDescription);
             toast.success(`تم إنشاء مشروع "${newProjectName}" بنجاح!`);
@@ -78,11 +94,31 @@ export default function ProjectsClient() {
         } catch (error) {
             console.error("Failed to create project", error);
             toast.error("فشل إنشاء المشروع.");
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleUpdateProject = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!projectToEdit || !newProjectName.trim()) return;
+        setIsSubmitting(true);
+        try {
+            await updateProject(projectToEdit.id, newProjectName, newProjectDescription);
+            setProjects(currentProjects => 
+                currentProjects.map(p => 
+                    p.id === projectToEdit.id 
+                        ? { ...p, name: newProjectName, description: newProjectDescription } 
+                        : p
+                )
+            );
+            toast.success(`تم تحديث المشروع "${newProjectName}" بنجاح.`);
+        } catch (error) {
+            console.error("Failed to update project", error);
+            toast.error("فشل تحديث المشروع.");
         } finally {
-            setIsCreating(false);
-            setShowCreateModal(false);
-            setNewProjectName("");
-            setNewProjectDescription("");
+            setIsSubmitting(false);
+            setShowCreateOrEditModal(false);
+            setProjectToEdit(null);
         }
     };
 
@@ -109,7 +145,6 @@ export default function ProjectsClient() {
         }
     };
 
-
     if (isLoading) {
         return (
             <div className="flex flex-col items-center justify-center h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-white transition-colors duration-300">
@@ -125,7 +160,7 @@ export default function ProjectsClient() {
                 <div className="flex justify-between items-center mb-8">
                     <h1 className="text-3xl font-bold text-gray-800 dark:text-white">My Projects</h1>
                     <button
-                        onClick={() => setShowCreateModal(true)}
+                        onClick={openCreateModal}
                         className="flex items-center gap-2 px-4 py-2 bg-black dark:bg-blue-600 text-white font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-blue-700 transition-colors"
                     >
                         <FilePlus size={18} />
@@ -145,13 +180,22 @@ export default function ProjectsClient() {
                             <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
                                 Created: {new Date(project.crated_at).toLocaleDateString()}
                             </p>
-                            <button 
-                                onClick={(e) => handleDeleteClick(project, e)}
-                                className="absolute bottom-3 right-3 p-2 text-gray-400 dark:text-gray-500 rounded-full hover:bg-red-50 dark:hover:bg-gray-700 hover:text-red-600 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                title="Delete project"
-                            >
-                                <Trash2 size={18} />
-                            </button>
+                            <div className="absolute bottom-3 left-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button 
+                                    onClick={(e) => handleEditClick(project, e)}
+                                    className="p-2 text-gray-400 dark:text-gray-500 rounded-full hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400"
+                                    title="Edit project"
+                                >
+                                    <Edit size={18} />
+                                </button>
+                                <button 
+                                    onClick={(e) => handleDeleteClick(project, e)}
+                                    className="p-2 text-gray-400 dark:text-gray-500 rounded-full hover:bg-red-50 dark:hover:bg-gray-700 hover:text-red-600 dark:hover:text-red-400"
+                                    title="Delete project"
+                                >
+                                    <Trash2 size={18} />
+                                </button>
+                            </div>
                         </Link>
                     ))}
                 </div>
@@ -191,12 +235,11 @@ export default function ProjectsClient() {
 
             </main>
 
-            {/* --- نافذة إنشاء مشروع (Modal) --- */}
-            {showCreateModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowCreateModal(false)}>
+            {showCreateOrEditModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowCreateOrEditModal(false)}>
                     <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-                        <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">Create New Project</h2>
-                        <form onSubmit={handleCreateProject}>
+                        <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">{projectToEdit ? "Edit Project" : "Create New Project"}</h2>
+                        <form onSubmit={projectToEdit ? handleUpdateProject : handleCreateProject}>
                             <input
                                 type="text"
                                 value={newProjectName}
@@ -213,13 +256,13 @@ export default function ProjectsClient() {
                                 rows={3}
                             />
                             <div className="flex justify-end gap-4">
-                                <button type="button" onClick={() => setShowCreateModal(false)} className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600">Cancel</button>
+                                <button type="button" onClick={() => setShowCreateOrEditModal(false)} className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600">Cancel</button>
                                 <button 
                                     type="submit" 
-                                    disabled={isCreating || !newProjectName} 
+                                    disabled={isSubmitting || !newProjectName} 
                                     className="px-4 py-2 bg-black dark:bg-blue-600 text-white rounded-md disabled:bg-gray-400 dark:disabled:bg-gray-600"
                                 >
-                                    {isCreating ? <LoaderCircle className="animate-spin" /> : "Create"}
+                                    {isSubmitting ? <LoaderCircle className="animate-spin" /> : (projectToEdit ? "Save Changes" : "Create")}
                                 </button>
                             </div>
                         </form>
@@ -227,7 +270,6 @@ export default function ProjectsClient() {
                 </div>
             )}
 
-            {/* --- نافذة تأكيد الحذف (Modal) --- */}
             {projectToDelete && (
                  <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50" onClick={() => setProjectToDelete(null)}>
                     <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
