@@ -1,7 +1,7 @@
 // File path: src/contexts/AuthContext.tsx
 'use client';
 
-import React, { createContext, useState, useEffect, ReactNode, useContext } from 'react';
+import React, { createContext, useState, useEffect, ReactNode, useContext, useCallback, useMemo } from 'react';
 import { User, Subscription } from '@/lib/types';
 
 // --- START: Define the shape of the context data ---
@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const refreshSubscription = async () => {
+  const refreshSubscription = useCallback(async () => {
     const currentToken = getCookie('token');
     if (!currentToken) return;
 
@@ -49,7 +49,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Failed to refresh subscription:", error);
       setSubscription(null);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const loadAuthData = async () => {
@@ -71,9 +71,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
     loadAuthData();
-  }, []);
+  }, [refreshSubscription]);
 
-  const login = async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     const response = await fetch('/api/auth/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -96,18 +96,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Fetch subscription after logging in
     await refreshSubscription();
-  };
+  }, [refreshSubscription]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('user');
     document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
     setUser(null);
     setToken(null);
     setSubscription(null);
-  };
+  }, []);
+
+  const value = useMemo(() => ({
+    user,
+    token,
+    subscription,
+    isLoading,
+    login,
+    logout,
+    refreshSubscription
+  }), [user, token, subscription, isLoading, login, logout, refreshSubscription]);
 
   return (
-    <AuthContext.Provider value={{ user, token, subscription, isLoading, login, logout, refreshSubscription }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

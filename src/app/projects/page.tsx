@@ -1,6 +1,4 @@
 import { Metadata } from 'next';
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
 import ProjectsClient from './ProjectsClient';
 
 export const metadata: Metadata = {
@@ -13,12 +11,5 @@ export const metadata: Metadata = {
 };
 
 export default function ProjectsPage() {
-    const cookieStore = cookies();
-    const token = cookieStore.get('token');
-
-    if (!token) {
-        redirect('/login?reason=unauthorized');
-    }
-
     return <ProjectsClient />;
 }

@@ -308,7 +308,7 @@ export default function Timeline({ cards, voices, onCardsUpdate, isBlocksProcess
                     <button 
                         onClick={togglePlayPause} 
                         disabled={audioSegments.length === 0}
-                        className="p-3 bg-black hover:bg-gray-800 text-white rounded-full transition-colors disabled:bg-gray-400"
+                        className="p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full transition-colors disabled:bg-gray-400"
                     >
                         {isPlaying ? <Pause size={20} /> : <Play size={20} className="ml-0.5 -scale-x-100" />}
                     </button>

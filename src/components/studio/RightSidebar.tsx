@@ -92,8 +92,8 @@ const VoiceCardItem: React.FC<{
                 ${isUnderMaintenance 
                     ? 'opacity-60 cursor-not-allowed' 
                     : isSelected 
-                        ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 ring-2 ring-blue-500 dark:ring-blue-400 shadow-lg shadow-blue-100 dark:shadow-blue-900/20'
-                        : 'bg-white dark:bg-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-700/50 hover:shadow-md border border-gray-100 dark:border-gray-700/50'
+                        ? 'bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-500 dark:ring-blue-400 shadow-lg'
+                        : 'bg-white dark:bg-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-700/50 border border-gray-200 dark:border-gray-700/50'
                 }
             `}
         >
@@ -105,7 +105,7 @@ const VoiceCardItem: React.FC<{
             {/* Avatar */}
             <div className={`relative w-11 h-11 flex items-center justify-center font-bold rounded-xl text-sm flex-shrink-0 shadow-sm ${
                 voice.isPro 
-                    ? 'bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 text-white' 
+                    ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white' 
                     : 'bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700 text-gray-700 dark:text-gray-200'
             }`}>
                 {voice.characterName.charAt(0).toUpperCase()}
@@ -137,12 +137,12 @@ const VoiceCardItem: React.FC<{
             <div className="flex items-center gap-1.5 flex-shrink-0">
                 <button
                     onClick={handleFavoriteClick}
-                    className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-pink-100 dark:hover:bg-pink-900/40"
+                    className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-red-100 dark:hover:bg-red-900/40"
                     title={isFavorite ? "Remove from favorites" : "Add to favorites"}
                 >
                     <Heart
                         size={16}
-                        className={`transition-colors ${isFavorite ? 'text-pink-500 fill-current' : 'text-gray-600 dark:text-gray-300'}`}
+                        className={`transition-colors ${isFavorite ? 'text-red-500 fill-current' : 'text-gray-600 dark:text-gray-300'}`}
                     />
                 </button>
                 <button
@@ -296,10 +296,10 @@ export default function RightSidebar({
                   <ArrowRight size={18} className="text-gray-700 dark:text-gray-300" />
                 </button>
               )}
-              <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg shadow-md">
+              <div className="p-2 bg-blue-600 rounded-lg shadow-md">
                 <Sparkles size={18} className="text-white" />
               </div>
-              <h2 className="text-lg font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+              <h2 className="text-lg font-bold text-gray-800 dark:text-white">
                 {showVoiceLibrary ? 'Select a Voice' : 'Edit Speech'}
               </h2>
             </div>
@@ -323,7 +323,7 @@ export default function RightSidebar({
                 className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 cursor-pointer transition-all group shadow-sm hover:shadow-md"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold shadow-md">
+                  <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold shadow-md">
                     {voices.find(v => v.name === activeVoiceName)?.characterName.charAt(0).toUpperCase() || 'C'}
                   </div>
                   <span className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -356,7 +356,7 @@ export default function RightSidebar({
                     className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 transition-all shadow-sm"
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold shadow-md flex-shrink-0">
+                      <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold shadow-md flex-shrink-0">
                         {voice.characterName.charAt(0).toUpperCase()}
                       </div>
                       <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{voice.characterName}</span>
@@ -364,12 +364,12 @@ export default function RightSidebar({
                     <div className="flex items-center gap-2 flex-shrink-0">
                         <button
                             onClick={() => handleToggleFavorite(voice.name)}
-                            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-pink-100 dark:hover:bg-pink-900/40"
+                            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-red-100 dark:hover:bg-red-900/40"
                             title={favoriteVoices.includes(voice.name) ? "Remove from favorites" : "Add to favorites"}
                         >
                             <Heart
                                 size={16}
-                                className={`transition-colors ${favoriteVoices.includes(voice.name) ? 'text-pink-500 fill-current' : 'text-gray-600 dark:text-gray-300'}`}
+                                className={`transition-colors ${favoriteVoices.includes(voice.name) ? 'text-red-500 fill-current' : 'text-gray-600 dark:text-gray-300'}`}
                             />
                         </button>
                         <button
@@ -388,7 +388,7 @@ export default function RightSidebar({
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-bold text-gray-900 dark:text-white">AI Tools</h3>
-                <span className="px-2 py-1 text-xs font-semibold text-purple-800 bg-purple-100 dark:bg-purple-900 dark:text-purple-200 rounded-full">
+                <span className="px-2 py-1 text-xs font-semibold text-yellow-800 bg-yellow-100 dark:bg-yellow-900/50 dark:text-yellow-300 rounded-full">
                   Coming Soon
                 </span>
               </div>

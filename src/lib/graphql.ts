@@ -97,7 +97,7 @@ export async function executeGraphQL<T>({ query, variables, headers = {} }: Exec
 
 // --- Project Functions ---
 
-export const getProjectsByUserId = async (userId: string): Promise<Project[]> => {
+export const getProjectsByUserId = async (userId: string, token: string): Promise<Project[]> => {
   const query = `
     query GetProjects($userId: uuid!) {
       Voice_Studio_projects(where: {user_id: {_eq: $userId}}, order_by: {crated_at: desc}) {
@@ -109,12 +109,18 @@ export const getProjectsByUserId = async (userId: string): Promise<Project[]> =>
       }
     }
   `;
-  const response = await fetchGraphQL<{ Voice_Studio_projects: Project[] }>(query, { userId });
+  const response = await executeGraphQL<{ Voice_Studio_projects: Project[] }>({
+      query,
+      variables: { userId },
+      headers: {
+          'Authorization': `Bearer ${token}`
+      }
+  });
   if (response.errors) throw new Error(response.errors[0].message);
   return response.data?.Voice_Studio_projects || [];
 };
 
-export const insertProject = async (userId: string, name: string, description: string): Promise<Project> => {
+export const insertProject = async (userId: string, name: string, description: string, token: string): Promise<Project> => {
     const mutation = `
       mutation InsertProjects($description: String, $name: String, $user_id: uuid!, $crated_at: timestamptz!) {
         insert_Voice_Studio_projects(objects: {description: $description, name: $name, user_id: $user_id, crated_at: $crated_at}) {
@@ -134,7 +140,13 @@ export const insertProject = async (userId: string, name: string, description: s
       description: description,
       crated_at: new Date().toISOString(),
     };
-    const response = await fetchGraphQL<{ insert_Voice_Studio_projects: { returning: Project[] } }>(mutation, variables);
+    const response = await executeGraphQL<{ insert_Voice_Studio_projects: { returning: Project[] } }>({
+        query: mutation, 
+        variables,
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
     if (response.errors) throw new Error(response.errors[0].message);
     return response.data!.insert_Voice_Studio_projects.returning[0];
 };
@@ -207,7 +219,7 @@ export const DELETE_UNUSED_BLOCKS = `
   }
 `;
 
-export const updateProject = async (projectId: string, name: string, description: string) => {
+export const updateProject = async (projectId: string, name: string, description: string, token: string) => {
     const mutation = `
         mutation UpdateProject($id: uuid!, $name: String, $description: String) {
             update_Voice_Studio_projects_by_pk(pk_columns: {id: $id}, _set: {name: $name, description: $description}) {
@@ -220,12 +232,18 @@ export const updateProject = async (projectId: string, name: string, description
         name: name,
         description: description,
     };
-    const response = await fetchGraphQL(mutation, variables);
+    const response = await executeGraphQL({
+        query: mutation, 
+        variables,
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
     if (response.errors) throw new Error(response.errors[0].message);
     return response.data;
 }
 
-export const deleteProject = async (projectId: string): Promise<{ id: string }> => {
+export const deleteProject = async (projectId: string, token: string): Promise<{ id: string }> => {
     const mutation = `
         mutation DeleteProject($id: uuid!) {
             delete_Voice_Studio_projects_by_pk(id: $id) {
@@ -234,7 +252,13 @@ export const deleteProject = async (projectId: string): Promise<{ id: string }> 
         }
     `;
     const variables = { id: projectId };
-    const response = await fetchGraphQL<{ delete_Voice_Studio_projects_by_pk: { id: string } }>(mutation, variables);
+    const response = await executeGraphQL<{ delete_Voice_Studio_projects_by_pk: { id: string } }>({
+        query: mutation, 
+        variables,
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
     if (response.errors) throw new Error(response.errors[0].message);
     if (!response.data?.delete_Voice_Studio_projects_by_pk) throw new Error("Project not found or could not be deleted.");
     return response.data.delete_Voice_Studio_projects_by_pk;

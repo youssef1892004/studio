@@ -17,33 +17,24 @@ import RightSidebar from '@/components/studio/RightSidebar';
 import Timeline from '@/components/Timeline';
 import CenteredLoader from '@/components/CenteredLoader';
 
+import { getApiUrl } from '@/lib/tts';
+import { notFound } from 'next/navigation';
+
 const PRO_VOICES_IDS = ['0', '1', '2', '3'];
 const MAINTENANCE_VOICES = ['0', '1', '2', '3'];
 
-interface StudioPageClientProps {
-    initialProject: Project;
-    initialVoices: (Voice & { isPro?: boolean })[];
-    initialBlocks: StudioBlock[];
-}
-
-export default function StudioPageClient({ initialProject, initialVoices, initialBlocks }: StudioPageClientProps) {
-    const [projectTitle, setProjectTitle] = useState(initialProject.name || "Untitled Project");
-    const [projectDescription, setProjectDescription] = useState(initialProject.description || "");
-    const [voices, setVoices] = useState(initialVoices);
-    const [cards, setCards] = useState<StudioBlock[]>(initialBlocks);
-    const [activeCardId, setActiveCardId] = useState<string | null>(initialBlocks.length > 0 ? initialBlocks[0].id : null);
+export default function StudioPageClient() {
+    const [project, setProject] = useState<Project | null>(null);
+    const [projectTitle, setProjectTitle] = useState("");
+    const [projectDescription, setProjectDescription] = useState("");
+    const [voices, setVoices] = useState<(Voice & { isPro?: boolean })[]>([]);
+    const [cards, setCards] = useState<StudioBlock[]>([]);
+    const [activeCardId, setActiveCardId] = useState<string | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
-    const [isCriticalLoading, setIsCriticalLoading] = useState(false);
+    const [isCriticalLoading, setIsCriticalLoading] = useState(true);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        // Reset isGenerating state for all cards on mount
-        setCards(currentCards =>
-            currentCards.map(card => ({ ...card, isGenerating: false }))
-        );
-    }, []); // Empty dependency array ensures this runs only once on mount
-    
     const isInitialLoad = useRef(true);
 
     const [languageFilter, setLanguageFilter] = useState('all');
@@ -52,11 +43,56 @@ export default function StudioPageClient({ initialProject, initialVoices, initia
     const [providerFilter, setProviderFilter] = useState('all');
     const [enableTashkeel, setEnableTashkeel] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    
-    const { user, subscription, isLoading: isAuthLoading, refreshSubscription } = useAuth();
+
+    const { user, subscription, isLoading: isAuthLoading, refreshSubscription, token } = useAuth();
     const router = useRouter();
     const params = useParams();
     const projectId = params.id as string;
+
+    useEffect(() => {
+        if (!token) return;
+
+        const fetchData = async () => {
+            setIsCriticalLoading(true);
+            try {
+                const [projectData, voicesData, blocksData] = await Promise.all([
+                    getProjectById(projectId),
+                    fetchVoices().catch(e => { console.error("Voice fetch failed:", e); return []; }),
+                    fetch(getApiUrl(`/api/project/get-records?projectId=${projectId}`), { 
+                        cache: 'no-store',
+                        headers: { Authorization: `Bearer ${token}` } 
+                    }).then(res => res.ok ? res.json() : [])
+                ]);
+
+                if (!projectData) {
+                    notFound();
+                    return;
+                }
+
+                const allVoices = voicesData.map((v: Voice) => ({ 
+                    ...v, 
+                    isPro: v.provider === 'ghaymah' && PRO_VOICES_IDS.includes(v.name) 
+                }));
+
+                setProject(projectData);
+                setProjectTitle(projectData.name || "Untitled Project");
+                setProjectDescription(projectData.description || "");
+                setVoices(allVoices);
+                setCards(blocksData.map((card: StudioBlock) => ({ ...card, isGenerating: false })));
+                if (blocksData.length > 0) {
+                    setActiveCardId(blocksData[0].id);
+                }
+
+            } catch (err) {
+                console.error("Failed to fetch project data:", err);
+                setError("Failed to load project data.");
+            } finally {
+                setIsCriticalLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [projectId, token]);
 
     const activeCard = cards.find(c => c.id === activeCardId);
 
@@ -67,14 +103,15 @@ export default function StudioPageClient({ initialProject, initialVoices, initia
     // Auto-save for project name and description
     useEffect(() => {
         if (isInitialLoad.current) return;
+        if (!token) return;
         const handler = setTimeout(() => {
-            updateProject(projectId, projectTitle, projectDescription)
+            updateProject(projectId, projectTitle, projectDescription, token)
                 .catch(err => {
                     console.error("Auto-save for metadata failed:", err);
                 });
         }, 2000);
         return () => clearTimeout(handler);
-    }, [projectTitle, projectDescription, projectId]);
+    }, [projectTitle, projectDescription, projectId, token]);
 
     // Main save function for blocks
     const saveBlocks = useCallback(async (blocksToSave: StudioBlock[]) => {
