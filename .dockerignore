@@ -1,0 +1,30 @@
+node_modules
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Next.js & Build Artifacts (should not be copied to builder stage)
+.next
+out
+build
+
+# Environment Variables (sensitive data)
+.env
+.env.local
+.env.*.local
+.env.production
+
+# Source Control and Configuration
+.git
+.gitignore
+.ghaymah.json  # لأنه يحتوي على معلومات خاصة بالنشر
+
+# Logs and Cache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+.DS_Store
+.vscode
