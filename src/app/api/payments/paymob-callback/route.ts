@@ -113,7 +113,8 @@ export async function POST(req: Request) {
         const maxChars = planData.data.Voice_Studio_Plans_by_pk.max_chars;
 
         // 2ب. حساب تواريخ الاشتراك (مثال: 30 يوم)
-        const startDate = new Date().toISOString();
+        const startDate = new Date().toISOString().split('T')[0]; // Format as YYYY-MM-DD
+        const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // Format as YYYY-MM-DD
         const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
         // 2ج. تفعيل الاشتراك (Upsert: تحديث أو إنشاء)
