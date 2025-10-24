@@ -50,11 +50,7 @@ export default function ProjectsClient() {
     const authContext = useAuth();
     const router = useRouter();
 
-    useEffect(() => {
-        if (!authContext.isLoading && !authContext.user) {
-            router.push('/login?reason=unauthorized');
-        }
-    }, [authContext.isLoading, authContext.user, router]);
+
 
     useEffect(() => {
         if (authContext.user?.id && authContext.token) {

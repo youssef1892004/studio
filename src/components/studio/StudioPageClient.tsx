@@ -144,14 +144,7 @@ export default function StudioPageClient() {
         return () => clearTimeout(handler);
     }, [cards, saveBlocks]);
 
-    // Redirect if not logged in
-    useEffect(() => {
-      if (!isAuthLoading && !user) {
-        router.replace('/login');
-      } else if (user) {
-        refreshSubscription();
-      }
-    }, [isAuthLoading, user, router, refreshSubscription]);
+
 
     const addCard = useCallback((currentVoices = voices) => {
         const newCardId = uuidv4();
