@@ -1,6 +1,7 @@
 // src/app/api/tts/generate-segment/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
+import { executeGraphQL } from '@/lib/graphql';
 
 async function getAccessToken() {
   if (!process.env.TTS_API_BASE_URL || !process.env.TTS_API_USERNAME || !process.env.TTS_API_PASSWORD) {
@@ -24,14 +25,42 @@ async function getAccessToken() {
   return data.access_token;
 }
 
+const GET_SUBSCRIPTION_QUERY = `
+  query GetSubscription($userId: uuid!) {
+    Voice_Studio_subscriptions(where: {user_id: {_eq: $userId}, active: {_eq: true}}) {
+      id
+      remaining_chars
+    }
+  }
+`;
+
 // --- (تعديل جذري) هذه الدالة ستقوم فقط بإنشاء المهمة وإعادة رقمها فورًا ---
 export async function POST(request: NextRequest) {
   try {
     // (تعديل) استقبال الـ flag الجديد
     const { text, voice, provider, project_id, user_id, arabic } = await request.json(); 
-    if (!text || !voice || !provider) {
-      return NextResponse.json({ error: 'Text, voice, and provider are required' }, { status: 400 });
+    if (!text || !voice || !provider || !user_id) {
+      return NextResponse.json({ error: 'Text, voice, provider and user_id are required' }, { status: 400 });
     }
+
+    //
+    // Check user subscription and character balance
+    //
+    const subResponse = await executeGraphQL<{ Voice_Studio_subscriptions: any[] }>({
+        query: GET_SUBSCRIPTION_QUERY,
+        variables: { userId: user_id }
+    });
+
+    if (subResponse.errors) {
+        throw new Error(`Failed to fetch subscription: ${subResponse.errors[0].message}`);
+    }
+
+    const subscription = subResponse.data?.Voice_Studio_subscriptions[0];
+
+    if (!subscription || subscription.remaining_chars < text.length) {
+        return NextResponse.json({ error: 'Insufficient characters or no active subscription.' }, { status: 402 }); // 402 Payment Required
+    }
+
 
     const token = await getAccessToken();
     
@@ -66,6 +95,33 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: await jobResponse.text() || 'Failed to create TTS job' }, { status: jobResponse.status });
         }
     }
+
+    //
+    // Deduct characters from user's subscription
+    //
+    const newRemainingChars = subscription.remaining_chars - text.length;
+    const UPDATE_SUBSCRIPTION_MUTATION = `
+        mutation UpdateSubscriptionChars($id: uuid!, $remaining_chars: Int!) {
+            update_Voice_Studio_subscriptions_by_pk(pk_columns: {id: $id}, _set: {remaining_chars: $remaining_chars}) {
+                id
+            }
+        }
+    `;
+    
+    const updateSubResponse = await executeGraphQL({
+        query: UPDATE_SUBSCRIPTION_MUTATION,
+        variables: {
+            id: subscription.id,
+            remaining_chars: newRemainingChars
+        }
+    });
+
+    if (updateSubResponse.errors) {
+        // Log the error, but don't block the user from getting their audio
+        // This is a critical issue that needs monitoring
+        console.error(`CRITICAL: Failed to deduct characters for subscription ${subscription.id}. Error: ${updateSubResponse.errors[0].message}`);
+    }
+
 
     // 2. إرجاع بيانات المهمة مباشرة للمتصفح
     return NextResponse.json(jobData);
