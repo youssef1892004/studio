@@ -115,11 +115,11 @@ export async function POST(req: Request) {
         // 2ب. حساب تواريخ الاشتراك (مثال: 30 يوم)
         const startDate = new Date().toISOString().split('T')[0]; // Format as YYYY-MM-DD
         const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // Format as YYYY-MM-DD
-        const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
 
         // 2ج. تفعيل الاشتراك (Upsert: تحديث أو إنشاء)
         const ACTIVATE_SUBSCRIPTION = `
-          mutation ActivateSubscription($userId: String!, $planId: uuid!, $startDate: timestamptz!, $endDate: timestamptz!, $maxChars: Int!) {
+          mutation ActivateSubscription($userId: uuid!, $planId: uuid!, $startDate: date!, $endDate: date!, $maxChars: Int!) {
             insert_Voice_Studio_subscriptions(
               objects: {
                 user_id: $userId,
@@ -131,7 +131,7 @@ export async function POST(req: Request) {
                 auto_renew: false
               },
               on_conflict: {
-                constraint: Voice_Studio_subscriptions_user_id_key, // TODO: تأكد أن هذا هو اسم القيد الصحيح
+                constraint: Voice_Studio_subscriptions_user_id_key,
                 update_columns: [plan_id, start_date, end_date, remaining_chars, active]
               }
             ) {
@@ -139,8 +139,8 @@ export async function POST(req: Request) {
             }
           }
         `;
-        
-        await fetch(process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL!, {
+        console.log('Attempting to activate subscription via ACTIVATE_SUBSCRIPTION mutation...');
+        const subscriptionMutationResponse = await fetch(process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL!, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -158,7 +158,13 @@ export async function POST(req: Request) {
             }),
         });
 
-        console.log(`Subscription activated for user ${paidUserId} on plan ${paidPlanId}`);
+        const subscriptionMutationResult = await subscriptionMutationResponse.json();
+
+        if (subscriptionMutationResult.errors) {
+            console.error('Failed to activate subscription in Hasura:', subscriptionMutationResult.errors);
+        } else {
+            console.log(`Subscription activated for user ${paidUserId} on plan ${paidPlanId}. Hasura Response:`, subscriptionMutationResult.data);
+        }
     }
 
     // الخطوة 5: إرسال استجابة 200 OK لإعلام Paymob

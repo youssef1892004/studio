@@ -23,7 +23,7 @@ const SubscriptionStatus = ({ subscription, className }: SubscriptionStatusProps
         <Crown className="h-5 w-5 text-yellow-500 flex-shrink-0" />
         <div className="w-40">
             <div className="flex justify-between text-xs text-gray-600 mb-1">
-                <span>{formatNumber(remaining_chars)} Chars Left</span>
+                <span>{formatNumber(remaining_chars)} حرف متبقي</span>
                 <span className="font-semibold">{plan.name}</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-1.5">

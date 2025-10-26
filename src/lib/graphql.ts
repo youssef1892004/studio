@@ -120,10 +120,10 @@ export const getProjectsByUserId = async (userId: string, token: string): Promis
   return response.data?.Voice_Studio_projects || [];
 };
 
-export const insertProject = async (userId: string, name: string, description: string, token: string): Promise<Project> => {
+export const insertProject = async (name: string, description: string, token: string): Promise<Project> => {
     const mutation = `
-      mutation InsertProjects($description: String, $name: String, $user_id: uuid!, $crated_at: timestamptz!) {
-        insert_Voice_Studio_projects(objects: {description: $description, name: $name, user_id: $user_id, crated_at: $crated_at}) {
+      mutation InsertProjects($description: String, $name: String, $crated_at: timestamptz!) {
+        insert_Voice_Studio_projects(objects: {description: $description, name: $name, crated_at: $crated_at}) {
           returning {
             id
             name
@@ -135,7 +135,6 @@ export const insertProject = async (userId: string, name: string, description: s
       }
     `;
     const variables = {
-      user_id: userId,
       name: name,
       description: description,
       crated_at: new Date().toISOString(),

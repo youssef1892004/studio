@@ -62,10 +62,13 @@ export async function POST(req: Request) {
     // =================================================================
     // Step 1: Authentication Request
     // =================================================================
+    console.log("PAYMOB_API_KEY:", process.env.PAYMOB_API_KEY);
     const authResponse = await fetch('https://accept.paymob.com/api/auth/tokens', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ api_key: process.env.PAYMOB_API_KEY }),
+      body: JSON.stringify({
+        api_key: process.env.PAYMOB_API_KEY,
+      }),
     });
     const authData = await authResponse.json();
     const token = authData.token;
