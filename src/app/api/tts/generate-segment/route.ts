@@ -43,9 +43,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Text, voice, provider and user_id are required' }, { status: 400 });
     }
 
-    //
-    // Check user subscription and character balance
-    //
+    const isFree = process.env.NEXT_PUBLIC_WEBSITE_IS_FREE === 'true';
+
+    // Always get subscription to avoid duplicating code, but only use it if not free
     const subResponse = await executeGraphQL<{ Voice_Studio_subscriptions: any[] }>({
         query: GET_SUBSCRIPTION_QUERY,
         variables: { userId: user_id }
@@ -54,13 +54,13 @@ export async function POST(request: NextRequest) {
     if (subResponse.errors) {
         throw new Error(`Failed to fetch subscription: ${subResponse.errors[0].message}`);
     }
-
     const subscription = subResponse.data?.Voice_Studio_subscriptions[0];
 
-    if (!subscription || subscription.remaining_chars < text.length) {
-        return NextResponse.json({ error: 'Insufficient characters or no active subscription.' }, { status: 402 }); // 402 Payment Required
+    if (!isFree) {
+        if (!subscription || subscription.remaining_chars < text.length) {
+            return NextResponse.json({ error: 'Insufficient characters or no active subscription.' }, { status: 402 }); // 402 Payment Required
+        }
     }
-
 
     const token = await getAccessToken();
     
@@ -96,30 +96,32 @@ export async function POST(request: NextRequest) {
         }
     }
 
-    //
-    // Deduct characters from user's subscription
-    //
-    const newRemainingChars = subscription.remaining_chars - text.length;
-    const UPDATE_SUBSCRIPTION_MUTATION = `
-        mutation UpdateSubscriptionChars($id: uuid!, $remaining_chars: Int!) {
-            update_Voice_Studio_subscriptions_by_pk(pk_columns: {id: $id}, _set: {remaining_chars: $remaining_chars}) {
-                id
+    if (!isFree && subscription) {
+        //
+        // Deduct characters from user's subscription
+        //
+        const newRemainingChars = subscription.remaining_chars - text.length;
+        const UPDATE_SUBSCRIPTION_MUTATION = `
+            mutation UpdateSubscriptionChars($id: uuid!, $remaining_chars: Int!) {
+                update_Voice_Studio_subscriptions_by_pk(pk_columns: {id: $id}, _set: {remaining_chars: $remaining_chars}) {
+                    id
+                }
             }
-        }
-    `;
-    
-    const updateSubResponse = await executeGraphQL({
-        query: UPDATE_SUBSCRIPTION_MUTATION,
-        variables: {
-            id: subscription.id,
-            remaining_chars: newRemainingChars
-        }
-    });
+        `;
+        
+        const updateSubResponse = await executeGraphQL({
+            query: UPDATE_SUBSCRIPTION_MUTATION,
+            variables: {
+                id: subscription.id,
+                remaining_chars: newRemainingChars
+            }
+        });
 
-    if (updateSubResponse.errors) {
-        // Log the error, but don't block the user from getting their audio
-        // This is a critical issue that needs monitoring
-        console.error(`CRITICAL: Failed to deduct characters for subscription ${subscription.id}. Error: ${updateSubResponse.errors[0].message}`);
+        if (updateSubResponse.errors) {
+            // Log the error, but don't block the user from getting their audio
+            // This is a critical issue that needs monitoring
+            console.error(`CRITICAL: Failed to deduct characters for subscription ${subscription.id}. Error: ${updateSubResponse.errors[0].message}`);
+        }
     }
 
 

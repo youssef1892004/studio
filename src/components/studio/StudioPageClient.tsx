@@ -560,31 +560,29 @@ export default function StudioPageClient() {
                     </main>
                     
                     {isSidebarOpen && (
-                        <div className="w-[420px] bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">
-                            <RightSidebar
-                                voices={filteredVoices}
-                                onApplyVoice={handleApplyVoice}
-                                activeVoiceName={activeCard?.voice}
-                                isOpen={isSidebarOpen}
-                                onToggle={toggleSidebar}
-                                languages={languages}
-                                countries={countries}
-                                languageFilter={languageFilter}
-                                setLanguageFilter={setLanguageFilter}
-                                countryFilter={countryFilter}
-                                setCountryFilter={setCountryFilter}
-                                genderFilter={genderFilter}
-                                setGenderFilter={setGenderFilter}
-                                providerFilter={providerFilter}
-                                setProviderFilter={setProviderFilter}
-                                providers={providers as string[]}
-                                enableTashkeel={enableTashkeel}
-                                setEnableTashkeel={setEnableTashkeel}
-                                searchTerm={searchTerm}
-                                setSearchTerm={setSearchTerm}
-                                maintenanceVoices={MAINTENANCE_VOICES}
-                             />
-                        </div>
+                        <RightSidebar
+                            voices={filteredVoices}
+                            onApplyVoice={handleApplyVoice}
+                            activeVoiceName={activeCard?.voice}
+                            isOpen={isSidebarOpen}
+                            onToggle={toggleSidebar}
+                            languages={languages}
+                            countries={countries}
+                            languageFilter={languageFilter}
+                            setLanguageFilter={setLanguageFilter}
+                            countryFilter={countryFilter}
+                            setCountryFilter={setCountryFilter}
+                            genderFilter={genderFilter}
+                            setGenderFilter={setGenderFilter}
+                            providerFilter={providerFilter}
+                            setProviderFilter={setProviderFilter}
+                            providers={providers as string[]}
+                            enableTashkeel={enableTashkeel}
+                            setEnableTashkeel={setEnableTashkeel}
+                            searchTerm={searchTerm}
+                            setSearchTerm={setSearchTerm}
+                            maintenanceVoices={MAINTENANCE_VOICES}
+                         />
                     )}
                 </div>
 

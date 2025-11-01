@@ -1,5 +1,5 @@
 // File path: src/app/layout.tsx
-import MobileBlocker from '@/components/MobileBlocker';
+
 import type { Metadata } from "next";
 import { Cairo } from "next/font/google";
 import "./globals.css";
@@ -100,7 +100,7 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <body className={cairo.className}>
-        <MobileBlocker />
+        
         <ClientLayout>
           {children}
         </ClientLayout>

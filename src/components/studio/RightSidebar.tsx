@@ -281,7 +281,7 @@ export default function RightSidebar({
 
   return (
     <aside 
-      className={`w-full sm:w-[420px] bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 border-l border-gray-200 dark:border-gray-700 flex-col h-full overflow-hidden transition-all duration-300 transform ${isOpen ? 'translate-x-0' : 'translate-x-full'} fixed right-0 top-0 bottom-0 z-30 md:relative md:flex md:translate-x-0 shadow-2xl md:shadow-none`}
+      className={`w-full md:w-[420px] bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 border-l border-gray-200 dark:border-gray-700 flex-col h-full overflow-hidden transition-all duration-300 transform ${isOpen ? 'translate-x-0' : 'translate-x-full'} fixed right-0 top-0 bottom-0 z-30 md:relative md:flex md:translate-x-0 shadow-2xl md:shadow-none`}
     >
       <div className="flex flex-col h-full">
         {/* Header */}

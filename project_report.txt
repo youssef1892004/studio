@@ -1,0 +1,121 @@
+
+# AI Voice Studio - تقرير المشروع
+
+## 1. نظرة عامة على المشروع
+
+AI Voice Studio هو تطبيق ويب مبني على Next.js يتيح للمستخدمين تحويل النصوص العربية إلى كلام واقعي باستخدام تقنيات الذكاء الاصطناعي (TTS). يوفر التطبيق تجربة "استوديو" لإدارة المشاريع الصوتية، وتقسيم النصوص إلى كتل، وتوليد المقاطع الصوتية، ومعاينة الأصوات، ودمج النتائج في ملف صوتي واحد.
+
+## 2. التقنيات المستخدمة
+
+- **الواجهة الأمامية (Frontend):** Next.js, React, TypeScript, Tailwind CSS
+- **إدارة الحالة (State Management):** React Context (للمصادقة والثيمات)
+- **محرر النصوص (Text Editor):** Editor.js
+- **قاعدة البيانات (Database):** Hasura GraphQL
+- **التخزين (Storage):** AWS S3/Wasabi
+- **معالجة الوسائط (Media Processing):** `fluent-ffmpeg` مع `ffmpeg-static`
+- **المصادقة (Authentication):** JWT
+
+## 3. هيكل المشروع
+
+```
+/
+├── public/               # الأصول الثابتة (صور، صوت)
+├── src/
+│   ├── app/              # مسارات الصفحات وواجهات API
+│   │   ├── api/          # المسارات الخلفية (TTS، التخزين، التسجيلات)
+│   │   ├── (pages)/      # صفحات عامة (تسجيل، مشاريع، إلخ)
+│   │   ├── globals.css   # أنماط عامة
+│   │   └── layout.tsx    # التخطيط الجذري (مزوّد السياقات)
+│   ├── components/       # مكونات واجهة قابلة لإعادة الاستخدام
+│   │   ├── studio/       # مكونات صفحة الاستوديو
+│   │   └── ui/           # عناصر واجهة عامة
+│   ├── contexts/         # سياقات المصادقة والثيمات
+│   └── lib/              # مساعدات، أنواع، GraphQL، TTS
+├── next.config.js        # إعدادات Next.js
+└── package.json          # الاعتماديات والسكربتات
+```
+
+## 4. الوظائف الأساسية
+
+- **مصادقة المستخدم وتسجيله:** نظام لتسجيل الدخول وإنشاء حسابات جديدة.
+- **إدارة المشاريع:** إنشاء، قراءة، تحديث، وحذف المشاريع.
+- **صفحة الاستوديو:** واجهة لتحرير النصوص وتوليد الصوت.
+- **توليد النص إلى كلام (TTS):** تحويل كتل نصية فردية إلى مقاطع صوتية.
+- **دمج المقاطع الصوتية:** دمج جميع المقاطع الصوتية في ملف MP3 واحد.
+- **اختيار ومعاينة الأصوات:** إمكانية اختيار أصوات مختلفة ومعاينتها.
+- **التكامل مع بوابات الدفع:** نظام دفع متكامل مع Paymob.
+
+## 5. المصادقة والترخيص
+
+- **مصادقة JWT:** يعتمد النظام على JWT للمصادقة.
+- **Hasura:** يتم استخدام Hasura كواجهة GraphQL API، وهي مهيأة لاستخدام JWT للترخيص.
+- **AuthContext:** يوفر `AuthContext` معلومات المستخدم والتوكن للواجهة الأمامية.
+- **Middleware:** يتم حماية المسارات مثل `/projects`, `/dashboard`, و `/profile` باستخدام middleware.
+
+## 6. مخطط قاعدة البيانات (مستنتج)
+
+- **users:** لتخزين معلومات المستخدمين (id, displayName, email, passwordHash, roles).
+- **Voice_Studio_projects:** لتخزين معلومات المشاريع (id, name, description, crated_at, user_id, blocks_json).
+- **Voice_Studio_blocks:** لتخزين الكتل النصية لكل مشروع (id, project_id, block_index, content, s3_url, created_at).
+- **Voice_Studio_subscriptions:** لتخزين معلومات اشتراكات المستخدمين.
+- **Voice_Studio_Plans:** لتخزين خطط الاشتراك المتاحة.
+- **libaray_Project_link_Storage:** لتخزين روابط الملفات الصوتية التي تم إنشاؤها.
+
+## 7. نقاط النهاية (API Endpoints)
+
+- **/api/auth/token:** لمصادقة المستخدم وإرجاع توكن JWT.
+- **/api/register:** لتسجيل مستخدم جديد.
+- **/api/project/get-records:** لجلب سجلات المشروع وتوليد روابط مؤقتة للمقاطع الصوتية.
+- **/api/project/save-editor-blocks:** لحفظ كتل المحرر في قاعدة البيانات.
+- **/api/project/save-merged-block:** لحفظ رابط المقطع المدمج.
+- **/api/project/upload-audio:** لرفع مقطع صوتي إلى Wasabi S3.
+- **/api/tts/create:** لإنشاء مهمة TTS جديدة.
+- **/api/tts/generate-link:** لتوليد رابط للمقطع الصوتي.
+- **/api/tts/generate-segment:** لتوليد مقطع صوتي واحد.
+- **/api/tts/merge-all:** لدمج جميع المقاطع الصوتية في ملف واحد.
+- **/api/tts/preview:** لمعاينة صوت معين.
+- **/api/tts/result/[job_id]:** لجلب نتيجة مهمة TTS.
+- **/api/tts/status/[job_id]:** للتحقق من حالة مهمة TTS.
+- **/api/user/subscription:** لجلب معلومات اشتراك المستخدم.
+- **/api/voices:** لجلب قائمة الأصوات المتاحة.
+- **/api/payments/paymob:** لبدء عملية دفع جديدة مع Paymob.
+- **/api/payments/paymob-callback:** لمعالجة الـ callback من Paymob بعد إتمام عملية الدفع.
+
+## 8. مكونات الواجهة الأمامية (Frontend Components)
+
+- **AudioPlayer:** مشغل صوتي بسيط.
+- **EditorCanvas:** لوحة المحرر التي تحتوي على كتل النصوص القابلة للفرز.
+- **ProjectHeader:** رأس صفحة المشروع الذي يحتوي على عنوان المشروع وأزرار التحكم.
+- **RightSidebar:** الشريط الجانبي الأيمن الذي يحتوي على إعدادات الصوت والفلاتر.
+- **Timeline:** الشريط الزمني الذي يعرض المقاطع الصوتية.
+- **VoiceCard:** بطاقة لعرض صوت معين.
+- **SortableEditorBlock:** كتلة نصية قابلة للفرز في المحرر.
+- **SubscriptionStatus:** لعرض حالة اشتراك المستخدم.
+
+## 9. متغيرات البيئة
+
+- **TTS_API_BASE_URL:** عنوان URL الأساسي لخدمة TTS.
+- **TTS_API_USERNAME:** اسم المستخدم لخدمة TTS.
+- **TTS_API_PASSWORD:** كلمة المرور لخدمة TTS.
+- **NEXT_PUBLIC_HASURA_GRAPHQL_URL:** عنوان URL لـ Hasura GraphQL.
+- **NEXT_PUBLIC_HASURA_ADMIN_SECRET:** مفتاح الإدارة لـ Hasura (يجب نقله إلى الخادم).
+- **HASURA_GRAPHQL_URL:** عنوان URL لـ Hasura GraphQL (للاستخدام من جانب الخادم).
+- **HASURA_ADMIN_SECRET:** مفتاح الإدارة لـ Hasura (للاستخدام من جانب الخادم).
+- **AWS_ACCESS_KEY_ID:** مفتاح الوصول لـ AWS.
+- **AWS_SECRET_ACCESS_KEY:** مفتاح الوصول السري لـ AWS.
+- **AWS_S3_BUCKET_NAME:** اسم حاوية S3.
+- **AWS_REGION:** منطقة AWS.
+- **AWS_S3_ENDPOINT:** نقطة نهاية S3 (Wasabi).
+- **PAYMOB_API_KEY:** مفتاح API لـ Paymob.
+- **PAYMOB_INTEGRATION_ID:** معرف التكامل لـ Paymob.
+- **PAYMOB_WALLET_INTEGRATION_ID:** معرف تكامل المحفظة لـ Paymob.
+- **PAYMOB_IFRAME_ID:** معرف iframe لـ Paymob.
+- **PAYMOB_HMAC_SECRET:** مفتاح HMAC لـ Paymob.
+
+## 10. مجالات التحسين
+
+- **معالجة الأخطاء:** يمكن تحسين معالجة الأخطاء في بعض أجزاء الكود لتكون أكثر قوة.
+- **الأمان:** يتم استخدام `HASURA_ADMIN_SECRET` في جانب العميل في بعض الأماكن، وهو ما يمثل خطرًا أمنيًا. يجب نقله إلى جانب الخادم.
+- **تكرار الكود:** يوجد بعض تكرار الكود، على سبيل المثال، دالة `getAccessToken` معرفة في ملفات متعددة.
+- **الاختبارات:** لا توجد اختبارات في المشروع. ستؤدي إضافة اختبارات الوحدات والتكامل إلى تحسين جودة الكود وقابليته للصيانة.
+- **القيم الثابتة:** توجد بعض القيم الثابتة التي يمكن نقلها إلى متغيرات البيئة أو ملف تكوين.

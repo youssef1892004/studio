@@ -213,7 +213,7 @@ export default function ProjectsClient() {
                                         <span>تم الإنشاء: {new Date(project.crated_at).toLocaleDateString('ar-EG')}</span>
                                     </div>
 
-                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pt-2 border-t border-gray-100">
+                                    <div className="flex gap-2 transition-opacity duration-300 pt-2 border-t border-gray-100">
                                         <button 
                                             onClick={(e) => handleEditClick(project, e)}
                                             className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-blue-100 hover:text-blue-600 transition-colors text-sm font-medium"

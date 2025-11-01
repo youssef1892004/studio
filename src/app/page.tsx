@@ -273,32 +273,32 @@ export default function LandingPage() {
                     <table className="min-w-full bg-white text-right">
                         <thead>
                             <tr className="bg-gray-100">
-                                <th className="px-8 py-5 text-lg font-bold text-gray-800 border-l border-gray-200">الميزة</th>
-                                <th className="px-8 py-5 text-lg font-bold text-gray-600 border-l border-gray-200">الخطة المجانية</th>
-                                <th className="px-8 py-5 text-lg font-bold bg-blue-600 text-white">الخطة الاحترافية (Pro)</th>
+                                <th className="px-4 py-3 sm:px-8 sm:py-5 text-base sm:text-lg font-bold text-gray-800 border-l border-gray-200">الميزة</th>
+                                <th className="px-4 py-3 sm:px-8 sm:py-5 text-base sm:text-lg font-bold text-gray-600 border-l border-gray-200">الخطة المجانية</th>
+                                <th className="px-4 py-3 sm:px-8 sm:py-5 text-base sm:text-lg font-bold bg-blue-600 text-white">الخطة الاحترافية (Pro)</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr className="border-t border-gray-200 hover:bg-blue-50/50 transition-colors">
-                                <td className="px-8 py-5 font-medium text-gray-800 border-l border-gray-200">مدة الصوت/الرصيد</td>
-                                <td className="px-8 py-5 text-gray-700 border-l border-gray-200">15 دقيقة شهرياً</td>
-                                <td className="px-8 py-5 font-bold text-green-600 flex items-center justify-end gap-2">
+                                <td className="px-4 py-3 sm:px-8 sm:py-5 font-medium text-gray-800 border-l border-gray-200">مدة الصوت/الرصيد</td>
+                                <td className="px-4 py-3 sm:px-8 sm:py-5 text-gray-700 border-l border-gray-200">15 دقيقة شهرياً</td>
+                                <td className="px-4 py-3 sm:px-8 sm:py-5 font-bold text-green-600 flex items-center justify-end gap-2">
                                   <Zap className="w-5 h-5" />
                                   ساعة كاملة (60 دقيقة)
                                 </td>
                             </tr>
                             <tr className="border-t border-gray-200 hover:bg-blue-50/50 transition-colors">
-                                <td className="px-8 py-5 font-medium text-gray-800 border-l border-gray-200">جودة التشكيل الآلي</td>
-                                <td className="px-8 py-5 text-red-500 border-l border-gray-200">أساسي</td>
-                                <td className="px-8 py-5 font-bold text-blue-600 flex items-center justify-end gap-2">
+                                <td className="px-4 py-3 sm:px-8 sm:py-5 font-medium text-gray-800 border-l border-gray-200">جودة التشكيل الآلي</td>
+                                <td className="px-4 py-3 sm:px-8 sm:py-5 text-red-500 border-l border-gray-200">أساسي</td>
+                                <td className="px-4 py-3 sm:px-8 sm:py-5 font-bold text-blue-600 flex items-center justify-end gap-2">
                                     <Star className="w-5 h-5 fill-current" />
                                     تشكيل آلي متقدم (Pro)
                                 </td>
                             </tr>
                             <tr className="border-t border-gray-200 hover:bg-blue-50/50 transition-colors">
-                                <td className="px-8 py-5 font-medium text-gray-800 border-l border-gray-200">تحرير الشريط الزمني</td>
-                                <td className="px-8 py-5 text-red-500 border-l border-gray-200">غير متاح</td>
-                                <td className="px-8 py-5 font-bold text-green-600 flex items-center justify-end gap-2">
+                                <td className="px-4 py-3 sm:px-8 sm:py-5 font-medium text-gray-800 border-l border-gray-200">تحرير الشريط الزمني</td>
+                                <td className="px-4 py-3 sm:px-8 sm:py-5 text-red-500 border-l border-gray-200">غير متاح</td>
+                                <td className="px-4 py-3 sm:px-8 sm:py-5 font-bold text-green-600 flex items-center justify-end gap-2">
                                     <CheckCircle className="w-5 h-5" />
                                     قص وحذف المقاطع
                                 </td>
