@@ -122,8 +122,8 @@ export default function Navbar() {
                                     )}
                                 </div>
                             ) : (
-                                <div className="items-center ml-6 space-x-4">
-                                    <Link href="/login" className="text-sm font-medium text-gray-500 hover:text-gray-700">Sign in</Link>
+                                <div className="flex items-center ml-6 gap-x-4">
+                                    <Link href="/login" className="inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Sign in</Link>
                                     <Link href="/register" className="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700">Sign up</Link>
                                 </div>
                             )}
@@ -172,7 +172,7 @@ export default function Navbar() {
                         ) : (
                             <div className="space-y-1 px-2">
                                 <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="block rounded-md py-2 px-3 text-base font-medium text-gray-700 hover:bg-gray-100">Sign in</Link>
-                                <Link href="/register" onClick={() => setMobileMenuOpen(false)} className="block rounded-md py-2 px-3 text-base font-medium text-gray-700 hover:bg-gray-100">Sign up</Link>
+                                <Link href="/register" onClick={() => setMobileMenuOpen(false)} className="block rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-indigo-700">Sign up</Link>
                             </div>
                         )}
                     </div>

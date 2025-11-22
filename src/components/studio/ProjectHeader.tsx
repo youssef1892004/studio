@@ -24,8 +24,8 @@ export default function ProjectHeader({
   const router = useRouter();
 
   return (
-    <div className="flex items-center justify-between px-4 h-full w-full">
-      <div className="flex items-center gap-4"> 
+    <div className="flex items-center justify-between px-4 h-full w-full overflow-x-auto">
+      <div className="flex items-center gap-4 whitespace-nowrap"> 
         <button onClick={() => router.push('/projects')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Back to projects">
           <ArrowRight className="w-5 h-5 text-gray-600" />
         </button>
@@ -47,7 +47,7 @@ export default function ProjectHeader({
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 whitespace-nowrap">
         {subscription && <SubscriptionStatus subscription={subscription} />}
         <button onClick={handleGenerate} disabled={isGenerateDisabled ?? isGenerating} className="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white text-sm font-semibold rounded-lg transition-colors disabled:bg-gray-400 flex items-center gap-2">
           {isGenerating ? 'Generating...' : 'Generate'}
