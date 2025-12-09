@@ -10,29 +10,29 @@ import { Project } from "@/lib/types";
 
 const upcomingFeatures = [
     {
-        title: "المؤثرات الصوتية", 
-        description: "إضافة تأثيرات (صدى، فلترة، تردد) على المقاطع الصوتية.", 
-        icon: Zap 
+        title: "المؤثرات الصوتية",
+        description: "إضافة تأثيرات (صدى، فلترة، تردد) على المقاطع الصوتية.",
+        icon: Zap
     },
     {
-        title: "أصوات جديدة وموسعة", 
-        description: "إطلاق مجموعة ضخمة من الأصوات الاحترافية واللهجات الإقليمية.", 
-        icon: Users 
+        title: "أصوات جديدة وموسعة",
+        description: "إطلاق مجموعة ضخمة من الأصوات الاحترافية واللهجات الإقليمية.",
+        icon: Users
     },
     {
-        title: "توليد الصور بالذكاء الاصطناعي", 
-        description: "تحويل النص إلى صورة (Text-to-Image) لإنشاء خلفيات بصرية.", 
-        icon: Image 
+        title: "توليد الصور بالذكاء الاصطناعي",
+        description: "تحويل النص إلى صورة (Text-to-Image) لإنشاء خلفيات بصرية.",
+        icon: Image
     },
     {
-        title: "توليد الفيديوهات القصيرة", 
-        description: "دمج الصوت مع الصور الثابتة أو مقاطع الفيديو البسيطة.", 
-        icon: Video 
+        title: "توليد الفيديوهات القصيرة",
+        description: "دمج الصوت مع الصور الثابتة أو مقاطع الفيديو البسيطة.",
+        icon: Video
     },
     {
-        title: "التسجيل وتحويل الصوت (AI)", 
-        description: "سجل صوتك وحوّله إلى أي صوت آخر مدعوم بتقنيات الاستنساخ الآمن.", 
-        icon: Mic 
+        title: "التسجيل وتحويل الصوت (AI)",
+        description: "سجل صوتك وحوّله إلى أي صوت آخر مدعوم بتقنيات الاستنساخ الآمن.",
+        icon: Mic
     },
 ];
 
@@ -74,14 +74,14 @@ export default function ProjectsClient() {
     };
 
     const handleEditClick = (project: Project, e: MouseEvent) => {
-        e.preventDefault(); 
+        e.preventDefault();
         e.stopPropagation();
         setProjectToEdit(project);
         setNewProjectName(project.name);
         setNewProjectDescription(project.description || "");
         setShowCreateOrEditModal(true);
     };
-    
+
     const handleCreateProject = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newProjectName.trim() || !authContext.user?.id || !authContext.token) return;
@@ -103,10 +103,10 @@ export default function ProjectsClient() {
         setIsSubmitting(true);
         try {
             await updateProject(projectToEdit.id, newProjectName, newProjectDescription, authContext.token);
-            setProjects(currentProjects => 
-                currentProjects.map(p => 
-                    p.id === projectToEdit.id 
-                        ? { ...p, name: newProjectName, description: newProjectDescription } 
+            setProjects(currentProjects =>
+                currentProjects.map(p =>
+                    p.id === projectToEdit.id
+                        ? { ...p, name: newProjectName, description: newProjectDescription }
                         : p
                 )
             );
@@ -122,7 +122,7 @@ export default function ProjectsClient() {
     };
 
     const handleDeleteClick = (project: Project, e: MouseEvent) => {
-        e.preventDefault(); 
+        e.preventDefault();
         e.stopPropagation();
         setProjectToDelete(project);
     };
@@ -146,20 +146,20 @@ export default function ProjectsClient() {
 
     if (isLoading) {
         return (
-            <div className="flex flex-col items-center justify-center h-screen bg-gray-50">
-                <LoaderCircle className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-                <p className="text-lg font-medium text-gray-700">جاري تحميل مشاريعك...</p>
+            <div className="flex flex-col items-center justify-center h-screen bg-studio-bg-light dark:bg-studio-bg">
+                <LoaderCircle className="w-12 h-12 text-studio-accent animate-spin mb-4" />
+                <p className="text-lg font-medium text-studio-text-light dark:text-studio-text">جاري تحميل مشاريعك...</p>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <div className="relative bg-blue-600 text-white">
+        <div className="min-h-screen bg-studio-bg-light dark:bg-studio-bg">
+            <div className="relative bg-studio-bg dark:bg-studio-bg text-studio-text dark:text-studio-text">
                 <div className="container mx-auto px-6 py-12 relative z-10">
                     <div className="mb-6">
-                        <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-6 py-3 rounded-full">
-                            <Gift className="w-5 h-5" />
+                        <div className="inline-flex items-center gap-2 bg-studio-panel-light/40 dark:bg-studio-panel/40 backdrop-blur-sm px-6 py-3 rounded-full border border-studio-border-light dark:border-studio-border">
+                            <Gift className="w-5 h-5 text-studio-accent" />
                             <span className="font-bold text-sm">🎉 جميع الميزات مجانية لمدة 14 يوم! 🎉</span>
                         </div>
                     </div>
@@ -167,15 +167,15 @@ export default function ProjectsClient() {
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                         <div>
                             <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
-                                <Folder className="w-10 h-10" />
+                                <Folder className="w-10 h-10 text-studio-accent" />
                                 مشاريعي
                             </h1>
-                            <p className="text-white/80 text-lg">أنشئ وأدر مشاريع الصوت الذكي الخاصة بك</p>
+                            <p className="text-studio-text-light/80 dark:text-studio-text/80 text-lg">أنشئ وأدر مشاريع الصوت الذكي الخاصة بك</p>
                         </div>
-                        
+
                         <button
                             onClick={openCreateModal}
-                            className="group flex items-center gap-2 px-6 py-3 bg-white text-blue-600 font-bold rounded-xl hover:bg-gray-100 transition-all duration-300 transform hover:scale-105 shadow-lg"
+                            className="group flex items-center gap-2 px-6 py-3 bg-studio-accent hover:bg-studio-accent/90 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
                         >
                             <FilePlus className="w-5 h-5 transition-transform duration-300 group-hover:rotate-90" />
                             مشروع جديد
@@ -191,39 +191,39 @@ export default function ProjectsClient() {
                             <Link
                                 href={`/studio/${project.id}`}
                                 key={project.id}
-                                className="group relative bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-200 overflow-hidden cursor-pointer"
+                                className="group relative bg-studio-panel-light dark:bg-studio-panel rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-studio-border-light dark:border-studio-border overflow-hidden cursor-pointer"
                             >
-                                <div className="h-2 bg-blue-500"></div>
-                                
+                                <div className="h-2 bg-studio-accent"></div>
+
                                 <div className="p-6">
-                                    <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center mb-4">
-                                        <Folder className="w-8 h-8 text-blue-600" />
+                                    <div className="w-14 h-14 bg-studio-accent/20 rounded-xl flex items-center justify-center mb-4">
+                                        <Folder className="w-8 h-8 text-studio-accent" />
                                     </div>
 
-                                    <h2 className="text-xl font-bold text-gray-800 mb-2 truncate group-hover:text-blue-600 transition-colors">
+                                    <h2 className="text-xl font-bold text-studio-text-light dark:text-studio-text mb-2 truncate group-hover:text-studio-accent transition-colors">
                                         {project.name || "مشروع بدون عنوان"}
                                     </h2>
-                                    
-                                    <p className="text-sm text-gray-600 mb-4 line-clamp-2 h-10">
+
+                                    <p className="text-sm text-studio-text-light/70 dark:text-studio-text/70 mb-4 line-clamp-2 h-10">
                                         {project.description || "لا يوجد وصف"}
                                     </p>
-                                    
-                                    <div className="flex items-center gap-2 text-xs text-gray-400 mb-4">
+
+                                    <div className="flex items-center gap-2 text-xs text-studio-text-light/50 dark:text-studio-text/50 mb-4">
                                         <Clock className="w-4 h-4" />
                                         <span>تم الإنشاء: {new Date(project.crated_at).toLocaleDateString('ar-EG')}</span>
                                     </div>
 
-                                    <div className="flex gap-2 transition-opacity duration-300 pt-2 border-t border-gray-100">
-                                        <button 
+                                    <div className="flex gap-2 transition-opacity duration-300 pt-2 border-t border-studio-border-light/50 dark:border-studio-border/50">
+                                        <button
                                             onClick={(e) => handleEditClick(project, e)}
-                                            className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-blue-100 hover:text-blue-600 transition-colors text-sm font-medium"
+                                            className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-studio-bg-light/50 dark:bg-studio-bg/50 text-studio-text-light dark:text-studio-text rounded-lg hover:bg-studio-accent/20 hover:text-studio-accent transition-colors text-sm font-medium"
                                         >
                                             <Edit className="w-4 h-4" />
                                             تعديل
                                         </button>
-                                        <button 
+                                        <button
                                             onClick={(e) => handleDeleteClick(project, e)}
-                                            className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-red-100 hover:text-red-600 transition-colors text-sm font-medium"
+                                            className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-studio-bg-light/50 dark:bg-studio-bg/50 text-studio-text-light dark:text-studio-text rounded-lg hover:bg-red-100 hover:text-red-600 transition-colors text-sm font-medium"
                                         >
                                             <Trash2 className="w-4 h-4" />
                                             حذف
@@ -235,13 +235,13 @@ export default function ProjectsClient() {
                     </div>
                 ) : (
                     <div className="text-center py-20">
-                        <div className="inline-block p-8 bg-white rounded-3xl shadow-lg mb-6">
-                            <Folder className="w-20 h-20 text-gray-300 mx-auto mb-4" />
-                            <h3 className="text-2xl font-bold text-gray-800 mb-2">لا توجد مشاريع بعد</h3>
-                            <p className="text-gray-600 mb-6">ابدأ بإنشاء مشروعك الأول الآن!</p>
+                        <div className="inline-block p-8 bg-studio-panel-light dark:bg-studio-panel rounded-3xl shadow-lg mb-6 border border-studio-border-light dark:border-studio-border">
+                            <Folder className="w-20 h-20 text-studio-border dark:text-studio-border mx-auto mb-4" />
+                            <h3 className="text-2xl font-bold text-studio-text-light dark:text-studio-text mb-2">لا توجد مشاريع بعد</h3>
+                            <p className="text-studio-text-light/70 dark:text-studio-text/70 mb-6">ابدأ بإنشاء مشروعك الأول الآن!</p>
                             <button
                                 onClick={openCreateModal}
-                                className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all duration-300 transform hover:scale-105"
+                                className="inline-flex items-center gap-2 px-6 py-3 bg-studio-accent hover:bg-studio-accent/90 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
                             >
                                 <FilePlus className="w-5 h-5" />
                                 إنشاء مشروع جديد
@@ -249,7 +249,7 @@ export default function ProjectsClient() {
                         </div>
                     </div>
                 )}
-                
+
                 <div className="mt-16 border-t-2 border-gray-200 pt-12">
                     <div className="text-center mb-12">
                         <div className="inline-flex items-center gap-2 bg-yellow-100 text-yellow-800 border border-yellow-200 px-6 py-2 rounded-full font-bold mb-4">
@@ -261,23 +261,23 @@ export default function ProjectsClient() {
                         </h2>
                         <p className="text-xl text-gray-600">ميزات متقدمة قادمة لتعزيز إنتاجك الصوتي</p>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {upcomingFeatures.map((feature, index) => (
-                            <div 
-                                key={index} 
-                                className="relative p-6 bg-white rounded-2xl shadow-lg border-2 border-dashed border-gray-300 hover:border-blue-400 transition-all duration-300 transform hover:scale-105"
+                            <div
+                                key={index}
+                                className="relative p-6 bg-studio-panel-light dark:bg-studio-panel rounded-2xl shadow-lg border-2 border-dashed border-studio-border-light dark:border-studio-border hover:border-studio-accent transition-all duration-300 transform hover:scale-105"
                             >
                                 <div className="flex items-start gap-4">
-                                    <div className="flex-shrink-0 w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center">
-                                        <feature.icon className="w-8 h-8 text-blue-600" />
+                                    <div className="flex-shrink-0 w-14 h-14 bg-studio-accent/20 rounded-xl flex items-center justify-center">
+                                        <feature.icon className="w-8 h-8 text-studio-accent" />
                                     </div>
-                                    
+
                                     <div className="flex-1">
-                                        <h3 className="text-lg font-bold text-gray-800 mb-2">
+                                        <h3 className="text-lg font-bold text-studio-text-light dark:text-studio-text mb-2">
                                             {feature.title}
                                         </h3>
-                                        <p className="text-sm text-gray-600 leading-relaxed">
+                                        <p className="text-sm text-studio-text-light/70 dark:text-studio-text/70 leading-relaxed">
                                             {feature.description}
                                         </p>
                                     </div>
@@ -289,17 +289,17 @@ export default function ProjectsClient() {
             </main>
 
             {showCreateOrEditModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowCreateOrEditModal(false)}>
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-                        <div className="bg-gray-100 p-6 rounded-t-2xl">
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => setShowCreateOrEditModal(false)}>
+                    <div className="bg-[#2a2a2a] dark:bg-[#2a2a2a] rounded-2xl shadow-2xl w-full max-w-md border border-gray-700 animate-scale-in" onClick={e => e.stopPropagation()}>
+                        <div className="bg-[#333] dark:bg-[#333] p-6 rounded-t-2xl border-b border-gray-700">
                             <div className="flex items-center justify-between">
-                                <h2 className="text-xl font-bold flex items-center gap-2 text-gray-800">
-                                    {projectToEdit ? <Edit className="w-6 h-6" /> : <FilePlus className="w-6 h-6" />}
+                                <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+                                    {projectToEdit ? <Edit className="w-6 h-6 text-[#F48969]" /> : <FilePlus className="w-6 h-6 text-[#F48969]" />}
                                     {projectToEdit ? "تعديل المشروع" : "مشروع جديد"}
                                 </h2>
                                 <button
                                     onClick={() => setShowCreateOrEditModal(false)}
-                                    className="p-2 text-gray-500 hover:bg-gray-200 rounded-full transition-colors"
+                                    className="p-2 text-gray-400 hover:text-white hover:bg-gray-600 rounded-full transition-colors"
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
@@ -309,7 +309,7 @@ export default function ProjectsClient() {
                         <form onSubmit={projectToEdit ? handleUpdateProject : handleCreateProject} className="p-6">
                             <div className="space-y-5">
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    <label className="block text-sm font-semibold text-gray-300 mb-2">
                                         اسم المشروع *
                                     </label>
                                     <input
@@ -317,37 +317,37 @@ export default function ProjectsClient() {
                                         value={newProjectName}
                                         onChange={(e) => setNewProjectName(e.target.value)}
                                         placeholder="أدخل اسم المشروع..."
-                                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
+                                        className="w-full px-4 py-3 bg-[#1F1F1F] border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:border-[#F48969] focus:ring-1 focus:ring-[#F48969] focus:outline-none transition-all"
                                         autoFocus
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    <label className="block text-sm font-semibold text-gray-300 mb-2">
                                         الوصف (اختياري)
                                     </label>
                                     <textarea
                                         value={newProjectDescription}
                                         onChange={(e) => setNewProjectDescription(e.target.value)}
                                         placeholder="أضف وصفاً للمشروع..."
-                                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors resize-none"
+                                        className="w-full px-4 py-3 bg-[#1F1F1F] border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:border-[#F48969] focus:ring-1 focus:ring-[#F48969] focus:outline-none transition-all resize-none"
                                         rows={3}
                                     />
                                 </div>
                             </div>
 
-                            <div className="flex gap-3 mt-6">
+                            <div className="flex gap-3 mt-8">
                                 <button
                                     type="button"
                                     onClick={() => setShowCreateOrEditModal(false)}
-                                    className="flex-1 px-6 py-3 bg-gray-200 text-gray-800 font-semibold rounded-xl hover:bg-gray-300 transition-colors"
+                                    className="flex-1 px-6 py-3 bg-transparent border border-gray-600 text-gray-300 font-semibold rounded-xl hover:bg-gray-700 hover:text-white transition-colors"
                                 >
                                     إلغاء
                                 </button>
-                                <button 
-                                    type="submit" 
-                                    disabled={isSubmitting || !newProjectName.trim()} 
-                                    className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2"
+                                <button
+                                    type="submit"
+                                    disabled={isSubmitting || !newProjectName.trim()}
+                                    className="flex-1 px-6 py-3 bg-[#F48969] hover:bg-[#e07555] text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-orange-900/20"
                                 >
                                     {isSubmitting ? (
                                         <>
@@ -399,9 +399,9 @@ export default function ProjectsClient() {
                                 >
                                     إلغاء
                                 </button>
-                                <button 
-                                    onClick={confirmDelete} 
-                                    disabled={isDeleting} 
+                                <button
+                                    onClick={confirmDelete}
+                                    disabled={isDeleting}
                                     className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl disabled:opacity-50 transition-all duration-300 flex items-center justify-center gap-2"
                                 >
                                     {isDeleting ? (

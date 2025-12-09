@@ -15,6 +15,8 @@ interface WaveformSegmentProps {
   onTrim?: (segmentId: string, startTime: number, endTime: number) => void;
   onDelete?: (segmentId: string) => void;
   segmentId?: string;
+  onClick?: () => void;
+  onDurationLoaded?: (duration: number) => void;
 }
 
 const WaveformSegment: React.FC<WaveformSegmentProps> = ({
@@ -27,7 +29,9 @@ const WaveformSegment: React.FC<WaveformSegmentProps> = ({
   onSeek,
   onTrim,
   onDelete,
-  segmentId
+  segmentId,
+  onClick,
+  onDurationLoaded
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -43,117 +47,137 @@ const WaveformSegment: React.FC<WaveformSegmentProps> = ({
   useEffect(() => {
     let mounted = true;
 
-const loadAndGenerateWaveform = async () => {
-  try {
-    console.log("🎵 بدء تحميل الموجة لـ:", audioUrl);
+    const loadAndGenerateWaveform = async () => {
+      try {
+        console.log("🎵 بدء تحميل الموجة لـ:", audioUrl);
 
-    // ✅ التحقق من صحة الرابط
-    if (!audioUrl || typeof audioUrl !== "string" || audioUrl.trim() === "") {
-      console.warn("❗ رابط الصوت غير صالح:", audioUrl);
-      setIsLoaded(true); // عرض حالة فارغة بدلاً من التحميل اللانهائي
-      return;
-    }
+        if (!audioUrl || typeof audioUrl !== "string" || audioUrl.trim() === "") {
+          setIsLoaded(true);
+          return;
+        }
 
-    // ✅ التحقق من صحة تنسيق الرابط
-    if (!audioUrl.startsWith("blob:") && !audioUrl.startsWith("http://") && !audioUrl.startsWith("https://")) {
-      console.warn("❗ تنسيق رابط الصوت غير مدعوم:", audioUrl);
-      setIsLoaded(true);
-      return;
-    }
+        let arrayBuffer: ArrayBuffer | null = null;
 
-    let arrayBuffer: ArrayBuffer;
+        // 1. Fetch Audio Bytes (Handle Blob vs Remote)
+        if (audioUrl.startsWith("blob:")) {
+          console.log("📦 جارٍ قراءة blob مباشرة...");
+          const response = await fetch(audioUrl);
+          if (!response.ok) throw new Error(`فشل قراءة blob: ${response.status}`);
+          arrayBuffer = await response.arrayBuffer();
+        } else {
+          // 🔗 روابط Wasabi أو سيرفر - نستخدم البروكسي لتجاوز مشاكل CORS/403
+          console.log("🌐 جارٍ تحميل من الخادم عبر البروكسي...");
+          const proxyUrl = `/api/proxy-audio?url=${encodeURIComponent(audioUrl)}`;
+          const response = await fetch(proxyUrl);
+          if (!response.ok) throw new Error(`فشل تحميل الصوت: ${response.status}`);
+          arrayBuffer = await response.arrayBuffer();
+        }
 
-    // ✅ التعامل مع blob URLs مباشرة
-    if (audioUrl.startsWith("blob:")) {
-      console.log("📦 جارٍ قراءة blob مباشرة...");
-      const response = await fetch(audioUrl);
-      if (!response.ok) {
-        throw new Error(`فشل قراءة blob: ${response.status} ${response.statusText}`);
+        if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+          throw new Error("ملف الصوت فارغ أو تالف");
+        }
+
+        // --- Calculate Duration ---
+        try {
+          const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          // Decode a copy of the buffer to allow reused for waveform generation
+          const decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+          if (onDurationLoaded) {
+            // Call with a small delay to avoid state update overlaps or ensure parent is ready
+            setTimeout(() => onDurationLoaded(decodedBuffer.duration), 0);
+          }
+        } catch (durErr) {
+          console.warn("فشل حساب مدة الصوت:", durErr);
+        }
+        // ---------------------------
+
+        // 2. Try Rust Wasm Engine First
+        try {
+          console.log("🦀 استخدام WebAssembly Waveform Engine...");
+          // Dynamic import to avoid SSR issues if any
+          const { generateWaveform } = await import('@/lib/wasm-loader');
+          const peaks = await generateWaveform(new Uint8Array(arrayBuffer), 300);
+
+          if (peaks && peaks.length > 0) {
+            console.log("✅ تم توليد الموجة بواسطة Wasm:", peaks.length);
+            setWaveformData(Array.from(peaks)); // Convert Float32Array to number[]
+            setIsLoaded(true);
+            return;
+          }
+        } catch (wasmErr) {
+          console.warn("⚠️ فشل Wasm Engine، العودة للطريقة التقليدية:", wasmErr);
+        }
+
+        // 3. Fallback to AudioContext (Browser Native)
+        console.log("🔄 استخدام Web Audio API (Client-side)...");
+
+
+        // ✅ التحقق من وجود بيانات
+        if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+          throw new Error("ملف الصوت فارغ أو تالف");
+        }
+
+        // 🎧 إنشاء AudioContext
+        if (!audioContextRef.current) {
+          audioContextRef.current = new (window.AudioContext ||
+            (window as any).webkitAudioContext)();
+        }
+
+        // 🔍 فك تشفير الصوت
+        const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
+
+        if (!mounted) return;
+
+        // 🎨 توليد الموجة
+        const rawData = audioBuffer.getChannelData(0);
+        const samples = 300;
+        const blockSize = Math.floor(rawData.length / samples);
+        const filteredData: number[] = [];
+
+        for (let i = 0; i < samples; i++) {
+          let sum = 0;
+          for (let j = 0; j < blockSize; j++) {
+            const index = i * blockSize + j;
+            if (index < rawData.length) sum += Math.abs(rawData[index]);
+          }
+          filteredData.push(sum / blockSize);
+        }
+
+        const maxAmplitude = Math.max(...filteredData, 0.0001);
+        const normalized = filteredData.map((n) => Math.min(n / maxAmplitude, 1));
+
+        setWaveformData(normalized);
+        setIsLoaded(true);
+      } catch (error) {
+        console.error("❌ خطأ في توليد الموجة:", error);
+
+        // ✅ تحديد نوع الخطأ وإظهار رسالة مناسبة
+        let errorMessage = "خطأ غير معروف";
+        if (error instanceof Error) {
+          if (error.message.includes("Failed to fetch") || error.message.includes("فشل تحميل")) {
+            errorMessage = "فشل في تحميل الملف الصوتي - تحقق من الاتصال بالإنترنت";
+          } else if (error.message.includes("decode")) {
+            errorMessage = "تنسيق الملف الصوتي غير مدعوم";
+          } else if (error.message.includes("فارغ") || error.message.includes("تالف")) {
+            errorMessage = "الملف الصوتي تالف أو فارغ";
+          } else {
+            errorMessage = error.message;
+          }
+        }
+
+        console.warn("🔄 استخدام موجة احتياطية بسبب:", errorMessage);
+
+        // 🎛️ موجة احتياطية عشوائية
+        const fallbackData = Array.from({ length: 300 }, (_, i) => {
+          const base = Math.sin(i / 10) * 0.5 + 0.5;
+          const noise = Math.random() * 0.3;
+          return Math.max(0.1, Math.min(1, base + noise));
+        });
+
+        setWaveformData(fallbackData);
+        setIsLoaded(true);
       }
-      arrayBuffer = await response.arrayBuffer();
-    } else {
-      // 🔗 روابط Wasabi أو سيرفر
-      console.log("🌐 جارٍ تحميل من الخادم...");
-      const response = await fetch(audioUrl);
-      if (!response.ok) {
-        throw new Error(`فشل تحميل الصوت: ${response.status} ${response.statusText}`);
-      }
-      arrayBuffer = await response.arrayBuffer();
-    }
-
-    // ✅ التحقق من وجود بيانات
-    if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-      throw new Error("ملف الصوت فارغ أو تالف");
-    }
-
-    // 🎧 إنشاء AudioContext
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext ||
-        (window as any).webkitAudioContext)();
-    }
-
-    // 🔍 فك تشفير الصوت
-    const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
-
-    if (!mounted) return;
-
-    console.log("✅ تم فك تشفير الصوت:", {
-      duration: audioBuffer.duration,
-      sampleRate: audioBuffer.sampleRate,
-      channels: audioBuffer.numberOfChannels,
-    });
-
-    // 🎨 توليد الموجة
-    const rawData = audioBuffer.getChannelData(0);
-    const samples = 300;
-    const blockSize = Math.floor(rawData.length / samples);
-    const filteredData: number[] = [];
-
-    for (let i = 0; i < samples; i++) {
-      let sum = 0;
-      for (let j = 0; j < blockSize; j++) {
-        const index = i * blockSize + j;
-        if (index < rawData.length) sum += Math.abs(rawData[index]);
-      }
-      filteredData.push(sum / blockSize);
-    }
-
-    const maxAmplitude = Math.max(...filteredData, 0.0001);
-    const normalized = filteredData.map((n) => Math.min(n / maxAmplitude, 1));
-
-    console.log("✅ تم إنشاء الموجة بنجاح:", normalized.length, "نقطة");
-    setWaveformData(normalized);
-    setIsLoaded(true);
-  } catch (error) {
-    console.error("❌ خطأ في توليد الموجة:", error);
-    
-    // ✅ تحديد نوع الخطأ وإظهار رسالة مناسبة
-    let errorMessage = "خطأ غير معروف";
-    if (error instanceof Error) {
-      if (error.message.includes("Failed to fetch") || error.message.includes("فشل تحميل")) {
-        errorMessage = "فشل في تحميل الملف الصوتي - تحقق من الاتصال بالإنترنت";
-      } else if (error.message.includes("decode")) {
-        errorMessage = "تنسيق الملف الصوتي غير مدعوم";
-      } else if (error.message.includes("فارغ") || error.message.includes("تالف")) {
-        errorMessage = "الملف الصوتي تالف أو فارغ";
-      } else {
-        errorMessage = error.message;
-      }
-    }
-    
-    console.warn("🔄 استخدام موجة احتياطية بسبب:", errorMessage);
-
-    // 🎛️ موجة احتياطية عشوائية
-    const fallbackData = Array.from({ length: 300 }, (_, i) => {
-      const base = Math.sin(i / 10) * 0.5 + 0.5;
-      const noise = Math.random() * 0.3;
-      return Math.max(0.1, Math.min(1, base + noise));
-    });
-
-    setWaveformData(fallbackData);
-    setIsLoaded(true);
-  }
-};
+    };
 
 
 
@@ -265,6 +289,7 @@ const loadAndGenerateWaveform = async () => {
       // النقر العادي للانتقال
       console.log('🎯 النقر على الموجة:', clickedTime.toFixed(2), 'ثانية');
       onSeek(clickedTime);
+      onClick?.();
     }
   };
 
@@ -392,10 +417,11 @@ const loadAndGenerateWaveform = async () => {
 
       {/* شاشة التحميل */}
       {!isLoaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 backdrop-blur-sm">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-[2px]">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-            <span className="text-sm text-gray-700 font-semibold">جاري تحليل الصوت...</span>
+            <div className="w-8 h-8 border-4 border-[#F48969]/30 border-t-[#F48969] rounded-full animate-spin"></div>
+            {/* Optional: Text removed for cleaner look or styled to match */}
+            {/* <span className="text-xs text-white/80 font-medium tracking-wide">جارٍ التحميل...</span> */}
           </div>
         </div>
       )}

@@ -1,7 +1,6 @@
 // src/app/api/project/save-editor-blocks/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { executeGraphQL } from '@/lib/graphql';
-import { UPDATE_PROJECT_BLOCKS } from '@/lib/graphql';
+import { executeGraphQL, UPSERT_PROJECT_BLOCKS } from '@/lib/graphql';
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,11 +24,27 @@ export async function POST(request: NextRequest) {
       return true;
     });
 
+    // Prepare blocks for upsert
+    const blocksToUpsert = filteredBlocks.map((block: any) => ({
+      id: block.id,
+      project_id: projectId,
+      block_index: block.block_index,
+      // Ensure content is a string since DB column is text
+      content: typeof block.content === 'object' ? JSON.stringify(block.content) : block.content,
+      voice: block.voice,
+      provider: block.provider,
+      s3_url: block.s3_url || '', // Ensure s3_url is not null
+      // Duration removed due to DB schema mismatch/permission issues
+      // duration: typeof block.duration === 'number' && !Number.isInteger(block.duration)
+      //   ? Math.round(block.duration * 1000)
+      //   : block.duration,
+      created_at: block.created_at || new Date().toISOString(),
+    }));
+
     const response = await executeGraphQL({
-      query: UPDATE_PROJECT_BLOCKS,
+      query: UPSERT_PROJECT_BLOCKS,
       variables: {
-        id: projectId,
-        blocks_json: filteredBlocks,
+        blocks: blocksToUpsert,
       },
       headers: {
         'x-hasura-admin-secret': adminSecret,

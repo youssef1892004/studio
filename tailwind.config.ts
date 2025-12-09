@@ -9,6 +9,27 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      colors: {
+        studio: {
+          bg: {
+            DEFAULT: '#3A3A3A',
+            light: '#CDCDCC',
+          },
+          panel: {
+            DEFAULT: '#706F6F',
+            light: '#C9C9C9',
+          },
+          border: {
+            DEFAULT: '#8E8D8D',
+            light: '#B2B1B1',
+          },
+          accent: '#F48969',
+          text: {
+            DEFAULT: '#E5E5E5',
+            light: '#374151',
+          },
+        },
+      },
       keyframes: {
         fadeInDown: {
           "0%": { opacity: "0", transform: "translateY(-30px)" },

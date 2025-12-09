@@ -17,15 +17,20 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 // المكون المزود للسياق (The Provider Component)
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
-  // [تعديل] القيمة الأولية هي light لضمان عدم وجود وميض
-  const [theme, setThemeState] = useState<Theme>('light');
+  // [تعديل] القيمة الأولية هي dark لضمان عدم وجود وميض
+  const [theme, setThemeState] = useState<Theme>('dark');
   const [mounted, setMounted] = useState(false);
 
   // 1. useEffect للتحميل الأولي وحفظ التفضيل
   useEffect(() => {
     if (typeof window !== 'undefined') {
-        // [FIX] فرض الوضع الفاتح دائماً، وتجاهل localStorage وتفضيلات النظام
-        setThemeState('light');
+      // استرجاع التفضيل المحفوظ أو استخدام الوضع الداكن كافتراضي
+      const savedTheme = localStorage.getItem('theme') as Theme;
+      if (savedTheme) {
+        setThemeState(savedTheme);
+      } else {
+        setThemeState('dark');
+      }
     }
     setMounted(true);
   }, []);
@@ -39,25 +44,23 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     // إزالة الكلاسين القديمين وإضافة الكلاس الجديد
     root.classList.remove('light', 'dark');
     root.classList.add(theme);
-    // حفظ التفضيل الجديد (لحفظ تفضيل الوضع الفاتح)
+    // حفظ التفضيل الجديد
     localStorage.setItem('theme', theme);
   }, [theme, mounted]);
 
   // دالة تحديث الثيم
   const setTheme = (newTheme: Theme) => {
-    // [FIX] منع التحديث وفرض الوضع الفاتح
-    setThemeState('light');
+    setThemeState(newTheme);
   };
-  
+
   // دالة التبديل بين الوضعين
   const toggleTheme = () => {
-    // [FIX] منع التبديل وفرض الوضع الفاتح
-    setThemeState('light');
+    setThemeState(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
   if (!mounted) {
     // هذا يمنع أي وميض (flickering) أثناء جلب الثيم من localStorage
-    return <>{children}</>; 
+    return <>{children}</>;
   }
 
   return (

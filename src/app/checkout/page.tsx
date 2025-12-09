@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import Button from '@/components/ui/button';
+import Button from '@/components/ui/Button';
 import { useAuth } from '@/contexts/AuthContext';
 import { executeGraphQL } from '@/lib/graphql';
 import CenteredLoader from '@/components/CenteredLoader';
@@ -195,7 +195,7 @@ const CheckoutPageContent = () => {
           {/* Left Column: Plan Details & Payment */}
           <div className="bg-white rounded-2xl shadow-lg p-8">
             <h2 className="text-2xl font-bold text-gray-800 mb-6">ملخص الطلب</h2>
-            
+
             <div className="border border-gray-200 rounded-lg p-6 mb-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-semibold text-gray-800">{plan.name}</h3>
@@ -279,9 +279,9 @@ const CheckoutPageContent = () => {
 
 // Wrap with Suspense because useSearchParams requires it.
 const CheckoutPage = () => (
-    <Suspense fallback={<CenteredLoader message="جاري تحميل صفحة الدفع..." />}>
-        <CheckoutPageContent />
-    </Suspense>
+  <Suspense fallback={<CenteredLoader message="جاري تحميل صفحة الدفع..." />}>
+    <CheckoutPageContent />
+  </Suspense>
 );
 
 export default CheckoutPage;

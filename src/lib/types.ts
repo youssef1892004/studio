@@ -23,10 +23,13 @@ export interface StudioBlock {
   content: OutputData;
   s3_url?: string;
   created_at: string;
-  
-  
+  voice?: string;
+  provider?: string;
+  speed?: number;
+  pitch?: number;
+
   // Frontend-only state
-  voice: string;
+  // voice: string; // Moved to backend
   audioUrl?: string;      // Temporary URL for client-side playback
   duration?: number;
   isGenerating?: boolean;
@@ -61,6 +64,7 @@ export interface Project {
   crated_at: string;
   user_id: string;
   blocks_json?: any;
+  image_url?: any;
 }
 
 export interface Subscription {

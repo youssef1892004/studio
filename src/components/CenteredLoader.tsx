@@ -9,10 +9,15 @@ interface CenteredLoaderProps {
 
 export default function CenteredLoader({ message }: CenteredLoaderProps) {
   return (
-    <div className="flex flex-col items-center justify-center h-screen w-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-      <div className="flex flex-col items-center p-8 bg-white dark:bg-gray-800 rounded-xl shadow-2xl transition-colors duration-200">
-        <LoaderCircle className="w-10 h-10 text-blue-600 dark:text-blue-400 animate-spin" />
-        <p className="mt-4 text-lg font-medium text-gray-700 dark:text-gray-200">{message}</p>
+    <div className="flex flex-col items-center justify-center h-screen w-screen bg-studio-bg dark:bg-studio-bg transition-colors duration-200">
+      <div className="flex flex-col items-center p-8 transition-colors duration-200 space-y-4">
+        <div className="relative">
+          <div className="w-12 h-12 border-4 border-studio-accent/20 border-t-studio-accent rounded-full animate-spin"></div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-2 h-2 bg-studio-accent rounded-full animate-pulse"></div>
+          </div>
+        </div>
+        <p className="text-lg font-medium text-studio-text dark:text-studio-text animate-pulse">{message}</p>
       </div>
     </div>
   );

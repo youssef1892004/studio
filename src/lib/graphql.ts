@@ -1,9 +1,10 @@
 // src/lib/graphql.ts
 import { SubscriptionClient } from 'subscriptions-transport-ws';
 import { Project, StudioBlock } from "./types";
+import { getEnv } from "./env";
 
-const HASURA_GRAPHQL_URL = process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL;
-const HASURA_ADMIN_SECRET = process.env.NEXT_PUBLIC_HASURA_ADMIN_SECRET;
+const HASURA_GRAPHQL_URL = getEnv('NEXT_PUBLIC_HASURA_GRAPHQL_URL');
+const HASURA_ADMIN_SECRET = getEnv('NEXT_PUBLIC_HASURA_ADMIN_SECRET');
 
 interface GraphQLResponse<T> {
   data?: T;
@@ -40,7 +41,7 @@ async function fetchGraphQL<T>(query: string, variables: Record<string, any>): P
   if (!HASURA_GRAPHQL_URL || !HASURA_ADMIN_SECRET) {
     throw new Error("Required Hasura environment variables (NEXT_PUBLIC_HASURA_GRAPHQL_URL, NEXT_PUBLIC_HASURA_ADMIN_SECRET) are not set. Please check your environment variable configuration (.env.local for local development, or your hosting provider settings for production).");
   }
-  
+
   const response = await fetch(HASURA_GRAPHQL_URL, {
     method: 'POST',
     headers: {
@@ -58,39 +59,39 @@ async function fetchGraphQL<T>(query: string, variables: Record<string, any>): P
 }
 
 interface ExecuteGraphQLOptions {
-    query: string;
-    variables?: Record<string, any>;
-    headers?: Record<string, string>;
-  }
-  
+  query: string;
+  variables?: Record<string, any>;
+  headers?: Record<string, string>;
+}
+
 export async function executeGraphQL<T>({ query, variables, headers = {} }: ExecuteGraphQLOptions): Promise<GraphQLResponse<T>> {
-    if (!HASURA_GRAPHQL_URL) {
-        throw new Error("Required Hasura environment variable (NEXT_PUBLIC_HASURA_GRAPHQL_URL) is not set.");
-    }
+  if (!HASURA_GRAPHQL_URL) {
+    throw new Error("Required Hasura environment variable (NEXT_PUBLIC_HASURA_GRAPHQL_URL) is not set.");
+  }
 
-    const defaultHeaders: Record<string, string> = {
-        'Content-Type': 'application/json',
-    };
+  const defaultHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
 
-    // Add admin secret if it's available and no other authorization is provided
-    if (HASURA_ADMIN_SECRET && !headers['Authorization'] && !headers['x-hasura-admin-secret']) {
-        defaultHeaders['x-hasura-admin-secret'] = HASURA_ADMIN_SECRET;
-    }
+  // Add admin secret if it's available and no other authorization is provided
+  if (HASURA_ADMIN_SECRET && !headers['Authorization'] && !headers['x-hasura-admin-secret']) {
+    defaultHeaders['x-hasura-admin-secret'] = HASURA_ADMIN_SECRET;
+  }
 
-    const response = await fetch(HASURA_GRAPHQL_URL, {
-        method: 'POST',
-        headers: {
-        ...defaultHeaders,
-        ...headers,
-        },
-        body: JSON.stringify({ query, variables }),
-    });
+  const response = await fetch(HASURA_GRAPHQL_URL, {
+    method: 'POST',
+    headers: {
+      ...defaultHeaders,
+      ...headers,
+    },
+    body: JSON.stringify({ query, variables }),
+  });
 
-    if (!response.ok) {
-        throw new Error(`Network error: ${response.status} ${response.statusText}`);
-    }
+  if (!response.ok) {
+    throw new Error(`Network error: ${response.status} ${response.statusText}`);
+  }
 
-    return response.json();
+  return response.json();
 }
 
 
@@ -110,18 +111,32 @@ export const getProjectsByUserId = async (userId: string, token: string): Promis
     }
   `;
   const response = await executeGraphQL<{ Voice_Studio_projects: Project[] }>({
-      query,
-      variables: { userId },
-      headers: {
-          'Authorization': `Bearer ${token}`
-      }
+    query,
+    variables: { userId },
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
   });
   if (response.errors) throw new Error(response.errors[0].message);
   return response.data?.Voice_Studio_projects || [];
 };
 
+export const INSERT_ASSET = `
+  mutation InsertAsset($image_url: jsonb, $video_url: jsonb, $voice_url: jsonb, $project_id: uuid) {
+    insert_Voice_Studio_Asset(objects: {image_url: $image_url, video_url: $video_url, voice_url: $voice_url, project_id: $project_id}) {
+          returning {
+            id
+            project_id
+            image_url
+            video_url
+            voice_url
+          }
+        }
+      }
+    `;
+
 export const insertProject = async (name: string, description: string, token: string): Promise<Project> => {
-    const mutation = `
+  const mutation = `
       mutation InsertProjects($description: String, $name: String, $crated_at: timestamptz!) {
         insert_Voice_Studio_projects(objects: {description: $description, name: $name, crated_at: $crated_at}) {
           returning {
@@ -134,20 +149,20 @@ export const insertProject = async (name: string, description: string, token: st
         }
       }
     `;
-    const variables = {
-      name: name,
-      description: description,
-      crated_at: new Date().toISOString(),
-    };
-    const response = await executeGraphQL<{ insert_Voice_Studio_projects: { returning: Project[] } }>({
-        query: mutation, 
-        variables,
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
-    });
-    if (response.errors) throw new Error(response.errors[0].message);
-    return response.data!.insert_Voice_Studio_projects.returning[0];
+  const variables = {
+    name: name,
+    description: description,
+    crated_at: new Date().toISOString(),
+  };
+  const response = await executeGraphQL<{ insert_Voice_Studio_projects: { returning: Project[] } }>({
+    query: mutation,
+    variables,
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
+  if (response.errors) throw new Error(response.errors[0].message);
+  return response.data!.insert_Voice_Studio_projects.returning[0];
 };
 
 export const UPDATE_PROJECT_BLOCKS = `
@@ -162,8 +177,20 @@ export const UPDATE_PROJECT_BLOCKS = `
   }
 `;
 
+export const UPDATE_PROJECT_ASSETS = `
+  mutation UpdateProjectAssets($id: uuid!, $image_url: jsonb!) {
+    update_Voice_Studio_projects_by_pk(
+      pk_columns: {id: $id}, 
+      _set: {image_url: $image_url}
+    ) {
+      id
+      image_url
+    }
+  }
+`;
+
 export const getProjectById = async (projectId: string): Promise<Project | null> => {
-    const query = `
+  const query = `
       query GetProjectById($id: uuid!) {
         Voice_Studio_projects_by_pk(id: $id) {
           id
@@ -175,9 +202,9 @@ export const getProjectById = async (projectId: string): Promise<Project | null>
         }
       }
     `;
-    const response = await fetchGraphQL<{ Voice_Studio_projects_by_pk: Project }>(query, { id: projectId });
-    if (response.errors) throw new Error(response.errors[0].message);
-    return response.data?.Voice_Studio_projects_by_pk || null;
+  const response = await fetchGraphQL<{ Voice_Studio_projects_by_pk: Project }>(query, { id: projectId });
+  if (response.errors) throw new Error(response.errors[0].message);
+  return response.data?.Voice_Studio_projects_by_pk || null;
 }
 
 export const DELETE_PROJECT_BLOCKS = `
@@ -194,7 +221,7 @@ export const UPSERT_PROJECT_BLOCKS = `
       objects: $blocks,
       on_conflict: {
         constraint: blocks_pkey,
-        update_columns: [content, s3_url, voice]
+        update_columns: [content, s3_url, voice, provider]
       }
     ) {
       affected_rows
@@ -205,62 +232,74 @@ export const UPSERT_PROJECT_BLOCKS = `
   }
 `;
 
+export const GET_ASSETS = `
+  query GetAssetsV2($project_id: uuid!) {
+  Voice_Studio_Asset(where: { project_id: { _eq: $project_id } }, order_by: { id: desc }) {
+    id
+    project_id
+    image_url
+    video_url
+    voice_url
+  }
+}
+`;
+
 export const DELETE_UNUSED_BLOCKS = `
   mutation DeleteUnusedBlocks($projectId: uuid!, $activeBlockIds: [uuid!]!) {
-    delete_Voice_Studio_blocks(
-      where: {
-        project_id: {_eq: $projectId},
-        id: {_nin: $activeBlockIds}
-      }
-    ) {
-      affected_rows
-    }
+  delete_Voice_Studio_blocks(
+    where: {
+    project_id: { _eq: $projectId },
+    id: { _nin: $activeBlockIds }
   }
+  ) {
+    affected_rows
+  }
+}
 `;
 
 export const updateProject = async (projectId: string, name: string, description: string, token: string) => {
-    const mutation = `
+  const mutation = `
         mutation UpdateProject($id: uuid!, $name: String, $description: String) {
-            update_Voice_Studio_projects_by_pk(pk_columns: {id: $id}, _set: {name: $name, description: $description}) {
-                id
-            }
-        }
-    `;
-    const variables = {
-        id: projectId, 
-        name: name,
-        description: description,
-    };
-    const response = await executeGraphQL({
-        query: mutation, 
-        variables,
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
-    });
-    if (response.errors) throw new Error(response.errors[0].message);
-    return response.data;
+  update_Voice_Studio_projects_by_pk(pk_columns: { id: $id }, _set: { name: $name, description: $description }) {
+    id
+  }
+}
+`;
+  const variables = {
+    id: projectId,
+    name: name,
+    description: description,
+  };
+  const response = await executeGraphQL({
+    query: mutation,
+    variables,
+    headers: {
+      'Authorization': `Bearer ${token} `
+    }
+  });
+  if (response.errors) throw new Error(response.errors[0].message);
+  return response.data;
 }
 
 export const deleteProject = async (projectId: string, token: string): Promise<{ id: string }> => {
-    const mutation = `
+  const mutation = `
         mutation DeleteProject($id: uuid!) {
-            delete_Voice_Studio_projects_by_pk(id: $id) {
-                id
-            }
-        }
-    `;
-    const variables = { id: projectId };
-    const response = await executeGraphQL<{ delete_Voice_Studio_projects_by_pk: { id: string } }>({
-        query: mutation, 
-        variables,
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
-    });
-    if (response.errors) throw new Error(response.errors[0].message);
-    if (!response.data?.delete_Voice_Studio_projects_by_pk) throw new Error("Project not found or could not be deleted.");
-    return response.data.delete_Voice_Studio_projects_by_pk;
+  delete_Voice_Studio_projects_by_pk(id: $id) {
+    id
+  }
+}
+`;
+  const variables = { id: projectId };
+  const response = await executeGraphQL<{ delete_Voice_Studio_projects_by_pk: { id: string } }>({
+    query: mutation,
+    variables,
+    headers: {
+      'Authorization': `Bearer ${token} `
+    }
+  });
+  if (response.errors) throw new Error(response.errors[0].message);
+  if (!response.data?.delete_Voice_Studio_projects_by_pk) throw new Error("Project not found or could not be deleted.");
+  return response.data.delete_Voice_Studio_projects_by_pk;
 };
 
 // --- Block Functions ---
@@ -268,20 +307,20 @@ export const deleteProject = async (projectId: string, token: string): Promise<{
 export const getAllBlocks = async (): Promise<StudioBlock[]> => {
   const query = `
     query GetBlocks {
-      Voice_Studio_blocks(order_by: { block_index: asc }) {
-        id
-        project_id
-        block_index
-        content
-        s3_url
-        created_at
-      }
-    }
-  `;
+  Voice_Studio_blocks(order_by: { block_index: asc }) {
+    id
+    project_id
+    block_index
+    content
+    s3_url
+    created_at
+  }
+}
+`;
 
   try {
     const response = await fetchGraphQL<{ Voice_Studio_blocks: any[] }>(query, {});
-    
+
     if (response.errors) {
       console.error('GraphQL errors:', response.errors);
       throw new Error(response.errors[0]?.message || 'Unknown GraphQL error');
@@ -304,20 +343,20 @@ export const getAllBlocks = async (): Promise<StudioBlock[]> => {
 export const getBlocksByProjectId = async (projectId: string): Promise<StudioBlock[]> => {
   const query = `
     query GetBlocks($projectId: uuid!) {
-      Voice_Studio_blocks(where: { project_id: { _eq: $projectId } }, order_by: { block_index: asc }) {
-        id
-        project_id
-        block_index
-        content
-        s3_url
-        created_at
-      }
-    }
-  `;
+  Voice_Studio_blocks(where: { project_id: { _eq: $projectId } }, order_by: { block_index: asc }) {
+    id
+    project_id
+    block_index
+    content
+    s3_url
+    created_at
+  }
+}
+`;
 
   try {
     const response = await fetchGraphQL<{ Voice_Studio_blocks: any[] }>(query, { projectId });
-    
+
     if (response.errors) {
       console.error('GraphQL errors:', response.errors);
       throw new Error(response.errors[0]?.message || 'Unknown GraphQL error');
@@ -360,7 +399,7 @@ export const upsertBlock = async (block: StudioBlock) => {
 
       if (!ttsResponse.ok) {
         const errText = await ttsResponse.text().catch(() => '');
-        console.warn(`TTS job creation warning: ${ttsResponse.status} ${ttsResponse.statusText} ${errText}`);
+        console.warn(`TTS job creation warning: ${ttsResponse.status} ${ttsResponse.statusText} ${errText} `);
       } else {
         console.log('TTS job created via local API');
       }
@@ -379,11 +418,11 @@ export const upsertBlock = async (block: StudioBlock) => {
 export const deleteBlock = async (blockId: string): Promise<{ id: string }> => {
   const mutation = `
     mutation DeleteBlock($id: uuid!) {
-      delete_Voice_Studio_blocks_by_pk(id: $id) {
-        id
-      }
-    }
-  `;
+  delete_Voice_Studio_blocks_by_pk(id: $id) {
+    id
+  }
+}
+`;
   const variables = { id: blockId };
   const response = await fetchGraphQL<{ delete_Voice_Studio_blocks_by_pk: { id: string } }>(mutation, variables);
   if (response.errors) throw new Error(response.errors[0].message);
@@ -395,11 +434,11 @@ export const deleteBlock = async (blockId: string): Promise<{ id: string }> => {
 export const deleteBlockByIndex = async (projectId: string, blockIndex: string): Promise<number> => {
   const mutation = `
     mutation DeleteBlockByIndex($projectId: uuid!, $blockIndex: String!) {
-      delete_Voice_Studio_blocks(where: { project_id: { _eq: $projectId }, block_index: { _eq: $blockIndex } }) {
-        affected_rows
-      }
-    }
-  `;
+  delete_Voice_Studio_blocks(where: { project_id: { _eq: $projectId }, block_index: { _eq: $blockIndex } }) {
+    affected_rows
+  }
+}
+`;
   const variables = { projectId, blockIndex };
   const response = await fetchGraphQL<{ delete_Voice_Studio_blocks: { affected_rows: number } }>(mutation, variables);
   if (response.errors) throw new Error(response.errors[0].message);
@@ -416,7 +455,7 @@ export const subscribeToBlocks = (projectId: string, callback: (blocks: StudioBl
   }
 
   const wsUrl = HASURA_GRAPHQL_URL.replace('http', 'ws');
-  
+
   const subscriptionClient = new SubscriptionClient(wsUrl, {
     reconnect: true,
     connectionParams: {
@@ -426,20 +465,47 @@ export const subscribeToBlocks = (projectId: string, callback: (blocks: StudioBl
     },
   });
 
-    const subscriptionQuery = `
+  const subscriptionQuery = `
         subscription GetBlocks($projectId: uuid!) {
-            Voice_Studio_blocks(where: {project_id: {_eq: $projectId}}, order_by: {block_index: asc}) {
-                block_index
-                s3_url
-                created_at
-                id
-                project_id
-            }
-        }
-    `;
+  Voice_Studio_blocks(where: { project_id: { _eq: $projectId } }, order_by: { block_index: asc }) {
+    block_index
+    s3_url
+    created_at
+    id
+    project_id
+    content
+    voice
+    provider
+  }
+}
+`;
 
-    return subscriptionClient.request({
-        query: subscriptionQuery,
-        variables: { projectId },
-    });
+  const observable = subscriptionClient.request({
+    query: subscriptionQuery,
+    variables: { projectId },
+  });
+
+  return observable.subscribe({
+    next: (result) => {
+      if (result.data && result.data.Voice_Studio_blocks) {
+        // Normalize content if needed, similar to getAllBlocks
+        const blocks = (result.data.Voice_Studio_blocks as any[]).map((block: any) => ({
+          ...block,
+          content: normalizeBlockContent(block.content)
+        }));
+        callback(blocks);
+      }
+    },
+    error: (error) => {
+      console.error('Subscription error object:', error);
+      if (typeof error === 'object') {
+        try {
+          console.error('Subscription error JSON:', JSON.stringify(error, null, 2));
+        } catch (e) {
+          console.error('Could not stringify error');
+        }
+      }
+      if (error?.message) console.error('Subscription error message:', error.message);
+    },
+  });
 };

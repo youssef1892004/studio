@@ -1,0 +1,17 @@
+[package]
+name = "media-engine"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+console_error_panic_hook = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+symphonia = { version = "0.5.3", features = ["mp3", "pcm", "isomp4", "aac"] }
+js-sys = "0.3"
+
+# Removed: actix-web, tokio, aws-*, dotenv, ffmpeg-next (Use web audio API or simpler codecs if needed)

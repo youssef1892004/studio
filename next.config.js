@@ -24,6 +24,14 @@ const nextConfig = {
             // Allow audio/media from blob and trusted cloud storage (Wasabi/AWS S3)
             value: "media-src 'self' blob: https://voicestudio.s3.eu-south-1.wasabisys.com https://*.wasabisys.com https://*.amazonaws.com;",
           },
+          {
+            key: "Cross-Origin-Embedder-Policy",
+            value: "require-corp",
+          },
+          {
+            key: "Cross-Origin-Opener-Policy",
+            value: "same-origin",
+          },
         ],
       },
     ]
@@ -31,7 +39,7 @@ const nextConfig = {
   webpack: (config, { isServer }) => {
     // We only need ffmpeg for merging on the server
     if (isServer) {
-      
+
 
       config.plugins.push(
         new CopyPlugin({
