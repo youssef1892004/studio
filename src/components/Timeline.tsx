@@ -24,7 +24,7 @@ interface Track {
     items: TimelineItem[];
 }
 
-interface TimelineItem {
+export interface TimelineItem {
     id: string;
     start: number;
     duration: number;

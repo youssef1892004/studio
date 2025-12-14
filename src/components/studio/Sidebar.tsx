@@ -24,7 +24,7 @@ const StudioSidebar: React.FC<StudioSidebarProps> = ({
     onItemClick
 }) => {
     return (
-        <div className="w-20 bg-studio-bg dark:bg-studio-bg border-r border-studio-border-light dark:border-studio-border flex flex-col items-center py-6 gap-4 z-20 shadow-xl">
+        <div className="w-20 bg-studio-bg dark:bg-studio-bg border-r border-studio-border-light dark:border-studio-border flex flex-col items-center py-6 gap-4 z-20 shadow-xl shrink-0">
             {sidebarItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeItem === item.id;
@@ -35,10 +35,11 @@ const StudioSidebar: React.FC<StudioSidebarProps> = ({
                         onClick={() => onItemClick?.(item.id)}
                         className={`
               group relative w-12 h-12 rounded-xl flex flex-col items-center justify-center gap-1
-              transition-all duration-300
+              transition-all duration-300 ease-out
+              hover:scale-105 active:scale-95
               ${isActive
-                                ? 'bg-studio-accent text-white shadow-[0_0_15px_rgba(244,137,105,0.4)]'
-                                : 'text-gray-500 dark:text-gray-400 hover:bg-studio-panel-light dark:hover:bg-studio-panel hover:text-studio-accent hover:shadow-[0_0_10px_rgba(244,137,105,0.2)]'
+                                ? 'bg-studio-accent text-white shadow-[0_4px_20px_rgba(244,137,105,0.5)] scale-105 ring-2 ring-studio-accent/20'
+                                : 'text-gray-500 dark:text-gray-400 hover:bg-studio-panel-light dark:hover:bg-studio-panel hover:text-studio-accent hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]'
                             }
             `}
                         title={item.label}

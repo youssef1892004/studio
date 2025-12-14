@@ -66,6 +66,29 @@ const UploadsPanel: React.FC<UploadsPanelProps> = ({ project, onAssetsUpdated })
                     const currentAssets = project.image_url || [];
                     onAssetsUpdated([...currentAssets, data.asset]);
                 }
+
+                if (data.asset) {
+                    const a = data.asset;
+                    const imageRaw = (a.image_url && a.image_url.length > 0) ? a.image_url : null;
+                    const videoRaw = (a.video_url && a.video_url.length > 0) ? a.video_url : null;
+                    const voiceRaw = (a.voice_url && a.voice_url.length > 0) ? a.voice_url : null;
+
+                    let rawUrl = imageRaw || videoRaw || voiceRaw;
+                    if (Array.isArray(rawUrl)) rawUrl = rawUrl[0];
+                    const url = typeof rawUrl === 'string' ? rawUrl : '';
+
+                    const type = imageRaw ? 'image/png' : videoRaw ? 'video/mp4' : 'audio/mp3';
+                    const name = url ? (url.split('/').pop() || 'Asset') : 'Asset';
+
+                    setDbAssets(prev => [{
+                        id: a.id,
+                        name: name,
+                        type: type,
+                        url: url,
+                        size: file.size,
+                        created_at: new Date().toISOString()
+                    }, ...prev]);
+                }
             };
         } catch (error: any) {
             console.error('Upload error:', error);
@@ -163,7 +186,7 @@ const UploadsPanel: React.FC<UploadsPanelProps> = ({ project, onAssetsUpdated })
             }
         };
         fetchAssets();
-    }, [project?.id, isUploading]); // Refresh on upload
+    }, [project?.id]); // Refresh on project change only
 
     const assets = dbAssets;
 
@@ -218,8 +241,17 @@ const UploadsPanel: React.FC<UploadsPanelProps> = ({ project, onAssetsUpdated })
                         assets.map((file: any, i: number) => (
                             <div
                                 key={i}
+                                draggable
+                                onDragStart={(e) => {
+                                    e.dataTransfer.setData('application/json', JSON.stringify({
+                                        url: file.url,
+                                        name: file.name,
+                                        type: file.type
+                                    }));
+                                    e.dataTransfer.effectAllowed = 'copy';
+                                }}
                                 onClick={() => setPreviewAsset(file)}
-                                className="flex items-center gap-3 p-3 bg-studio-panel-light dark:bg-studio-panel rounded-lg border border-studio-border-light dark:border-studio-border group hover:border-studio-accent/50 transition-colors relative cursor-pointer"
+                                className="flex items-center gap-3 p-3 bg-studio-panel-light dark:bg-studio-panel rounded-lg border border-studio-border-light dark:border-studio-border group hover:border-studio-accent/50 transition-colors relative cursor-grab active:cursor-grabbing"
                                 style={{ zIndex: activeMenuId === file.id ? 50 : 1 }}
                             >
                                 <div className="p-2 bg-black/5 dark:bg-white/5 rounded-lg">

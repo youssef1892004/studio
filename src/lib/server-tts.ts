@@ -60,6 +60,7 @@ export async function pollTTSJob(jobId: string, blockId: string, projectId: stri
         let attempts = 0;
         const maxAttempts = 60; // 2 minutes approx (2s interval)
 
+        let failReason = '';
         while (status !== 'completed' && status !== 'failed' && attempts < maxAttempts) {
             await new Promise(r => setTimeout(r, 2000));
             attempts++;
@@ -76,11 +77,14 @@ export async function pollTTSJob(jobId: string, blockId: string, projectId: stri
 
             const statusData = await statusRes.json();
             status = statusData.status;
+            if (status === 'failed') {
+                failReason = statusData.error || statusData.message || JSON.stringify(statusData);
+            }
             console.log(`[Worker] Job ${jobId} status: ${status}`);
         }
 
         if (status === 'failed') {
-            throw new Error('TTS Generation failed on remote service');
+            throw new Error(`TTS Generation failed on remote service: ${failReason}`);
         }
 
         if (status !== 'completed') {

@@ -95,10 +95,15 @@ export async function POST(request: NextRequest) {
             }
         `;
 
-        await executeGraphQL(INSERT_ASSET_MUTATION_V2, mutationVariables);
+        const result = await executeGraphQL(INSERT_ASSET_MUTATION_V2, mutationVariables);
+        const insertedAsset = result.insert_Voice_Studio_Asset?.returning?.[0];
+
+        if (!insertedAsset) {
+            throw new Error("Failed to insert asset record to database.");
+        }
 
         const newAsset = {
-            id: uuidv4(), // Note: The actual ID comes from DB, but for UI optimism we can just return what we have or await the DB result if needed. 
+            id: insertedAsset.id, // Use actual DB ID from Hasura 
             // Better to use the returned data from GraphQL if possible, but for now matching previous behavior:
             url: s3Url,
             name: fileName,

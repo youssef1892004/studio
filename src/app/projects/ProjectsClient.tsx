@@ -94,7 +94,7 @@ export default function ProjectsClient() {
         if (!newProjectName.trim() || !authContext.user?.id || !authContext.token) return;
         setIsSubmitting(true);
         try {
-            const newProject = await insertProject(newProjectName, newProjectDescription, authContext.token);
+            const newProject = await insertProject(newProjectName, newProjectDescription, authContext.user.id);
             toast.success(`تم إنشاء مشروع "${newProjectName}" بنجاح!`);
             router.push(`/studio/${newProject.id}`);
         } catch (error) {

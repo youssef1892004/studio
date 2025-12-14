@@ -7,19 +7,9 @@ import { fetchVoices } from '@/lib/tts';
 import { Voice, StudioBlock, Project } from '@/lib/types';
 import { LoaderCircle, List } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getProjectById, updateProject, subscribeToBlocks, deleteBlock, deleteBlockByIndex } from '@/lib/graphql';
+import { getProjectById, updateProject, subscribeToBlocks, deleteBlock, deleteBlockByIndex, executeGraphQL, UPDATE_PROJECT_BLOCKS } from '@/lib/graphql';
 
-// ... (lines 11-656 remain unchanged, but I can't express that in ReplacementContent easily without context. 
-// I will use two chunks if possible, or just one if I can target the import and the function separately.
-// The tool supports multiple chunks? No, replace_file_content is single chunk.
-// multi_replace_file_content is for multiple chunks. I should use that.)
 
-// Wait, I can't use multi_replace_file_content because I need to see the file content to know line numbers exactly for the import.
-// I have the file content from step 2098.
-// Import is at line 10.
-// handleDeleteBlock is at line 657.
-
-// I will use multi_replace_file_content.
 
 
 import { uploadAudioSegment } from '@/lib/tts';
@@ -29,7 +19,7 @@ import ProjectHeader from '@/components/studio/ProjectHeader';
 // import RightSidebar from '@/components/studio/RightSidebar'; // Removed
 import StudioSidebar from '@/components/studio/Sidebar';
 import Toolbar from '@/components/studio/Toolbar';
-import Timeline, { TimelineHandle } from '@/components/Timeline';
+import Timeline, { TimelineHandle, TimelineItem } from '@/components/Timeline';
 import CenteredLoader from '@/components/CenteredLoader';
 import PreviewPlayer from '@/components/studio/PreviewPlayer';
 import DynamicPanel from '@/components/studio/DynamicPanel';
@@ -47,67 +37,62 @@ export default function StudioPageClient() {
     const [voices, setVoices] = useState<(Voice & { isPro?: boolean })[]>([]);
     const [cards, setCards] = useState<StudioBlock[]>([]);
     const [isExporting, setIsExporting] = useState(false);
+    const [videoTrackItems, setVideoTrackItems] = useState<TimelineItem[]>([]);
 
     const handleExportVideo = async () => {
         setIsExporting(true);
+        const toastId = toast.loading('Initializing video export engine (WASM)...');
+
         try {
-            // Construct Timeline JSON
-            const timeline = {
-                width: 1920,
-                height: 1080,
-                fps: 30,
-                tracks: [
-                    {
-                        id: "video-track",
-                        clips: videoTrackItems.map(item => ({
-                            type: item.type === 'scene' ? 'video' : 'image',
-                            id: item.id,
-                            src: item.audioUrl || "", // We stored URL in audioUrl for now
-                            start: item.start,
-                            duration: item.duration,
-                            offset: 0,
-                            volume: 1.0
-                        }))
-                    },
-                    {
-                        id: "audio-track",
-                        clips: cards.filter(c => c.audioUrl).map(c => ({
-                            type: "audio",
-                            id: c.id,
-                            src: c.audioUrl!,
-                            start: 0, // TODO: Calculate actual start time based on sequence
-                            duration: c.duration || 0,
-                            offset: 0,
-                            volume: 1.0
-                        }))
-                    }
-                ]
-            };
+            // Dynamic import to load WASM module only on demand
+            const { renderTimelineToVideo } = await import('@/lib/ffmpeg-video');
 
-            // Fix audio start times
-            let currentAudioTime = 0;
-            const audioTrack = timeline.tracks.find(t => t.id === "audio-track");
-            if (audioTrack) {
-                audioTrack.clips.forEach((clip: any) => {
-                    clip.start = currentAudioTime;
-                    currentAudioTime += clip.duration;
+            // 1. Prepare Video Items
+            // Already compatible: videoTrackItems is TimelineItem[]
+
+            // 2. Prepare Audio Items
+            // Convert cards to TimelineItems logic (similar to Timeline.tsx)
+            let currentAudioStart = 0;
+            const audioItems: TimelineItem[] = cards
+                .filter(c => c.audioUrl)
+                .map(c => {
+                    const duration = c.duration || 0;
+                    const item: TimelineItem = {
+                        id: c.id,
+                        start: currentAudioStart,
+                        duration: duration,
+                        content: "audio",
+                        type: 'voice',
+                        audioUrl: c.audioUrl
+                    };
+                    currentAudioStart += duration;
+                    return item;
                 });
-            }
 
-            const res = await fetch('/api/render', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(timeline)
+            toast.loading('Rendering video in browser... this may take a moment.', { id: toastId });
+
+            // 3. Render
+            const blob = await renderTimelineToVideo(videoTrackItems, audioItems, {
+                width: 1280, // Default 720p for performance
+                height: 720,
+                fps: 30
             });
 
-            if (!res.ok) throw new Error('Export failed');
+            // 4. Download
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${projectTitle || 'video'}_export.mp4`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
 
-            const data = await res.json();
-            toast.success(`Export started! Job ID: ${data.job_id}`);
+            toast.success('Video exported successfully!', { id: toastId });
 
-        } catch (error) {
-            console.error(error);
-            toast.error('Failed to start export');
+        } catch (error: any) {
+            console.error("Export Error:", error);
+            toast.error(`Export failed: ${error.message || 'Unknown error'}`, { id: toastId });
         } finally {
             setIsExporting(false);
         }
@@ -116,13 +101,12 @@ export default function StudioPageClient() {
     const [isCriticalLoading, setIsCriticalLoading] = useState(true);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [activeLeftTool, setActiveLeftTool] = useState('voice');
-    const [videoTrackItems, setVideoTrackItems] = useState<any[]>([]);
     const [activeCardId, setActiveCardId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     const addNewBlock = () => {
         if (voices.length > 0) {
-            handleAddGhostBlock("", voices[0], "ghaymah", 1, 1);
+            handleAddGhostBlock("", voices[0], voices[0].provider || "", 1, 1);
         } else {
             toast.error("No voices available");
         }
@@ -134,7 +118,7 @@ export default function StudioPageClient() {
     const [countryFilter, setCountryFilter] = useState('all');
     const [genderFilter, setGenderFilter] = useState('all');
     const [providerFilter, setProviderFilter] = useState('all');
-    const [enableTashkeel, setEnableTashkeel] = useState(true);
+    const [enableTashkeel, setEnableTashkeel] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
     const [loadingMessage, setLoadingMessage] = useState("يتم تحميل المشروع...");
@@ -150,6 +134,8 @@ export default function StudioPageClient() {
     const router = useRouter();
     const params = useParams();
     const projectId = params.id as string;
+
+    const [timelineLoaded, setTimelineLoaded] = useState(false);
     const dynamicPanelRef = useRef<HTMLDivElement>(null);
 
     const scrollToTop = () => {
@@ -206,6 +192,10 @@ export default function StudioPageClient() {
                 }));
 
                 setProject(projectData);
+                if (projectData.blocks_json && Array.isArray(projectData.blocks_json)) {
+                    setVideoTrackItems(projectData.blocks_json);
+                }
+                setTimelineLoaded(true);
                 setProjectTitle(projectData.name || "Untitled Project");
                 setProjectDescription(projectData.description || "");
                 setVoices(allVoices);
@@ -251,6 +241,31 @@ export default function StudioPageClient() {
 
         fetchData();
     }, [projectId, token]);
+
+    // Persist Video Timeline to Project.blocks_json
+    useEffect(() => {
+        if (!projectId || !token || !timelineLoaded) return;
+
+        const timer = setTimeout(async () => {
+            try {
+                // Only save if we have items or explicitly want to clear
+                const res = await executeGraphQL<any>({
+                    query: UPDATE_PROJECT_BLOCKS,
+                    variables: {
+                        id: projectId,
+                        blocks_json: videoTrackItems
+                    },
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (res.errors) throw new Error(res.errors[0].message);
+            } catch (e: any) {
+                console.error("Failed to save timeline", e);
+                toast.error(`Auto-save failed: ${e.message}`);
+            }
+        }, 2000);
+
+        return () => clearTimeout(timer);
+    }, [videoTrackItems, projectId, token, timelineLoaded]);
 
     // Keep track of active card ID in a ref to use inside subscription callback without re-running effect
     const activeCardIdRef = useRef<string | null>(null);
@@ -354,6 +369,9 @@ export default function StudioPageClient() {
 
                 return mergedCards;
             });
+        }, (err) => {
+            console.error("Subscription Error:", err);
+            toast.error("Service disconnected. You may need to refresh if issues persist.", { id: 'conn-err' });
         });
 
         return () => {
@@ -559,7 +577,7 @@ export default function StudioPageClient() {
                 body: JSON.stringify({
                     text: sanitizedText,
                     voice: voice.voiceId,
-                    provider: provider,
+                    provider: voice.provider,
                     project_id: projectId,
                     user_id: user.id,
                     arabic: enableTashkeel,
@@ -760,7 +778,7 @@ export default function StudioPageClient() {
 
         updateCard(blockId, {
             voice: voice.name,
-            provider: provider,
+            provider: voice.provider,
             speed: speed,
             pitch: pitch,
             isGenerating: true,
@@ -779,7 +797,7 @@ export default function StudioPageClient() {
                 body: JSON.stringify({
                     text: sanitizedText,
                     voice: voice.voiceId,
-                    provider: provider,
+                    provider: voice.provider,
                     project_id: projectId,
                     user_id: user?.id,
                     arabic: enableTashkeel,
@@ -997,7 +1015,7 @@ export default function StudioPageClient() {
             )}
 
             {project && (
-                <div className="flex h-screen bg-studio-bg-light dark:bg-studio-bg font-sans overflow-hidden text-studio-text-light dark:text-studio-text">
+                <div className="flex h-screen bg-studio-bg-light dark:bg-studio-bg font-sans overflow-hidden text-studio-text-light dark:text-studio-text flex-row">
                     {/* Left Sidebar - Always Visible */}
                     <StudioSidebar
                         activeItem={activeLeftTool}
@@ -1021,7 +1039,7 @@ export default function StudioPageClient() {
 
                         <div className="flex-1 flex flex-col overflow-hidden relative">
                             {/* Middle Area: Split View (Preview + Dynamic Panel) */}
-                            <div className="flex-1 flex flex-row overflow-hidden">
+                            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
                                 {/* Preview Player (Left/Center) */}
                                 <div className="flex-1 flex flex-col relative bg-black/20 border-r border-studio-border-light dark:border-studio-border">
                                     <PreviewPlayer
@@ -1034,7 +1052,7 @@ export default function StudioPageClient() {
                                 </div>
 
                                 {/* Dynamic Panel (Right Side) */}
-                                <div ref={dynamicPanelRef} className="w-[350px] xl:w-[400px] flex-shrink-0 bg-studio-bg-light dark:bg-studio-bg border-l border-studio-border-light dark:border-studio-border z-10 overflow-y-auto">
+                                <div ref={dynamicPanelRef} className="w-full lg:w-[350px] xl:w-[400px] flex-shrink-0 bg-studio-bg-light dark:bg-studio-bg border-l-0 lg:border-l border-t lg:border-t-0 border-studio-border-light dark:border-studio-border z-10 overflow-y-auto">
                                     <DynamicPanel
                                         voices={voices}
                                         activeTool={activeLeftTool}
@@ -1052,7 +1070,7 @@ export default function StudioPageClient() {
                             </div>
 
                             {/* Timeline Area */}
-                            <div className="h-[250px] flex-shrink-0 border-t border-studio-border-light dark:border-studio-border bg-studio-panel-light dark:bg-studio-panel z-10">
+                            <div className="h-[180px] md:h-[250px] flex-shrink-0 border-t border-studio-border-light dark:border-studio-border bg-studio-panel-light dark:bg-studio-panel z-10">
                                 <Timeline
                                     cards={cards}
                                     voices={voices}

@@ -36,39 +36,41 @@ export async function POST(request: NextRequest) {
     try {
         const { projectId, assetId, action, newName } = await request.json();
 
-        if (!projectId || !assetId || !action) {
+        if (!assetId || !action) {
             return NextResponse.json({ error: 'Missing required parameters.' }, { status: 400 });
         }
 
-        // Fetch current assets (DISABLED: Column image_url does not exist)
-        /*
-        const getQuery = `
-            query GetProjectAssets($id: uuid!) {
-                Voice_Studio_projects_by_pk(id: $id) {
-                    image_url
-                }
-            }
-        `;
-        const currentData = await executeGraphQL(getQuery, { id: projectId });
-        const currentAssets = currentData.Voice_Studio_projects_by_pk?.image_url || [];
-        */
-        const currentAssets: any[] = []; // Mock empty
-
-        let updatedAssets = [...currentAssets];
-        const assetIndex = updatedAssets.findIndex((a: any) => a.id === assetId);
-
-        if (assetIndex === -1) {
-            // Since we can't fetch from DB, we can't find the asset to delete/rename.
-            // We'll return success with empty list or error. 
-            // Returning error might be better to indicate failure.
-            return NextResponse.json({ error: 'Asset not found (Persistence disabled).' }, { status: 404 });
-        }
-
         if (action === 'delete') {
-            const assetToDelete = updatedAssets[assetIndex];
+            // 1. Fetch Asset to get URL
+            const getAssetQuery = `
+                query GetAsset($id: uuid!) {
+                    Voice_Studio_Asset_by_pk(id: $id) {
+                        id
+                        image_url
+                        video_url
+                        voice_url
+                    }
+                }
+            `;
+            const assetData = await executeGraphQL(getAssetQuery, { id: assetId });
+            const asset = assetData?.Voice_Studio_Asset_by_pk;
 
-            // Delete from S3 if keys are present
-            if (S3_BUCKET_NAME && AWS_REGION && AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY) {
+            if (!asset) {
+                return NextResponse.json({ error: 'Asset not found.' }, { status: 404 });
+            }
+
+            // 2. Determine URL for S3 deletion
+            let url = null;
+            const getUrl = (val: any) => {
+                if (Array.isArray(val) && val.length > 0) return val[0];
+                if (typeof val === 'string') return val;
+                return null;
+            };
+
+            url = getUrl(asset.image_url) || getUrl(asset.video_url) || getUrl(asset.voice_url);
+
+            // 3. Delete from S3
+            if (url && S3_BUCKET_NAME && AWS_REGION && AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY) {
                 try {
                     const s3Client = new S3Client({
                         region: AWS_REGION,
@@ -79,11 +81,9 @@ export async function POST(request: NextRequest) {
                         }
                     });
 
-                    // Extract key from URL
-                    // URL format: https://s3.eu-south-1.wasabisys.com/BUCKET/KEY
-                    const urlParts = assetToDelete.url.split(`${S3_BUCKET_NAME}/`);
-                    if (urlParts.length > 1) {
-                        const key = urlParts[1];
+                    const bucketUrlPrefix = `${WASABI_ENDPOINT}/${S3_BUCKET_NAME}/`;
+                    if (url.startsWith(bucketUrlPrefix)) {
+                        const key = url.replace(bucketUrlPrefix, '');
                         await s3Client.send(new DeleteObjectCommand({
                             Bucket: S3_BUCKET_NAME,
                             Key: key,
@@ -94,37 +94,23 @@ export async function POST(request: NextRequest) {
                 }
             }
 
-            updatedAssets.splice(assetIndex, 1);
+            // 4. Delete from DB
+            const deleteQuery = `
+                mutation DeleteAsset($id: uuid!) {
+                    delete_Voice_Studio_Asset_by_pk(id: $id) {
+                        id
+                    }
+                }
+            `;
+            await executeGraphQL(deleteQuery, { id: assetId });
+
+            return NextResponse.json({ success: true, message: 'Asset deleted successfully.' });
+
         } else if (action === 'rename') {
-            if (!newName) {
-                return NextResponse.json({ error: 'New name is required for rename action.' }, { status: 400 });
-            }
-            updatedAssets[assetIndex] = { ...updatedAssets[assetIndex], name: newName };
-        } else {
-            return NextResponse.json({ error: 'Invalid action.' }, { status: 400 });
+            return NextResponse.json({ error: 'Renaming is not currently supported.' }, { status: 400 });
         }
 
-        // Update project (DISABLED)
-        /*
-        const updateQuery = `
-            mutation UpdateProjectAssets($id: uuid!, $image_url: jsonb!) {
-                update_Voice_Studio_projects_by_pk(
-                    pk_columns: {id: $id}, 
-                    _set: {image_url: $image_url}
-                ) {
-                    id
-                    image_url
-                }
-            }
-        `;
-        await executeGraphQL(updateQuery, { id: projectId, image_url: updatedAssets });
-        */
-
-        return NextResponse.json({
-            success: true,
-            assets: updatedAssets,
-            message: `Asset ${action}d successfully.`
-        });
+        return NextResponse.json({ error: 'Invalid action.' }, { status: 400 });
 
     } catch (error: any) {
         console.error("Manage assets error:", error);

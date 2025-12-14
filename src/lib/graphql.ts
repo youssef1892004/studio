@@ -88,6 +88,9 @@ export async function executeGraphQL<T>({ query, variables, headers = {} }: Exec
   });
 
   if (!response.ok) {
+    if (response.status >= 500 && response.status < 600) {
+      throw new Error('Service Temporarily Unavailable. Please try again later.');
+    }
     throw new Error(`Network error: ${response.status} ${response.statusText}`);
   }
 
@@ -135,10 +138,10 @@ export const INSERT_ASSET = `
       }
     `;
 
-export const insertProject = async (name: string, description: string, token: string): Promise<Project> => {
+export const insertProject = async (name: string, description: string, userId: string): Promise<Project> => {
   const mutation = `
-      mutation InsertProjects($description: String, $name: String, $crated_at: timestamptz!) {
-        insert_Voice_Studio_projects(objects: {description: $description, name: $name, crated_at: $crated_at}) {
+      mutation InsertProjects($description: String, $name: String, $crated_at: timestamptz!, $user_id: uuid!) {
+        insert_Voice_Studio_projects(objects: {description: $description, name: $name, crated_at: $crated_at, user_id: $user_id}) {
           returning {
             id
             name
@@ -153,13 +156,12 @@ export const insertProject = async (name: string, description: string, token: st
     name: name,
     description: description,
     crated_at: new Date().toISOString(),
+    user_id: userId,
   };
   const response = await executeGraphQL<{ insert_Voice_Studio_projects: { returning: Project[] } }>({
     query: mutation,
     variables,
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
+    // Using Admin Secret via defaultHeaders in executeGraphQL by omitting Authorization
   });
   if (response.errors) throw new Error(response.errors[0].message);
   return response.data!.insert_Voice_Studio_projects.returning[0];
@@ -449,15 +451,22 @@ export const deleteBlockByIndex = async (projectId: string, blockIndex: string):
 
 // --- Subscription Function ---
 
-export const subscribeToBlocks = (projectId: string, callback: (blocks: StudioBlock[]) => void) => {
+export const subscribeToBlocks = (projectId: string, callback: (blocks: StudioBlock[]) => void, onError?: (error: any) => void) => {
   if (!HASURA_GRAPHQL_URL || !HASURA_ADMIN_SECRET) {
     throw new Error("Hasura environment variables are not configured");
   }
 
-  const wsUrl = HASURA_GRAPHQL_URL.replace('http', 'ws');
+  let wsUrl = HASURA_GRAPHQL_URL;
+  if (wsUrl.startsWith('https://')) {
+    wsUrl = wsUrl.replace('https://', 'wss://');
+  } else {
+    wsUrl = wsUrl.replace('http://', 'ws://');
+  }
 
   const subscriptionClient = new SubscriptionClient(wsUrl, {
     reconnect: true,
+    lazy: true,
+    timeout: 30000,
     connectionParams: {
       headers: {
         'x-hasura-admin-secret': HASURA_ADMIN_SECRET,
@@ -506,6 +515,8 @@ export const subscribeToBlocks = (projectId: string, callback: (blocks: StudioBl
         }
       }
       if (error?.message) console.error('Subscription error message:', error.message);
+
+      if (onError) onError(error);
     },
   });
 };

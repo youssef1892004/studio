@@ -63,14 +63,23 @@ export async function POST(request: NextRequest) {
 
     const token = await getAccessToken();
 
+    console.log(`Generating TTS for User ${user_id}, Project ${project_id}, Block ${block_id}`);
+    console.log(`Text length: ${text?.length}, Content: ${text?.substring(0, 50)}...`);
+
+    // Normalize provider: The remote API might expect 'ghaymah' specifically
+    let effectiveProvider = provider;
+    if (effectiveProvider === 'ghaymah_pro') {
+      effectiveProvider = 'ghaymah';
+    }
+
     const blockPayload = {
       text: text,
       block_id: block_id,
-      provider: provider,
+      provider: effectiveProvider,
       voice: voice,
       arabic: arabic, // Pass the arabic flag
-      speed: speed || 1, // Extract from request
-      pitch: pitch || 1, // Extract from request
+      speed: Number(speed) || 1, // Extract from request
+      pitch: Number(pitch) || 1, // Extract from request
     };
 
     const payload = {
@@ -78,6 +87,8 @@ export async function POST(request: NextRequest) {
       user_id: user_id,
       blocks: [blockPayload]
     };
+
+    console.log("Sending TTS Payload:", JSON.stringify(payload, null, 2));
 
     // 1. Create Job
     const jobResponse = await fetch(`${process.env.TTS_API_BASE_URL}/tts`, {
