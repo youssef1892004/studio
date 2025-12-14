@@ -17,14 +17,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { displayName, email, password } = body;
+    const { displayName, email, password, phoneNumber } = body;
 
-    if (!displayName || !email || !password) {
+    if (!displayName || !email || !password || !phoneNumber) {
       return jsonResponse({ message: 'الرجاء ملء جميع الحقول.' }, 400);
     }
 
     if (password.length < 6) {
-        return jsonResponse({ message: 'يجب أن تكون كلمة المرور 6 أحرف على الأقل.' }, 400);
+      return jsonResponse({ message: 'يجب أن تكون كلمة المرور 6 أحرف على الأقل.' }, 400);
     }
 
     const password_hash = await bcrypt.hash(password, 10);
@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
       object: {
         displayName: displayName,
         email: email,
+        phoneNumber: phoneNumber,
         passwordHash: password_hash,
         locale: "ar",
         roles: {
@@ -62,18 +63,18 @@ export async function POST(request: NextRequest) {
     });
 
     const hasuraData = await hasuraResponse.json();
-    
+
     if (hasuraData.errors) {
-        if (hasuraData.errors[0]?.extensions?.code === 'constraint-violation') {
-             throw new Error('هذا البريد الإلكتروني مسجل بالفعل.');
-        }
-        console.error("Hasura Error:", hasuraData.errors);
-        throw new Error(hasuraData.errors[0].message);
+      if (hasuraData.errors[0]?.extensions?.code === 'constraint-violation') {
+        throw new Error('هذا البريد الإلكتروني مسجل بالفعل.');
+      }
+      console.error("Hasura Error:", hasuraData.errors);
+      throw new Error(hasuraData.errors[0].message);
     }
 
     if (!hasuraData.data || !hasuraData.data.insertUser) {
-        console.error("Unexpected Hasura response:", hasuraData);
-        throw new Error("Failed to create user in the database.");
+      console.error("Unexpected Hasura response:", hasuraData);
+      throw new Error("Failed to create user in the database.");
     }
 
     // --- (تصحيح) قراءة الاستجابة الصحيحة "insertUser" ---

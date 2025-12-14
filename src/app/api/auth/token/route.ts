@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { NextRequest, NextResponse } from 'next/server';
 import { HasuraUser } from '@/lib/types';
+import { getEnv } from '@/lib/env';
 
 function jsonResponse(data: any, status: number) {
   return new NextResponse(JSON.stringify(data), {
@@ -23,11 +24,20 @@ async function getUserByEmail(email: string): Promise<HasuraUser | undefined> {
       }
     }
   `;
-  const response = await fetch(process.env.HASURA_GRAPHQL_URL!, {
+
+
+  const url = getEnv('HASURA_GRAPHQL_URL') || getEnv('NEXT_PUBLIC_HASURA_GRAPHQL_URL');
+  const secret = getEnv('HASURA_ADMIN_SECRET') || getEnv('NEXT_PUBLIC_HASURA_ADMIN_SECRET');
+
+  if (!url) throw new Error("Hasura URL not found");
+
+  console.log(`[Auth] Fetching user from: ${url} `);
+
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-hasura-admin-secret': process.env.HASURA_ADMIN_SECRET!,
+      'x-hasura-admin-secret': secret!,
     },
     body: JSON.stringify({ query: GET_USER_QUERY, variables: { email } }),
   });
@@ -41,9 +51,14 @@ async function getUserByEmail(email: string): Promise<HasuraUser | undefined> {
 export async function POST(request: NextRequest) {
   try {
     // 1. التحقق من وجود متغيرات البيئة الأساسية
-    if (!process.env.HASURA_GRAPHQL_URL || !process.env.HASURA_ADMIN_SECRET || !process.env.HASURA_GRAPHQL_JWT_SECRET) {
-        console.error("FATAL: Missing Hasura environment variables in .env.local");
-        return jsonResponse({ message: 'خطأ في إعدادات الخادم.' }, 500);
+    const jwtSecret = getEnv('HASURA_GRAPHQL_JWT_SECRET');
+    if (!getEnv('HASURA_GRAPHQL_URL') && !getEnv('NEXT_PUBLIC_HASURA_GRAPHQL_URL')) {
+      console.error("FATAL: Missing Hasura URL");
+      return jsonResponse({ message: 'خطأ في إعدادات الخادم.' }, 500);
+    }
+    if (!jwtSecret) {
+      console.error("FATAL: Missing JWT Secret");
+      return jsonResponse({ message: 'خطأ في إعدادات الخادم (JWT).' }, 500);
     }
 
     const { email, password } = await request.json();
@@ -55,39 +70,39 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return jsonResponse({ message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة.' }, 401);
     }
-    
+
     // 2. التحقق المفصل من بيانات المستخدم القادمة من قاعدة البيانات
     if (!user.id) {
-        console.error("DATABASE ERROR: User found but is missing an ID.", user);
-        return jsonResponse({ message: 'بيانات المستخدم غير مكتملة (ID مفقود).' }, 500);
+      console.error("DATABASE ERROR: User found but is missing an ID.", user);
+      return jsonResponse({ message: 'بيانات المستخدم غير مكتملة (ID مفقود).' }, 500);
     }
     if (!user.passwordHash) {
-        console.error("DATABASE ERROR: User found but is missing a password hash.", user);
-        return jsonResponse({ message: 'بيانات المستخدم غير مكتملة (كلمة المرور مفقودة).' }, 500);
+      console.error("DATABASE ERROR: User found but is missing a password hash.", user);
+      return jsonResponse({ message: 'بيانات المستخدم غير مكتملة (كلمة المرور مفقودة).' }, 500);
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
       return jsonResponse({ message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة.' }, 401);
     }
-    
+
     let jwtSecretObject;
     try {
-        jwtSecretObject = JSON.parse(process.env.HASURA_GRAPHQL_JWT_SECRET);
+      jwtSecretObject = JSON.parse(jwtSecret!);
     } catch (e) {
-        console.error("Error parsing HASURA_GRAPHQL_JWT_SECRET:", e);
-        return jsonResponse({ message: 'خطأ في إعدادات JWT Secret بالخادم.' }, 500);
+      console.error("Error parsing HASURA_GRAPHQL_JWT_SECRET:", e);
+      return jsonResponse({ message: 'خطأ في إعدادات JWT Secret بالخادم.' }, 500);
     }
 
     if (!jwtSecretObject || !jwtSecretObject.key) {
-        console.error("HASURA_GRAPHQL_JWT_SECRET is missing the 'key' property.");
-        return jsonResponse({ message: "إعدادات JWT Secret بالخادم غير مكتملة." }, 500);
+      console.error("HASURA_GRAPHQL_JWT_SECRET is missing the 'key' property.");
+      return jsonResponse({ message: "إعدادات JWT Secret بالخادم غير مكتملة." }, 500);
     }
 
     const userRoles = Array.isArray(user.roles) ? user.roles.map(r => r.role) : [];
     const allowedRoles = ['user', ...userRoles];
     const defaultRole = userRoles.length > 0 ? userRoles[0] : "user";
-    
+
     const claims = {
       "https://hasura.io/jwt/claims": {
         "x-hasura-allowed-roles": allowedRoles,

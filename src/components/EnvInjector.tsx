@@ -1,15 +1,10 @@
-'use client';
-
-import { useEffect } from 'react';
+import Script from 'next/script';
 
 export default function EnvInjector({ env }: { env: Record<string, string | undefined> }) {
-    if (typeof window !== 'undefined') {
-        (window as any).__ENV = { ...((window as any).__ENV || {}), ...env };
-    }
-
     return (
-        <script
+        <Script
             id="env-injector"
+            strategy="beforeInteractive"
             dangerouslySetInnerHTML={{
                 __html: `window.__ENV = ${JSON.stringify(env)};`,
             }}

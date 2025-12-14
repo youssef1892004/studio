@@ -2,8 +2,8 @@ import { Metadata } from 'next';
 import ProjectsClient from './ProjectsClient';
 
 export const metadata: Metadata = {
-  title: 'My Projects',
-  description: 'Manage your voice projects on Studio. Create, edit, and generate audio content.',
+  title: 'مشاريعي - MuejamStudio',
+  description: 'قم بإدارة مشاريعك الصوتية والمرئية في استوديو معجم. أنشئ، حرر، وانتج محتوى احترافي.',
   robots: {
     index: false,
     follow: false,
@@ -11,5 +11,5 @@ export const metadata: Metadata = {
 };
 
 export default function ProjectsPage() {
-    return <ProjectsClient />;
+  return <ProjectsClient />;
 }

@@ -47,8 +47,8 @@ export default function PricingPage() {
   const getPlanFeatures = (plan: Plan) => {
     const features = [
       `${plan.max_chars.toLocaleString()} حرف شهرياً`,
-      plan.max_vioce_clones > 0 
-        ? `${plan.max_vioce_clones} استنساخ صوتي` 
+      plan.max_vioce_clones > 0
+        ? `${plan.max_vioce_clones} استنساخ صوتي`
         : 'لا يوجد استنساخ صوتي',
       `دعم ${plan.support_level}`,
       'تنزيل MP3',
@@ -80,8 +80,8 @@ export default function PricingPage() {
   }, []);
 
   const getFeatureIcon = (isIncluded: boolean) => {
-    return isIncluded 
-      ? <CheckCircle size={18} className="text-green-500 flex-shrink-0" /> 
+    return isIncluded
+      ? <CheckCircle size={18} className="text-green-500 flex-shrink-0" />
       : <XCircle size={18} className="text-red-500 flex-shrink-0" />;
   };
 
@@ -97,58 +97,58 @@ export default function PricingPage() {
   const allPlans = [freePlan, ...plans];
 
   return (
-    <div className="min-h-screen pt-16 bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
+    <div className="min-h-screen pt-16 bg-background text-foreground transition-colors duration-300">
       <div className="max-w-7xl mx-auto p-8">
-        
-        <Link 
-            href="/" 
-            className="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:underline mb-8"
+
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-primary hover:underline mb-8"
         >
           <ArrowLeft className="w-4 h-4 ml-2" />
           العودة إلى الرئيسية
         </Link>
-        
-        <h1 className="text-5xl font-bold text-center mb-4 text-gray-900 dark:text-white">
-            خطط الأسعار المرنة
+
+        <h1 className="text-5xl font-bold text-center mb-4 text-foreground">
+          خطط الأسعار المرنة
         </h1>
-        <p className="text-xl text-center text-gray-600 dark:text-gray-400 mb-12">
-            اختر الخطة التي تناسب احتياجاتك لإنتاج محتوى صوتي احترافي.
+        <p className="text-xl text-center text-muted-foreground mb-12">
+          اختر الخطة التي تناسب احتياجاتك لإنتاج محتوى صوتي احترافي.
         </p>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 justify-center">
           {allPlans.map(plan => (
-            <div key={plan.id} className="bg-gray-50 dark:bg-gray-800 p-8 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 text-center flex flex-col justify-between">
-                <div>
-                    <h2 className="text-3xl font-bold mb-2 text-gray-900 dark:text-white">{plan.name}</h2>
-                    <div className="text-5xl font-extrabold my-6">
-                        {parseFloat(plan.price) === 0 ? (
-                            <span className="text-blue-600">مجاني</span>
-                        ) : (
-                            <>
-                                LE {(parseFloat(plan.price) / 100).toFixed(2)}
-                                <span className="text-xl font-normal">/شهرياً</span>
-                            </>
-                        )}
-                    </div>
-                    <ul className="space-y-3 text-gray-700 dark:text-gray-300 text-right mb-8">
-                        {getPlanFeatures(plan).map((feature, index) => (
-                            <li key={index} className="flex items-center justify-end">
-                                <span className="mr-3">{feature}</span>
-                                {getFeatureIcon(true)} {/* All derived features are considered included */}
-                            </li>
-                        ))}
-                    </ul>
+            <div key={plan.id} className="bg-card p-8 rounded-xl shadow-lg border border-border text-center flex flex-col justify-between hover:shadow-xl transition-shadow duration-300">
+              <div>
+                <h2 className="text-3xl font-bold mb-2 text-foreground">{plan.name}</h2>
+                <div className="text-5xl font-extrabold my-6">
+                  {parseFloat(plan.price) === 0 ? (
+                    <span className="text-primary">مجاني</span>
+                  ) : (
+                    <>
+                      LE {(parseFloat(plan.price) / 100).toFixed(2)}
+                      <span className="text-xl font-normal text-muted-foreground">/شهرياً</span>
+                    </>
+                  )}
                 </div>
-                <Link 
-                    href={parseFloat(plan.price) === 0 ? '#' : `/checkout?plan_id=${plan.id}`}
-                    className={`block w-full py-3 font-semibold rounded-lg transition-colors mt-6
-                        ${parseFloat(plan.price) === 0 
-                            ? 'bg-gray-200 text-gray-700 cursor-not-allowed' 
-                            : 'bg-blue-600 text-white hover:bg-blue-700'
-                        }`}
-                >
-                    {parseFloat(plan.price) === 0 ? 'الخطة الحالية' : 'اشترك الآن'}
-                </Link>
+                <ul className="space-y-3 text-muted-foreground text-right mb-8">
+                  {getPlanFeatures(plan).map((feature, index) => (
+                    <li key={index} className="flex items-center justify-end">
+                      <span className="mr-3">{feature}</span>
+                      {getFeatureIcon(true)} {/* All derived features are considered included */}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <Link
+                href={parseFloat(plan.price) === 0 ? '#' : `/checkout?plan_id=${plan.id}`}
+                className={`block w-full py-3 font-semibold rounded-lg transition-colors mt-6
+                        ${parseFloat(plan.price) === 0
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  }`}
+              >
+                {parseFloat(plan.price) === 0 ? 'الخطة الحالية' : 'اشترك الآن'}
+              </Link>
             </div>
           ))}
         </div>

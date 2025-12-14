@@ -1,0 +1,13 @@
+[Report]
+Error: Hasura Connection Error
+Detail: Hasura cannot connect to Postgres Database.
+Internal Error: `FATAL: could not open file "global/pg_filenode.map": Input/output error`
+
+This indicates a CORRUPTED Database File System on the Server (Ghaymah Cloud).
+This is NOT a code issue in your Next.js project.
+The Postgres instance on the server has a corrupted disk or file permission issue.
+
+Action Required:
+You MUST contact the server provider (Ghaymah) or if you have access, Restart/Recreate the Postgres Service.
+Simply restarting the Next.js app will NOT fix this.
+The database itself is broken.

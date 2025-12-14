@@ -2,38 +2,45 @@
 import { useState, useEffect, MouseEvent } from 'react';
 import { useAuth } from "@/contexts/AuthContext";
 import { getProjectsByUserId, insertProject, deleteProject, updateProject } from "@/lib/graphql";
-import { FilePlus, LoaderCircle, Trash2, Edit, Zap, Users, Image, Video, Mic, Folder, Clock, Gift, Sparkles, X } from "lucide-react";
+import {
+    FilePlus, LoaderCircle, Trash2, Edit, Zap, Users, Image as ImageIcon, Video, Mic,
+    Folder, Clock, Gift, Sparkles, X, Search, MoreVertical, LayoutGrid, List, Plus
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { Project } from "@/lib/types";
+import { motion, AnimatePresence } from "framer-motion";
 
 const upcomingFeatures = [
     {
         title: "المؤثرات الصوتية",
         description: "إضافة تأثيرات (صدى، فلترة، تردد) على المقاطع الصوتية.",
-        icon: Zap
+        icon: Zap,
+        color: "text-amber-400",
+        bg: "bg-amber-400/10"
     },
     {
         title: "أصوات جديدة وموسعة",
         description: "إطلاق مجموعة ضخمة من الأصوات الاحترافية واللهجات الإقليمية.",
-        icon: Users
+        icon: Users,
+        color: "text-blue-400",
+        bg: "bg-blue-400/10"
     },
     {
         title: "توليد الصور بالذكاء الاصطناعي",
         description: "تحويل النص إلى صورة (Text-to-Image) لإنشاء خلفيات بصرية.",
-        icon: Image
+        icon: ImageIcon,
+        color: "text-purple-400",
+        bg: "bg-purple-400/10"
     },
     {
         title: "توليد الفيديوهات القصيرة",
         description: "دمج الصوت مع الصور الثابتة أو مقاطع الفيديو البسيطة.",
-        icon: Video
-    },
-    {
-        title: "التسجيل وتحويل الصوت (AI)",
-        description: "سجل صوتك وحوّله إلى أي صوت آخر مدعوم بتقنيات الاستنساخ الآمن.",
-        icon: Mic
-    },
+        icon: Video,
+        color: "text-rose-400",
+        bg: "bg-rose-400/10"
+    }
 ];
 
 export default function ProjectsClient() {
@@ -46,11 +53,11 @@ export default function ProjectsClient() {
     const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
     const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
     const authContext = useAuth();
     const router = useRouter();
-
-
 
     useEffect(() => {
         if (authContext.user?.id && authContext.token) {
@@ -144,361 +151,367 @@ export default function ProjectsClient() {
         }
     };
 
+    const filteredProjects = projects.filter(project =>
+        project.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        project.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
     if (isLoading) {
         return (
-            <div className="flex flex-col items-center justify-center h-screen bg-studio-bg-light dark:bg-studio-bg">
-                <LoaderCircle className="w-12 h-12 text-studio-accent animate-spin mb-4" />
-                <p className="text-lg font-medium text-studio-text-light dark:text-studio-text">جاري تحميل مشاريعك...</p>
+            <div className="flex flex-col items-center justify-center h-screen bg-background">
+                <LoaderCircle className="w-12 h-12 text-primary animate-spin mb-4" />
+                <p className="text-lg font-medium text-muted-foreground animate-pulse">جاري تحميل مساحة العمل...</p>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-studio-bg-light dark:bg-studio-bg">
-            <div className="relative bg-studio-bg dark:bg-studio-bg text-studio-text dark:text-studio-text">
-                <div className="container mx-auto px-6 py-12 relative z-10">
-                    <div className="mb-6">
-                        <div className="inline-flex items-center gap-2 bg-studio-panel-light/40 dark:bg-studio-panel/40 backdrop-blur-sm px-6 py-3 rounded-full border border-studio-border-light dark:border-studio-border">
-                            <Gift className="w-5 h-5 text-studio-accent" />
-                            <span className="font-bold text-sm">🎉 جميع الميزات مجانية لمدة 14 يوم! 🎉</span>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="min-h-screen bg-background text-foreground transition-colors duration-300 pt-24">
+            {/* Header Section */}
+            <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border transition-all duration-300">
+                <div className="container mx-auto px-6 py-6">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                         <div>
-                            <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
-                                <Folder className="w-10 h-10 text-studio-accent" />
-                                مشاريعي
-                            </h1>
-                            <p className="text-studio-text-light/80 dark:text-studio-text/80 text-lg">أنشئ وأدر مشاريع الصوت الذكي الخاصة بك</p>
+                            <div className="flex items-center gap-3 mb-1">
+                                <h1 className="text-3xl font-black tracking-tight" style={{ fontFamily: 'inherit' }}>
+                                    مشاريعي
+                                </h1>
+                                <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold">
+                                    {projects.length} مشاريع
+                                </span>
+                            </div>
+                            <p className="text-muted-foreground text-sm">أدر جميع مشاريعك الصوتية والمرئية في مكان واحد.</p>
                         </div>
 
-                        <button
-                            onClick={openCreateModal}
-                            className="group flex items-center gap-2 px-6 py-3 bg-studio-accent hover:bg-studio-accent/90 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
-                        >
-                            <FilePlus className="w-5 h-5 transition-transform duration-300 group-hover:rotate-90" />
-                            مشروع جديد
-                        </button>
+                        <div className="flex items-center gap-4 w-full md:w-auto">
+                            {/* Search */}
+                            <div className="relative flex-1 md:w-64 group">
+                                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                                <input
+                                    type="text"
+                                    placeholder="بحث عن مشروع..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full bg-muted/50 border border-border rounded-xl py-2.5 pr-10 pl-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
+                                />
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-lg border border-border">
+                                <button
+                                    onClick={() => setViewMode('grid')}
+                                    className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-background shadow text-primary' : 'text-muted-foreground hover:bg-background/50'}`}
+                                >
+                                    <LayoutGrid className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('list')}
+                                    className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-background shadow text-primary' : 'text-muted-foreground hover:bg-background/50'}`}
+                                >
+                                    <List className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            <button
+                                onClick={openCreateModal}
+                                className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl transition-all shadow-lg shadow-primary/20 hover:scale-105 active:scale-95"
+                            >
+                                <Plus className="w-5 h-5" />
+                                <span>جديد</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <main className="container mx-auto px-6 py-12">
-                {projects.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-16">
-                        {projects.map((project, index) => (
-                            <Link
-                                href={`/studio/${project.id}`}
-                                key={project.id}
-                                className="group relative bg-studio-panel-light dark:bg-studio-panel rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border border-studio-border-light dark:border-studio-border overflow-hidden cursor-pointer"
-                            >
-                                <div className="h-2 bg-studio-accent"></div>
+                {/* Floating FAB for Mobile */}
+                <button
+                    onClick={openCreateModal}
+                    className="md:hidden fixed bottom-6 left-6 z-50 w-14 h-14 bg-primary text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-90 transition-all"
+                >
+                    <Plus className="w-7 h-7" />
+                </button>
 
-                                <div className="p-6">
-                                    <div className="w-14 h-14 bg-studio-accent/20 rounded-xl flex items-center justify-center mb-4">
-                                        <Folder className="w-8 h-8 text-studio-accent" />
-                                    </div>
-
-                                    <h2 className="text-xl font-bold text-studio-text-light dark:text-studio-text mb-2 truncate group-hover:text-studio-accent transition-colors">
-                                        {project.name || "مشروع بدون عنوان"}
-                                    </h2>
-
-                                    <p className="text-sm text-studio-text-light/70 dark:text-studio-text/70 mb-4 line-clamp-2 h-10">
-                                        {project.description || "لا يوجد وصف"}
-                                    </p>
-
-                                    <div className="flex items-center gap-2 text-xs text-studio-text-light/50 dark:text-studio-text/50 mb-4">
-                                        <Clock className="w-4 h-4" />
-                                        <span>تم الإنشاء: {new Date(project.crated_at).toLocaleDateString('ar-EG')}</span>
-                                    </div>
-
-                                    <div className="flex gap-2 transition-opacity duration-300 pt-2 border-t border-studio-border-light/50 dark:border-studio-border/50">
-                                        <button
-                                            onClick={(e) => handleEditClick(project, e)}
-                                            className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-studio-bg-light/50 dark:bg-studio-bg/50 text-studio-text-light dark:text-studio-text rounded-lg hover:bg-studio-accent/20 hover:text-studio-accent transition-colors text-sm font-medium"
+                {filteredProjects.length > 0 ? (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className={viewMode === 'grid'
+                            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+                            : "flex flex-col gap-4"
+                        }
+                    >
+                        <AnimatePresence>
+                            {filteredProjects.map((project, index) => (
+                                <motion.div
+                                    key={project.id}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    transition={{ delay: index * 0.05 }}
+                                >
+                                    <Link
+                                        href={`/studio/${project.id}`}
+                                        className={`group relative flex bg-card border border-border/40 rounded-3xl overflow-hidden hover:shadow-2xl hover:shadow-primary/20 transition-all duration-500
+                                            ${viewMode === 'grid'
+                                                ? 'flex-col h-full hover:-translate-y-2'
+                                                : 'flex-row h-auto items-stretch hover:translate-x-[-4px]'
+                                            }`}
+                                    >
+                                        {/* Visual Header */}
+                                        <div className={`relative overflow-hidden shrink-0 bg-gradient-to-br from-primary via-orange-500 to-rose-600
+                                            ${viewMode === 'grid' ? 'h-48 w-full' : 'w-32 sm:w-48 h-auto'}`}
                                         >
-                                            <Edit className="w-4 h-4" />
-                                            تعديل
-                                        </button>
-                                        <button
-                                            onClick={(e) => handleDeleteClick(project, e)}
-                                            className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-studio-bg-light/50 dark:bg-studio-bg/50 text-studio-text-light dark:text-studio-text rounded-lg hover:bg-red-100 hover:text-red-600 transition-colors text-sm font-medium"
+                                            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
+                                            {/* decorative circle */}
+                                            {viewMode === 'grid' && (
+                                                <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700"></div>
+                                            )}
+
+                                            {/* Centered Icon - Always Visible but positioned differently */}
+                                            <div className={`absolute flex items-center justify-center text-white
+                                                ${viewMode === 'grid' ? 'top-4 left-4' : 'inset-0'}`}
+                                            >
+                                                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-lg">
+                                                    <Folder className="w-6 h-6" />
+                                                </div>
+                                            </div>
+
+                                            {/* Date - Show in corner for Grid */}
+                                            {viewMode === 'grid' && (
+                                                <div className="absolute bottom-4 right-4 text-white z-10 w-full px-4">
+                                                    <span className="text-xs font-bold text-white/90 bg-black/20 px-3 py-1.5 rounded-full backdrop-blur-md border border-white/10 shadow-sm flex items-center gap-1.5 w-fit ml-auto">
+                                                        <Clock className="w-3 h-3" />
+                                                        {new Date(project.crated_at).toLocaleDateString('ar-EG')}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Content Body */}
+                                        <div className={`flex-1 p-5 flex relative bg-card
+                                            ${viewMode === 'grid' ? 'flex-col justify-between' : 'flex-row items-center justify-between gap-6'}`}
                                         >
-                                            <Trash2 className="w-4 h-4" />
-                                            حذف
-                                        </button>
-                                    </div>
-                                </div>
-                            </Link>
-                        ))}
-                    </div>
+                                            {/* Text Area */}
+                                            <div className="space-y-2 flex-1 min-w-0">
+                                                <div className="flex items-center gap-3">
+                                                    <h2 className="text-xl sm:text-2xl font-bold text-foreground leading-tight group-hover:text-primary transition-colors truncate">
+                                                        {project.name || "مشروع بدون عنوان"}
+                                                    </h2>
+                                                    {viewMode === 'list' && (
+                                                        <span className="text-[10px] sm:text-xs text-muted-foreground bg-secondary/50 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
+                                                            <Clock className="w-3 h-3" />
+                                                            {new Date(project.crated_at).toLocaleDateString('ar-EG')}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-sm sm:text-base text-muted-foreground/80 leading-relaxed font-medium line-clamp-2">
+                                                    {project.description || "لا يوجد وصف إضافي للمشروع..."}
+                                                </p>
+                                            </div>
+
+                                            {/* Actions Area */}
+                                            <div className={`flex items-center gap-3
+                                                ${viewMode === 'grid' ? 'justify-between pt-6 mt-2 border-t border-border/50 w-full' : 'shrink-0'}`}
+                                            >
+                                                {viewMode === 'grid' && (
+                                                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 border-2 border-card flex items-center justify-center text-[10px] text-white font-bold shadow-sm">ME</div>
+                                                )}
+
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={(e) => handleEditClick(project, e)}
+                                                        className="w-9 h-9 flex items-center justify-center bg-secondary/50 hover:bg-primary hover:text-white text-muted-foreground rounded-full transition-all duration-300 shadow-sm hover:shadow-lg hover:scale-110"
+                                                        title="تعديل"
+                                                    >
+                                                        <Edit className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => handleDeleteClick(project, e)}
+                                                        className="w-9 h-9 flex items-center justify-center bg-secondary/50 hover:bg-red-500 hover:text-white text-muted-foreground rounded-full transition-all duration-300 shadow-sm hover:shadow-lg hover:scale-110"
+                                                        title="حذف"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Link>
+                                </motion.div>
+                            ))}
+                        </AnimatePresence>
+                    </motion.div>
                 ) : (
-                    <div className="text-center py-20">
-                        <div className="inline-block p-8 bg-studio-panel-light dark:bg-studio-panel rounded-3xl shadow-lg mb-6 border border-studio-border-light dark:border-studio-border">
-                            <Folder className="w-20 h-20 text-studio-border dark:text-studio-border mx-auto mb-4" />
-                            <h3 className="text-2xl font-bold text-studio-text-light dark:text-studio-text mb-2">لا توجد مشاريع بعد</h3>
-                            <p className="text-studio-text-light/70 dark:text-studio-text/70 mb-6">ابدأ بإنشاء مشروعك الأول الآن!</p>
-                            <button
-                                onClick={openCreateModal}
-                                className="inline-flex items-center gap-2 px-6 py-3 bg-studio-accent hover:bg-studio-accent/90 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
-                            >
-                                <FilePlus className="w-5 h-5" />
-                                إنشاء مشروع جديد
-                            </button>
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="flex flex-col items-center justify-center py-24 text-center"
+                    >
+                        <div className="w-32 h-32 bg-gradient-to-tr from-primary/20 to-orange-500/20 rounded-full flex items-center justify-center mb-8 relative">
+                            <div className="absolute inset-0 rounded-full border-2 border-primary/20 border-dashed animate-spin-slow" />
+                            <Folder className="w-14 h-14 text-primary" />
                         </div>
-                    </div>
+                        <h3 className="text-3xl font-bold text-foreground mb-3">لا توجد مشاريع حتى الآن</h3>
+                        <p className="text-muted-foreground max-w-md mx-auto mb-8 text-lg">
+                            مساحة عملك فارغة. ابدأ رحلتك الإبداعية الآن بإنشاء أول مشروع لك.
+                        </p>
+                        <button
+                            onClick={openCreateModal}
+                            className="btn btn-primary px-8 py-4 text-lg rounded-full shadow-xl shadow-primary/30 flex items-center gap-3 hover:scale-105 transition-transform"
+                        >
+                            <Plus className="w-6 h-6" />
+                            <span>إنشاء مشروع جديد</span>
+                        </button>
+                    </motion.div>
                 )}
 
-                <div className="mt-16 border-t-2 border-gray-200 pt-12">
-                    <div className="text-center mb-12">
-                        <div className="inline-flex items-center gap-2 bg-yellow-100 text-yellow-800 border border-yellow-200 px-6 py-2 rounded-full font-bold mb-4">
-                            <Sparkles className="w-5 h-5" />
-                            قريباً
-                        </div>
-                        <h2 className="text-4xl font-bold bg-gradient-to-r from-gray-800 to-blue-700 bg-clip-text text-transparent mb-4">
-                            المزيد من القوة الإبداعية
-                        </h2>
-                        <p className="text-xl text-gray-600">ميزات متقدمة قادمة لتعزيز إنتاجك الصوتي</p>
+                {/* Upcoming Features Teaser */}
+                <div className="mt-32">
+                    <div className="flex items-center gap-4 mb-8">
+                        <div className="h-px flex-1 bg-border" />
+                        <span className="text-sm font-bold text-muted-foreground uppercase tracking-wider px-4 border border-border rounded-full py-1">قريباً في MuejamStudio</span>
+                        <div className="h-px flex-1 bg-border" />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         {upcomingFeatures.map((feature, index) => (
                             <div
                                 key={index}
-                                className="relative p-6 bg-studio-panel-light dark:bg-studio-panel rounded-2xl shadow-lg border-2 border-dashed border-studio-border-light dark:border-studio-border hover:border-studio-accent transition-all duration-300 transform hover:scale-105"
+                                className="group relative p-6 bg-card hover:bg-muted/30 border border-border rounded-2xl transition-all duration-300 hover:border-primary/30"
                             >
-                                <div className="flex items-start gap-4">
-                                    <div className="flex-shrink-0 w-14 h-14 bg-studio-accent/20 rounded-xl flex items-center justify-center">
-                                        <feature.icon className="w-8 h-8 text-studio-accent" />
-                                    </div>
-
-                                    <div className="flex-1">
-                                        <h3 className="text-lg font-bold text-studio-text-light dark:text-studio-text mb-2">
-                                            {feature.title}
-                                        </h3>
-                                        <p className="text-sm text-studio-text-light/70 dark:text-studio-text/70 leading-relaxed">
-                                            {feature.description}
-                                        </p>
-                                    </div>
+                                <div className={`w-12 h-12 ${feature.bg} ${feature.color} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+                                    <feature.icon className="w-6 h-6" />
                                 </div>
+                                <h3 className="text-base font-bold text-foreground mb-2">
+                                    {feature.title}
+                                </h3>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    {feature.description}
+                                </p>
                             </div>
                         ))}
                     </div>
                 </div>
             </main>
 
-            {showCreateOrEditModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => setShowCreateOrEditModal(false)}>
-                    <div className="bg-[#2a2a2a] dark:bg-[#2a2a2a] rounded-2xl shadow-2xl w-full max-w-md border border-gray-700 animate-scale-in" onClick={e => e.stopPropagation()}>
-                        <div className="bg-[#333] dark:bg-[#333] p-6 rounded-t-2xl border-b border-gray-700">
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-xl font-bold flex items-center gap-2 text-white">
-                                    {projectToEdit ? <Edit className="w-6 h-6 text-[#F48969]" /> : <FilePlus className="w-6 h-6 text-[#F48969]" />}
-                                    {projectToEdit ? "تعديل المشروع" : "مشروع جديد"}
+            {/* Create/Edit Modal */}
+            <AnimatePresence>
+                {showCreateOrEditModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                            onClick={() => setShowCreateOrEditModal(false)}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                            className="relative bg-card w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-border"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="p-6 border-b border-border flex items-center justify-between bg-muted/20">
+                                <h2 className="text-xl font-bold flex items-center gap-2 text-foreground">
+                                    {projectToEdit ? <Edit className="w-5 h-5 text-primary" /> : <Sparkles className="w-5 h-5 text-primary" />}
+                                    {projectToEdit ? "تعديل بيانات المشروع" : "إنشاء مشروع جديد"}
                                 </h2>
-                                <button
-                                    onClick={() => setShowCreateOrEditModal(false)}
-                                    className="p-2 text-gray-400 hover:text-white hover:bg-gray-600 rounded-full transition-colors"
-                                >
+                                <button onClick={() => setShowCreateOrEditModal(false)} className="text-muted-foreground hover:text-foreground transition-colors">
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
-                        </div>
 
-                        <form onSubmit={projectToEdit ? handleUpdateProject : handleCreateProject} className="p-6">
-                            <div className="space-y-5">
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-300 mb-2">
-                                        اسم المشروع *
-                                    </label>
+                            <form onSubmit={projectToEdit ? handleUpdateProject : handleCreateProject} className="p-6 space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-foreground">اسم المشروع</label>
                                     <input
                                         type="text"
                                         value={newProjectName}
                                         onChange={(e) => setNewProjectName(e.target.value)}
-                                        placeholder="أدخل اسم المشروع..."
-                                        className="w-full px-4 py-3 bg-[#1F1F1F] border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:border-[#F48969] focus:ring-1 focus:ring-[#F48969] focus:outline-none transition-all"
+                                        placeholder="مثال: الحملة الإعلانية لشهر رمضان"
+                                        className="w-full px-4 py-3 bg-background border border-input rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
                                         autoFocus
                                     />
                                 </div>
-
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-300 mb-2">
-                                        الوصف (اختياري)
-                                    </label>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-foreground">وصف المشروع <span className="text-muted-foreground text-xs font-normal">(اختياري)</span></label>
                                     <textarea
                                         value={newProjectDescription}
                                         onChange={(e) => setNewProjectDescription(e.target.value)}
-                                        placeholder="أضف وصفاً للمشروع..."
-                                        className="w-full px-4 py-3 bg-[#1F1F1F] border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:border-[#F48969] focus:ring-1 focus:ring-[#F48969] focus:outline-none transition-all resize-none"
-                                        rows={3}
+                                        placeholder="أضف ملاحظات سريعة عن المشروع..."
+                                        className="w-full px-4 py-3 bg-background border border-input rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none resize-none h-24"
                                     />
                                 </div>
-                            </div>
 
-                            <div className="flex gap-3 mt-8">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowCreateOrEditModal(false)}
-                                    className="flex-1 px-6 py-3 bg-transparent border border-gray-600 text-gray-300 font-semibold rounded-xl hover:bg-gray-700 hover:text-white transition-colors"
-                                >
-                                    إلغاء
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={isSubmitting || !newProjectName.trim()}
-                                    className="flex-1 px-6 py-3 bg-[#F48969] hover:bg-[#e07555] text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-orange-900/20"
-                                >
-                                    {isSubmitting ? (
-                                        <>
-                                            <LoaderCircle className="w-5 h-5 animate-spin" />
-                                            جاري الحفظ...
-                                        </>
-                                    ) : (
-                                        projectToEdit ? "حفظ التغييرات" : "إنشاء المشروع"
-                                    )}
-                                </button>
-                            </div>
-                        </form>
+                                <div className="flex gap-3 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCreateOrEditModal(false)}
+                                        className="flex-1 px-4 py-3 rounded-xl border border-input hover:bg-muted font-medium transition-colors"
+                                    >
+                                        إلغاء
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={isSubmitting || !newProjectName.trim()}
+                                        className="flex-1 px-4 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-primary/20"
+                                    >
+                                        {isSubmitting ? <LoaderCircle className="w-5 h-5 animate-spin" /> : (projectToEdit ? "حفظ التغييرات" : "إنشاء الآن")}
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
                     </div>
-                </div>
-            )}
+                )}
+            </AnimatePresence>
 
-            {projectToDelete && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setProjectToDelete(null)}>
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-                        <div className="bg-red-100 text-red-800 p-6 rounded-t-2xl">
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-xl font-bold flex items-center gap-2">
-                                    <Trash2 className="w-6 h-6" />
-                                    تأكيد الحذف
-                                </h2>
-                                <button
-                                    onClick={() => setProjectToDelete(null)}
-                                    className="p-2 hover:bg-black/10 rounded-full transition-colors"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="p-6">
-                            <p className="text-gray-700 mb-6 text-lg">
-                                هل أنت متأكد من حذف المشروع <span className="font-bold text-gray-900">&quot;{projectToDelete.name}&quot;</span>؟
-                            </p>
-                            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
-                                <p className="text-sm text-red-800 font-medium">
-                                    ⚠️ تحذير: هذا الإجراء لا يمكن التراجع عنه!
+            {/* Delete Confirmation Modal */}
+            <AnimatePresence>
+                {projectToDelete && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                            onClick={() => setProjectToDelete(null)}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="relative bg-card w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden border border-border"
+                        >
+                            <div className="p-6 text-center">
+                                <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <Trash2 className="w-8 h-8" />
+                                </div>
+                                <h3 className="text-xl font-bold text-foreground mb-2">حذف المشروع؟</h3>
+                                <p className="text-muted-foreground mb-6">
+                                    هل أنت متأكد من حذف <span className="font-bold text-foreground">"{projectToDelete.name}"</span>؟ لا يمكن التراجع عن هذا الإجراء.
                                 </p>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setProjectToDelete(null)}
+                                        className="flex-1 py-3 border border-border rounded-xl hover:bg-muted font-medium transition-colors"
+                                    >
+                                        إلغاء
+                                    </button>
+                                    <button
+                                        onClick={confirmDelete}
+                                        disabled={isDeleting}
+                                        className="flex-1 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 font-bold flex items-center justify-center gap-2"
+                                    >
+                                        {isDeleting ? <LoaderCircle className="w-5 h-5 animate-spin" /> : "نعم، حذف"}
+                                    </button>
+                                </div>
                             </div>
-
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setProjectToDelete(null)}
-                                    className="flex-1 px-6 py-3 bg-gray-200 text-gray-800 font-semibold rounded-xl hover:bg-gray-300 transition-colors"
-                                >
-                                    إلغاء
-                                </button>
-                                <button
-                                    onClick={confirmDelete}
-                                    disabled={isDeleting}
-                                    className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl disabled:opacity-50 transition-all duration-300 flex items-center justify-center gap-2"
-                                >
-                                    {isDeleting ? (
-                                        <>
-                                            <LoaderCircle className="w-5 h-5 animate-spin" />
-                                            جاري الحذف...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Trash2 className="w-5 h-5" />
-                                            حذف نهائي
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
+                        </motion.div>
                     </div>
-                </div>
-            )}
-
-            <style jsx>{`
-                @keyframes float {
-                    0%, 100% { transform: translateY(0px); }
-                    50% { transform: translateY(-20px); }
-                }
-                
-                @keyframes float-delayed {
-                    0%, 100% { transform: translateY(0px); }
-                    50% { transform: translateY(-30px); }
-                }
-                
-                .animate-float {
-                    animation: float 6s ease-in-out infinite;
-                }
-                
-                .animate-float-delayed {
-                    animation: float-delayed 8s ease-in-out infinite;
-                }
-                
-                @keyframes fade-in {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-                
-                .animate-fade-in {
-                    animation: fade-in 0.3s ease-out;
-                }
-                
-                @keyframes fade-in-up {
-                    from {
-                        opacity: 0;
-                        transform: translateY(30px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
-                }
-                
-                @keyframes fade-in-down {
-                    from {
-                        opacity: 0;
-                        transform: translateY(-30px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
-                }
-                
-                .animate-fade-in-up {
-                    animation: fade-in-up 0.6s ease-out backwards;
-                }
-                
-                .animate-fade-in-down {
-                    animation: fade-in-down 0.6s ease-out;
-                }
-                
-                .animate-fade-in-up-delay {
-                    animation: fade-in-up 0.6s ease-out 0.2s backwards;
-                }
-                
-                @keyframes scale-in {
-                    from {
-                        opacity: 0;
-                        transform: scale(0.9);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: scale(1);
-                    }
-                }
-                
-                .animate-scale-in {
-                    animation: scale-in 0.3s ease-out;
-                }
-            `}</style>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

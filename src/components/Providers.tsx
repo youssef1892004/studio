@@ -7,20 +7,7 @@ import { useEffect } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { getEnv } from '@/lib/env'
 
-if (typeof window !== 'undefined') {
-    const key = getEnv('NEXT_PUBLIC_POSTHOG_KEY');
-    const host = getEnv('NEXT_PUBLIC_POSTHOG_HOST');
-    const isFree = getEnv('NEXT_PUBLIC_WEBSITE_IS_FREE') === 'true';
-
-    if (key) {
-        posthog.init(key, {
-            api_host: host,
-            // Enable debug mode in development
-            debug: process.env.NODE_ENV === 'development',
-            capture_pageview: false, // We're capturing pageviews manually
-        })
-    }
-}
+// Init moved to PHProvider to avoid hydration mismatch by injecting scripts during render
 
 export function PostHogPageview(): JSX.Element {
     const pathname = usePathname();
@@ -44,6 +31,20 @@ export function PostHogPageview(): JSX.Element {
 
 export function PHProvider({ children }: { children: React.ReactNode }) {
     const { user } = useAuth()
+
+    useEffect(() => {
+        // Initialize PostHog client-side only
+        const key = getEnv('NEXT_PUBLIC_POSTHOG_KEY');
+        const host = getEnv('NEXT_PUBLIC_POSTHOG_HOST');
+
+        if (key && !posthog.__loaded) {
+            posthog.init(key, {
+                api_host: host,
+                debug: process.env.NODE_ENV === 'development',
+                capture_pageview: false,
+            });
+        }
+    }, []);
 
     useEffect(() => {
         if (user) {

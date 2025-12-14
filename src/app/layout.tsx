@@ -16,8 +16,8 @@ const cairo = Cairo({ subsets: ["arabic"] });
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001'),
   title: {
-    default: "Studio - AI Voice Studio | استوديو صوت بالذكاء الاصطناعي لتحويل النص إلى كلام",
-    template: "%s | Studio - AI Voice Studio",
+    default: "MuejamStudio - AI Media Studio | استوديو الذكاء الاصطناعي لإنتاج المحتوى",
+    template: "%s | MuejamStudio - AI Media Studio",
   },
   description: "منصة Studio تتيح لك تحويل النصوص العربية إلى أصوات واقعية واحترافية باستخدام الذكاء الاصطناعي. أنشئ تعليقات صوتية، كتب مسموعة، ومحتوى صوتي عالي الجودة بسهولة. | Generate realistic Arabic text-to-speech AI voices with Studio.",
   keywords: [
@@ -101,7 +101,21 @@ export default function RootLayout({
 
 }>) {
   return (
-    <html lang="ar" dir="rtl">
+    <html lang="ar" dir="rtl" className="dark" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                if (localStorage.getItem('theme') === 'light') {
+                  document.documentElement.classList.remove('dark');
+                  document.documentElement.classList.add('light');
+                }
+              } catch (_) {}
+            `,
+          }}
+        />
+      </head>
       <body className={cairo.className}>
         <EnvInjector
           env={{
