@@ -18,6 +18,7 @@ export default function Navbar() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [profileMenuOpen, setProfileMenuOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
+    const [showPromoBar, setShowPromoBar] = useState(true);
 
     const profileMenuRef = useRef<HTMLDivElement>(null);
 
@@ -69,8 +70,6 @@ export default function Navbar() {
     let positionClass = 'relative'; // Default safe behavior avoids overlap on Auth/generic pages
     if (isLandingPage) positionClass = 'fixed top-0';
     if (isProjectsPage) positionClass = 'absolute top-0';
-
-    const [showPromoBar, setShowPromoBar] = useState(true);
 
     return (
         <div className={`w-full z-50 transition-all duration-300 ${positionClass}`}>

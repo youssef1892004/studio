@@ -160,7 +160,7 @@ export default function ProjectsClient() {
         return (
             <div className="flex flex-col items-center justify-center h-screen bg-background">
                 <LoaderCircle className="w-12 h-12 text-primary animate-spin mb-4" />
-                <p className="text-lg font-medium text-muted-foreground animate-pulse">جاري تحميل مساحة العمل...</p>
+                <p className="text-lg font-medium text-muted-foreground animate-pulse">جاري تحميل المشاريع...</p>
             </div>
         );
     }

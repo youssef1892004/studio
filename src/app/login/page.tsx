@@ -37,7 +37,7 @@ function LoginComponent() {
     try {
       await login(email, password);
       toast.success('تم تسجيل الدخول بنجاح!');
-      router.push('/');
+      router.push('/projects');
     } catch (err: any) {
       toast.error(err.message || 'حدث خطأ غير متوقع أثناء تسجيل الدخول.');
     } finally {
