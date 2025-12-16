@@ -24,6 +24,7 @@ import CenteredLoader from '@/components/CenteredLoader';
 import PreviewPlayer from '@/components/studio/PreviewPlayer';
 import DynamicPanel from '@/components/studio/DynamicPanel';
 import StudioContextMenu from '@/components/studio/StudioContextMenu';
+import PropertiesPanel from '@/components/studio/PropertiesPanel'; // New Import
 
 import { getApiUrl } from '@/lib/tts';
 import { notFound } from 'next/navigation';
@@ -124,7 +125,7 @@ export default function StudioPageClient() {
 
     const [loadingMessage, setLoadingMessage] = useState("يتم تحميل المشروع...");
     const [loadingProgress, setLoadingProgress] = useState(0);
-    const [activeMedia, setActiveMedia] = useState<{ url: string; type: string; start: number; volume?: number } | null>(null);
+    const [activeMedia, setActiveMedia] = useState<{ id?: string; url: string; type: string; start: number; volume?: number } | null>(null);
 
     // Playback State
     const [isPlaying, setIsPlaying] = useState(false);
@@ -203,6 +204,40 @@ export default function StudioPageClient() {
         setActiveVideoId(null); // Deselect video
         setActiveLeftTool('voice');
         setIsSidebarOpen(true);
+    };
+
+    // Selection Logic for Properties Panel (New)
+    const selectedItem = useMemo(() => {
+        if (activeVideoId) {
+            const item = videoTrackItems.find(i => i.id === activeVideoId);
+            if (item) return { id: item.id, type: 'video' as const, volume: item.volume ?? 1, playbackRate: item.playbackRate ?? 1, name: item.content };
+        } else if (activeCardId) {
+            const card = cards.find(c => c.id === activeCardId);
+            if (card) return { id: card.id, type: 'voice' as const, volume: card.volume ?? 1, playbackRate: card.playbackRate ?? 1, name: 'Voice Block' };
+        }
+        return null;
+    }, [activeVideoId, activeCardId, videoTrackItems, cards]);
+
+    const handleUpdateItemSpeed = (rate: number) => {
+        if (activeVideoId) {
+            setVideoTrackItems(prev => prev.map(item => item.id === activeVideoId ? { ...item, playbackRate: rate } : item));
+        } else if (activeCardId) {
+            setCards(prev => prev.map(c => c.id === activeCardId ? { ...c, playbackRate: rate } : c));
+        }
+    };
+
+    const handleUpdateVolume = (vol: number) => {
+        if (activeVideoId) {
+            setVideoTrackItems(prev => prev.map(item => item.id === activeVideoId ? { ...item, volume: vol } : item));
+        } else if (activeCardId) {
+            setCards(prev => prev.map(c => c.id === activeCardId ? { ...c, volume: vol } : c));
+        } else if (activeMedia?.id) {
+            setVideoTrackItems(prev => prev.map(item => item.id === activeMedia.id ? { ...item, volume: vol } : item));
+        }
+    };
+
+    const handleDeleteSelection = () => {
+        handleContextAction('delete');
     };
 
     const handleContextAction = (action: string, value?: any) => {
@@ -1217,9 +1252,22 @@ export default function StudioPageClient() {
 
                         <div className="flex-1 flex flex-col overflow-hidden relative">
                             {/* Middle Area: Split View (Preview + Dynamic Panel) */}
+                            {/* Middle Area: Split View (Left Panel + Center Player + Right Properties) */}
                             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-                                {/* Preview Player (Left/Center) */}
-                                <div className="flex-1 flex flex-col relative bg-black/20 border-r border-studio-border-light dark:border-studio-border">
+
+                                {/* Right: Properties Panel (Now First in Source -> Right in RTL) */}
+                                <div className="w-full lg:w-[300px] flex-shrink-0 bg-[#1E1E1E] border-l border-studio-border z-10 overflow-y-auto">
+                                    <PropertiesPanel
+                                        selectedItem={selectedItem}
+                                        currentGlobalSpeed={selectedItem?.playbackRate ?? playbackRate}
+                                        onUpdateVolume={handleUpdateVolume}
+                                        onUpdateSpeed={handleUpdateItemSpeed}
+                                        onDelete={handleDeleteSelection}
+                                    />
+                                </div>
+
+                                {/* Center: Preview Player */}
+                                <div className="flex-1 flex flex-col relative bg-black/20 overflow-hidden">
                                     <PreviewPlayer
                                         activeMedia={activeMedia}
                                         isPlaying={isPlaying}
@@ -1227,11 +1275,12 @@ export default function StudioPageClient() {
                                         playbackRate={playbackRate}
                                         onPlayPause={() => timelineRef.current?.togglePlayPause()}
                                         onSeek={(t) => timelineRef.current?.seek(t)}
+                                        onVolumeChange={handleUpdateVolume}
                                     />
                                 </div>
 
-                                {/* Dynamic Panel (Right Side) */}
-                                <div ref={dynamicPanelRef} className="w-full lg:w-[350px] xl:w-[400px] flex-shrink-0 bg-studio-bg-light dark:bg-studio-bg border-l-0 lg:border-l border-t lg:border-t-0 border-studio-border-light dark:border-studio-border z-10 overflow-y-auto">
+                                {/* Left: Dynamic Panel (Now Last in Source -> Left in RTL) */}
+                                <div ref={dynamicPanelRef} className={`w-full lg:w-[340px] flex-shrink-0 bg-studio-bg-light dark:bg-studio-bg border-r border-studio-border-light dark:border-studio-border z-10 overflow-y-auto ${!activeLeftTool ? 'hidden' : ''}`}>
                                     <DynamicPanel
                                         voices={voices}
                                         activeTool={activeLeftTool}

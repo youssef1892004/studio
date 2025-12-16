@@ -41,6 +41,7 @@ export interface StudioBlock {
   voiceSelected?: boolean;
   error?: string;
   volume?: number;
+  playbackRate?: number;
 }
 
 export interface User {

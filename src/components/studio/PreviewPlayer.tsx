@@ -2,16 +2,26 @@ import React, { useRef, useEffect } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Maximize, Volume2 } from 'lucide-react';
 
 interface PreviewPlayerProps {
-    activeMedia?: { url: string; type: string; start: number; volume?: number } | null;
+    activeMedia?: { id?: string; url: string; type: string; start: number; volume?: number } | null;
     isPlaying?: boolean;
     currentTime?: number;
     onPlayPause?: () => void;
     onSeek?: (time: number) => void;
+    onVolumeChange?: (volume: number) => void;
     playbackRate?: number;
 }
 
-const PreviewPlayer: React.FC<PreviewPlayerProps> = ({ activeMedia, isPlaying = false, currentTime = 0, onPlayPause, onSeek, playbackRate = 1 }) => {
+const PreviewPlayer: React.FC<PreviewPlayerProps> = ({ activeMedia, isPlaying = false, currentTime = 0, onPlayPause, onSeek, onVolumeChange, playbackRate = 1 }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const toggleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            containerRef.current?.requestFullscreen();
+        } else {
+            document.exitFullscreen();
+        }
+    };
 
     // Sync video player
     useEffect(() => {
@@ -59,7 +69,7 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({ activeMedia, isPlaying = 
     return (
         <div className="flex-1 bg-black/20 flex flex-col items-center justify-center relative p-4 min-h-[300px]">
             {/* Main Preview Area */}
-            <div className="w-full h-full max-w-4xl bg-studio-panel dark:bg-studio-panel rounded-lg shadow-2xl overflow-hidden relative aspect-video flex items-center justify-center border border-studio-border dark:border-studio-border">
+            <div ref={containerRef} className="w-full h-full max-w-4xl bg-studio-panel dark:bg-studio-panel rounded-lg shadow-2xl overflow-hidden relative aspect-video flex items-center justify-center border border-studio-border dark:border-studio-border group">
                 {/* Media Preview */}
                 {activeMedia ? (
                     activeMedia.type === 'video' ? (
@@ -89,25 +99,32 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({ activeMedia, isPlaying = 
                 )}
 
                 {/* Overlay Controls (Bottom) */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300 pointer-events-auto z-10">
+                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-auto z-10">
                     <div className="flex items-center justify-between text-white">
                         <div className="flex items-center gap-4">
-                            <button className="hover:text-studio-accent transition-colors"><SkipBack className="w-5 h-5" /></button>
+                            <button className="hover:text-studio-accent transition-colors" onClick={() => onSeek?.(Math.max(0, currentTime - 5))}><SkipBack className="w-5 h-5" /></button>
                             <button className="hover:text-studio-accent transition-colors" onClick={onPlayPause}>
                                 {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current" />}
                             </button>
-                            <button className="hover:text-studio-accent transition-colors"><SkipForward className="w-5 h-5" /></button>
+                            <button className="hover:text-studio-accent transition-colors" onClick={() => onSeek?.(currentTime + 5)}><SkipForward className="w-5 h-5" /></button>
                             <span className="text-xs font-mono opacity-80">{formatTime(currentTime)} / 00:00</span>
                         </div>
 
                         <div className="flex items-center gap-4">
                             <div className="flex items-center gap-2">
                                 <Volume2 className="w-4 h-4" />
-                                <div className="w-20 h-1 bg-white/30 rounded-full overflow-hidden">
-                                    <div className="w-2/3 h-full bg-studio-accent"></div>
-                                </div>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.05"
+                                    value={activeMedia?.volume ?? 1}
+                                    onChange={(e) => onVolumeChange?.(parseFloat(e.target.value))}
+                                    className="w-20 h-1 accent-studio-accent bg-white/30 rounded-lg cursor-pointer"
+                                    onClick={(e) => e.stopPropagation()}
+                                />
                             </div>
-                            <button className="hover:text-studio-accent transition-colors"><Maximize className="w-4 h-4" /></button>
+                            <button className="hover:text-studio-accent transition-colors" onClick={toggleFullscreen}><Maximize className="w-4 h-4" /></button>
                         </div>
                     </div>
                 </div>

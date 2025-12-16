@@ -35,6 +35,7 @@ export interface TimelineItem {
     audioUrl?: string;
     isGenerating?: boolean; // Added loading state
     volume?: number; // 0-1
+    playbackRate?: number;
 }
 
 // --- Helper Components ---
@@ -137,9 +138,9 @@ interface TimelineProps {
     onAddBlock?: () => void;
     onGenerateAll?: () => void;
     videoTrackItems?: TimelineItem[];
-    onVideoTrackUpdate?: (items: TimelineItem[]) => void;
+    onVideoTrackUpdate?: (items: TimelineItem[] | ((prev: TimelineItem[]) => TimelineItem[])) => void;
     activeBlockId?: string | null;
-    onActiveMediaChange?: (media: { url: string; type: string; start: number; volume?: number } | null) => void;
+    onActiveMediaChange?: (media: { id?: string; url: string; type: string; start: number; volume?: number } | null) => void;
     onTimeUpdate?: (time: number) => void;
     onIsPlayingChange?: (isPlaying: boolean) => void;
     onPlaybackRateChange?: (rate: number) => void;
@@ -213,6 +214,8 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                     blockId: card.id,
                     audioUrl: card.audioUrl,
                     isGenerating: card.isGenerating, // Map loading state
+                    volume: card.volume,
+                    playbackRate: card.playbackRate
                 };
                 currentStart += duration;
                 return item;
@@ -491,8 +494,10 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                 }
 
                 // Sync Speed
-                if (Math.abs(audioRef.current.playbackRate - playbackRate) > 0.01) {
-                    audioRef.current.playbackRate = playbackRate;
+                const itemSpeed = activeAudioItem.playbackRate ?? 1;
+                const finalRate = playbackRate * itemSpeed;
+                if (Math.abs(audioRef.current.playbackRate - finalRate) > 0.01) {
+                    audioRef.current.playbackRate = finalRate;
                 }
 
                 if (audioRef.current.paused) {
@@ -583,6 +588,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
             lastActiveVolumeRef.current = currentVolume;
             if (currentVideoItem && currentVideoItem.audioUrl) {
                 onActiveMediaChange?.({
+                    id: currentVideoItem.id,
                     url: currentVideoItem.audioUrl,
                     type: currentVideoItem.type === 'scene' || (currentVideoItem.content && (currentVideoItem.content.toLowerCase().endsWith('.mp4') || currentVideoItem.content.toLowerCase().endsWith('.mov'))) ? 'video' : 'image',
                     start: currentVideoItem.start,
@@ -1058,6 +1064,8 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                     </div>
                 </div>
             </div>
+
+            <audio ref={audioRef} className="hidden" />
         </div>
     );
 });
