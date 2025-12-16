@@ -123,7 +123,7 @@ export default function StudioPageClient() {
 
     const [loadingMessage, setLoadingMessage] = useState("يتم تحميل المشروع...");
     const [loadingProgress, setLoadingProgress] = useState(0);
-    const [activePreviewImage, setActivePreviewImage] = useState<string | null>(null);
+    const [activeMedia, setActiveMedia] = useState<{ url: string; type: string; start: number } | null>(null);
 
     // Playback State
     const [isPlaying, setIsPlaying] = useState(false);
@@ -1043,7 +1043,7 @@ export default function StudioPageClient() {
                                 {/* Preview Player (Left/Center) */}
                                 <div className="flex-1 flex flex-col relative bg-black/20 border-r border-studio-border-light dark:border-studio-border">
                                     <PreviewPlayer
-                                        currentImageSrc={activePreviewImage}
+                                        activeMedia={activeMedia}
                                         isPlaying={isPlaying}
                                         currentTime={currentTime}
                                         onPlayPause={() => timelineRef.current?.togglePlayPause()}
@@ -1082,7 +1082,7 @@ export default function StudioPageClient() {
                                     videoTrackItems={videoTrackItems}
                                     onVideoTrackUpdate={setVideoTrackItems}
                                     activeBlockId={activeCardId}
-                                    onActiveImageChange={setActivePreviewImage}
+                                    onActiveMediaChange={setActiveMedia}
                                     onTimeUpdate={setCurrentTime}
                                     onIsPlayingChange={setIsPlaying}
                                     ref={timelineRef}

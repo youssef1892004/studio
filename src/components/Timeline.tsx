@@ -1,7 +1,7 @@
 'use client';
 
 import { Voice, StudioBlock } from '@/lib/types';
-import { Play, Pause, ZoomIn, ZoomOut, Volume2, VolumeX, Eye, EyeOff, Lock, Unlock, Scissors, ChevronRight, ChevronLeft, Settings, SkipBack, SkipForward, Plus, Wand2 } from 'lucide-react';
+import { Play, Pause, ZoomIn, ZoomOut, Volume2, VolumeX, Eye, EyeOff, Lock, Unlock, Scissors, ChevronRight, ChevronLeft, Settings, SkipBack, SkipForward, Plus, Wand2, Trash2 } from 'lucide-react';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import dynamic from 'next/dynamic';
@@ -138,7 +138,7 @@ interface TimelineProps {
     videoTrackItems?: TimelineItem[];
     onVideoTrackUpdate?: (items: TimelineItem[]) => void;
     activeBlockId?: string | null;
-    onActiveImageChange?: (url: string | null) => void;
+    onActiveMediaChange?: (media: { url: string; type: string; start: number } | null) => void;
     onTimeUpdate?: (time: number) => void;
     onIsPlayingChange?: (isPlaying: boolean) => void;
 }
@@ -150,7 +150,7 @@ export interface TimelineHandle {
     togglePlayPause: () => void;
 }
 
-const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voices, onCardsUpdate, isBlocksProcessing, onBlockClick, onAddBlock, onGenerateAll, videoTrackItems = [], onVideoTrackUpdate, activeBlockId, onActiveImageChange, onTimeUpdate, onIsPlayingChange }, ref) => {
+const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voices, onCardsUpdate, isBlocksProcessing, onBlockClick, onAddBlock, onGenerateAll, videoTrackItems = [], onVideoTrackUpdate, activeBlockId, onActiveMediaChange, onTimeUpdate, onIsPlayingChange }, ref) => {
 
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
@@ -163,7 +163,8 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
     const timelineScrollRef = useRef<HTMLDivElement>(null);
     const headersScrollRef = useRef<HTMLDivElement>(null);
     const animationFrameRef = useRef<number>();
-    const lastActiveImageRef = useRef<string | null>(null);
+    const lastActiveItemIdRef = useRef<string | null>(null);
+    const lastTimestampRef = useRef<number>(0);
 
     // Imperative Handle
     React.useImperativeHandle(ref, () => ({
@@ -235,18 +236,21 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
     }, [voiceTrackItems, draggingItemId, dragTargetIndex]);
 
     // Update total duration based on tracks
-    useEffect(() => {
-        let maxDuration = 30;
-        if (voiceTrackItems.length > 0) {
-            const lastItem = voiceTrackItems[voiceTrackItems.length - 1];
-            maxDuration = Math.max(maxDuration, lastItem.start + lastItem.duration + 5);
-        }
-        if (videoTrackItems.length > 0) {
-            const lastItem = videoTrackItems.reduce((prev, current) => (prev.start + prev.duration > current.start + current.duration) ? prev : current);
-            maxDuration = Math.max(maxDuration, lastItem.start + lastItem.duration + 5);
-        }
-        setTotalDuration(maxDuration);
+    // Calculate total duration (Master Source of Truth)
+    // Calculate total duration (Master Source of Truth)
+    const maxContentTime = useMemo(() => {
+        let max = 0;
+        voiceTrackItems.forEach(item => max = Math.max(max, item.start + item.duration));
+        videoTrackItems.forEach(item => max = Math.max(max, item.start + item.duration));
+        // Stop exactly at the end of the content.
+        // We use a small epsilon (0.1) just to ensure the last frame renders fully if it falls on the edge.
+        return max > 0 ? max + 0.1 : 30;
     }, [voiceTrackItems, videoTrackItems]);
+
+    // Sync state for UI
+    useEffect(() => {
+        setTotalDuration(maxContentTime);
+    }, [maxContentTime]);
 
     // Tracks configuration
     const tracks: Track[] = useMemo(() => [
@@ -323,7 +327,8 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
     const handleDragStart = (e: React.DragEvent, id: string, type: TrackType) => {
         setDraggingItemId(id);
         e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('application/json', JSON.stringify({ type: 'reorder', id, trackType: type }));
+        const actionType = type === 'voice' ? 'reorder' : 'move-video';
+        e.dataTransfer.setData('application/json', JSON.stringify({ type: actionType, id, trackType: type }));
     };
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -437,6 +442,44 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                     audioUrl: data.url
                 };
                 onVideoTrackUpdate([...videoTrackItems, newItem]);
+            } else if (data.type === 'move-video' && onVideoTrackUpdate) {
+                const rect = timelineScrollRef.current?.getBoundingClientRect();
+                if (!rect) return;
+                const x = e.clientX - rect.left + scrollLeft;
+                let dropTime = Math.max(0, x / zoomLevel);
+
+                // Collision Detection & Snapping
+                const movingItem = videoTrackItems.find(i => i.id === data.id);
+                if (movingItem) {
+                    const duration = movingItem.duration;
+                    const others = videoTrackItems.filter(i => i.id !== movingItem.id);
+
+                    // Sort others by start time for consistent checking
+                    others.sort((a, b) => a.start - b.start);
+
+                    for (const other of others) {
+                        const otherEnd = other.start + other.duration;
+                        // If overlap:
+                        if (dropTime < otherEnd && (dropTime + duration) > other.start) {
+                            // Snap to closest edge
+                            const distToLeft = Math.abs((dropTime + duration) - other.start);
+                            const distToRight = Math.abs(dropTime - otherEnd);
+
+                            if (distToLeft < distToRight) {
+                                dropTime = Math.max(0, other.start - duration);
+                            } else {
+                                dropTime = otherEnd;
+                            }
+                        }
+                    }
+                }
+
+                onVideoTrackUpdate(videoTrackItems.map(item => {
+                    if (item.id === data.id) {
+                        return { ...item, start: dropTime };
+                    }
+                    return item;
+                }));
             }
         } catch (err) { console.error(err); }
 
@@ -445,168 +488,128 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
 
     // --- Audio Playback Logic ---
 
-    // Calculate actual content duration (without buffer)
-    const maxContentTime = useMemo(() => {
-        let max = 0;
-        voiceTrackItems.forEach(item => max = Math.max(max, item.start + item.duration));
-        videoTrackItems.forEach(item => max = Math.max(max, item.start + item.duration));
-        return max > 0 ? max : 30; // Default to 30s if empty
-    }, [voiceTrackItems, videoTrackItems]);
 
-    // Handle audio ending and moving to next segment
-    const handlePlayNext = useCallback(() => {
-        if (currentCardIndex < voiceTrackItems.length - 1) {
-            setCurrentCardIndex(prev => prev + 1);
-        } else {
-            setIsPlaying(false);
-            setCurrentCardIndex(0);
-            setCurrentTime(0); // Reset to start
-        }
-    }, [currentCardIndex, voiceTrackItems.length]);
 
-    // Sync audio element with current segment
+    // --- Master Clock Playback Engine ---
+
+    // 1. Sync Audio to Clock (Replaces old Sync)
     useEffect(() => {
-        let isCancelled = false;
+        if (!isPlaying) {
+            audioRef.current?.pause();
+            return;
+        }
 
-        const playCurrentSegment = async () => {
-            const currentItem = voiceTrackItems[currentCardIndex];
-            if (isPlaying && currentItem?.audioUrl && audioRef.current) {
-                // Use proxy for playback to avoid CORS/403 issues
-                const targetSrc = currentItem.audioUrl.startsWith('http')
-                    ? `/api/proxy-audio?url=${encodeURIComponent(currentItem.audioUrl)}`
-                    : currentItem.audioUrl;
+        const activeAudioItem = voiceTrackItems.find(item =>
+            currentTime >= item.start && currentTime < (item.start + item.duration)
+        );
 
-                // Check if we need to update (compare decoded to handle browser URL encoding)
-                if (!audioRef.current.src.includes(encodeURIComponent(currentItem.audioUrl))) {
-                    console.log("🎵 Switching audio source to proxy:", targetSrc);
+        if (activeAudioItem && activeAudioItem.audioUrl) {
+            const targetSrc = activeAudioItem.audioUrl.startsWith('http')
+                ? `/api/proxy-audio?url=${encodeURIComponent(activeAudioItem.audioUrl)}`
+                : activeAudioItem.audioUrl;
+
+            if (audioRef.current) {
+                // Switch source if needed
+                if (!audioRef.current.src.includes(encodeURIComponent(activeAudioItem.audioUrl))) {
                     audioRef.current.src = targetSrc;
-                    audioRef.current.load(); // Ensure it loads
+                    audioRef.current.load();
+                    audioRef.current.play().catch(e => { });
                 }
 
-                const localTime = Math.max(0, currentTime - currentItem.start);
+                // Sync Time
+                const trackOffset = Math.max(0, currentTime - activeAudioItem.start);
+                // Only seek if drift > 0.25s
+                if (Math.abs(audioRef.current.currentTime - trackOffset) > 0.25) {
+                    audioRef.current.currentTime = trackOffset;
+                }
 
-                if (localTime < currentItem.duration) {
-                    // Only seek if significantly off
-                    if (Math.abs(audioRef.current.currentTime - localTime) > 0.2) {
-                        audioRef.current.currentTime = localTime;
-                    }
-
-                    if (audioRef.current.paused && !isCancelled) {
-                        try {
-                            await audioRef.current.play();
-                        } catch (e: any) {
-                            if (e.name !== 'AbortError') {
-                                console.error("Play failed", e);
-                            }
-                        }
-                    }
-
-                    // --- Preloading Logic ---
-                    // If we are within 5 seconds of the end, preload the next track
-                    if (currentItem.duration - localTime < 5) {
-                        const nextItem = voiceTrackItems[currentCardIndex + 1];
-                        if (nextItem && nextItem.audioUrl) {
-                            const nextSrc = nextItem.audioUrl.startsWith('http')
-                                ? `/api/proxy-audio?url=${encodeURIComponent(nextItem.audioUrl)}`
-                                : nextItem.audioUrl;
-
-                            // Check if already preloaded (simple cache check via global or ref could be added, 
-                            // but browser cache handles repeated new Audio() calls well if url is same)
-                            // We use a simple check to avoid spamming logs/objects in this loop
-                            if (!(window as any)._preloadedUrls?.includes(nextSrc)) {
-                                console.log("🚀 Preloading next track:", nextSrc);
-                                const preloadAudio = new Audio(nextSrc);
-                                preloadAudio.load(); // Trigger browser cache
-                                (window as any)._preloadedUrls = [...((window as any)._preloadedUrls || []), nextSrc];
-                            }
-                        }
-                    }
-
-                } else {
-                    handlePlayNext();
+                if (audioRef.current.paused) {
+                    audioRef.current.play().catch(e => { });
                 }
             }
-        };
-
-        if (isPlaying) {
-            playCurrentSegment();
         } else {
+            // Gap: Pause audio
+            // If we are in a gap, just pause. Clock keeps ticking.
             if (audioRef.current && !audioRef.current.paused) {
                 audioRef.current.pause();
             }
         }
-
-        return () => {
-            isCancelled = true;
-        };
-    }, [isPlaying, currentCardIndex, voiceTrackItems, currentTime, handlePlayNext]);
+    }, [currentTime, isPlaying, voiceTrackItems]);
 
     // Update loop
+    // 2. Master Clock Loop
     useEffect(() => {
         let animationFrame: number;
 
-        const loop = () => {
-            if (isPlaying) {
-                setCurrentTime(prev => {
-                    let nextTime = prev;
+        const loop = (timestamp: number) => {
+            if (!isPlaying) return;
 
-                    // If audio is playing, sync with it
-                    if (audioRef.current && !audioRef.current.paused) {
-                        const currentItem = voiceTrackItems[currentCardIndex];
-                        if (currentItem) {
-                            const newTime = currentItem.start + audioRef.current.currentTime;
-                            // Prevent jumping back if audio loops slightly or lags
-                            nextTime = Math.max(prev, newTime);
-                        }
-                    } else {
-                        // Fallback or for non-audio tracks: increment by delta time
-                        nextTime = prev + 0.016; // 60fps approx
-                    }
+            if (!lastTimestampRef.current) lastTimestampRef.current = timestamp;
 
-                    // Stop if we exceed content time
-                    if (nextTime >= maxContentTime) {
-                        setIsPlaying(false);
-                        return maxContentTime;
-                    }
-                    return nextTime;
-                });
+            const delta = (timestamp - lastTimestampRef.current) / 1000;
+            const clampedDelta = Math.min(delta, 0.1); // Prevent jumps from lag
 
-                // Auto scroll
+            lastTimestampRef.current = timestamp;
+
+            setCurrentTime(prev => {
+                const newTime = prev + clampedDelta;
+                // Stop if we exceed total duration
+                if (newTime >= maxContentTime) {
+                    setIsPlaying(false);
+                    return 0; // Reset to start
+                }
+
+                // Auto Scroll
                 if (timelineScrollRef.current) {
-                    const currentPos = currentTime * zoomLevel;
+                    const currentPos = newTime * zoomLevel;
                     const containerWidth = timelineScrollRef.current.clientWidth;
-                    if (currentPos > scrollLeft + containerWidth * 0.8) {
-                        timelineScrollRef.current.scrollLeft = currentPos - containerWidth * 0.2;
+                    const sl = timelineScrollRef.current.scrollLeft;
+
+                    if (currentPos > sl + containerWidth * 0.85) {
+                        timelineScrollRef.current.scrollLeft = currentPos - containerWidth * 0.15;
                     }
                 }
 
-                animationFrame = requestAnimationFrame(loop);
-            }
+                return newTime;
+            });
+
+            animationFrame = requestAnimationFrame(loop);
         };
 
         if (isPlaying) {
+            lastTimestampRef.current = performance.now();
             animationFrame = requestAnimationFrame(loop);
         }
 
         return () => {
             if (animationFrame) cancelAnimationFrame(animationFrame);
         };
-    }, [isPlaying, currentCardIndex, voiceTrackItems, maxContentTime]);
+    }, [isPlaying, maxContentTime, zoomLevel]);
 
-    // Sync Active Image
+    // Sync Active Media Item (Image or Video)
     useEffect(() => {
         const currentVideoItem = videoTrackItems.find(item =>
             currentTime >= item.start && currentTime < (item.start + item.duration)
         );
-        const newUrl = currentVideoItem?.audioUrl || null;
-        if (newUrl !== lastActiveImageRef.current) {
-            lastActiveImageRef.current = newUrl;
-            onActiveImageChange?.(newUrl);
+
+        const currentId = currentVideoItem?.id || null;
+
+        if (currentId !== lastActiveItemIdRef.current) {
+            lastActiveItemIdRef.current = currentId;
+            if (currentVideoItem && currentVideoItem.audioUrl) {
+                onActiveMediaChange?.({
+                    url: currentVideoItem.audioUrl,
+                    type: currentVideoItem.type === 'scene' || (currentVideoItem.content && (currentVideoItem.content.toLowerCase().endsWith('.mp4') || currentVideoItem.content.toLowerCase().endsWith('.mov'))) ? 'video' : 'image',
+                    start: currentVideoItem.start
+                });
+            } else {
+                onActiveMediaChange?.(null);
+            }
         }
 
         // Sync Time
         onTimeUpdate?.(currentTime);
-    }, [currentTime, videoTrackItems, onActiveImageChange, onTimeUpdate]);
+    }, [currentTime, videoTrackItems, onActiveMediaChange, onTimeUpdate]);
 
 
     // --- Interaction Handlers ---
@@ -657,8 +660,16 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
         if (!onCardsUpdate) return;
         onCardsUpdate(prevCards => prevCards.filter(card => card.id !== segmentId));
         setIsPlaying(false);
-        alert(`🗑️ Deleted segment.`);
+        // alert(`🗑️ Deleted segment.`);
     }, [onCardsUpdate]);
+
+    const handleDeleteVideoItem = useCallback((itemId: string) => {
+        if (!onVideoTrackUpdate) return;
+        if (confirm('Delete this clip?')) {
+            const newItems = videoTrackItems.filter(i => i.id !== itemId);
+            onVideoTrackUpdate(newItems);
+        }
+    }, [videoTrackItems, onVideoTrackUpdate]);
 
     const handleDurationLoad = useCallback((blockId: string, duration: number) => {
         if (!onCardsUpdate) return;
@@ -709,7 +720,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
     return (
         <div className="flex flex-col h-full bg-[#1E1E1E] text-gray-300 select-none" dir="ltr">
             {/* Hidden Audio Element */}
-            <audio ref={audioRef} className="hidden" onEnded={handlePlayNext} />
+            <audio ref={audioRef} className="hidden" />
 
             {/* Toolbar */}
             <div className="h-12 bg-[#2A2A2A] border-b border-[#8E8D8D] flex items-center justify-between px-4 z-30 shadow-md">
@@ -836,7 +847,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                                                 key={item.id}
                                                 draggable={true}
                                                 onDragStart={(e) => handleDragStart(e, item.blockId || item.id, track.type)}
-                                                className={`absolute top-2 bottom-2 rounded-lg overflow-hidden transition-all border cursor-move ${isSelected ? 'border-[#F48969] ring-2 ring-[#F48969] z-10' : 'border-[#8E8D8D] hover:border-gray-400'
+                                                className={`absolute top-2 bottom-2 rounded-lg overflow-hidden transition-all border cursor-move group/item ${isSelected ? 'border-[#F48969] ring-2 ring-[#F48969] z-10' : 'border-[#8E8D8D] hover:border-gray-400'
                                                     } ${track.type === 'voice' ? 'bg-[#706F6F]' :
                                                         track.type === 'image' ? 'bg-[#4A4A4A]' :
                                                             track.type === 'scene' ? 'bg-[#3D3D3D]' : 'bg-[#555555]'
@@ -845,6 +856,19 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                                             >
                                                 {/* Item Content */}
                                                 <div className="h-full w-full relative">
+                                                    {/* Delete Button for Video Items */}
+                                                    {track.type !== 'voice' && (
+                                                        <button
+                                                            className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded opacity-0 group-hover/item:opacity-100 transition-opacity z-20 hover:bg-red-600"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDeleteVideoItem(item.id);
+                                                            }}
+                                                            title="Delete Clip"
+                                                        >
+                                                            <Trash2 size={12} />
+                                                        </button>
+                                                    )}
                                                     {track.type === 'voice' ? (
                                                         item.audioUrl ? (
                                                             // Use Real WaveformSegment
@@ -885,13 +909,29 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                                                         <div className="w-full h-full flex items-center justify-center bg-black/20 overflow-hidden relative">
                                                             {item.audioUrl ? (
                                                                 <>
-                                                                    <img
-                                                                        src={`/api/asset-proxy?url=${encodeURIComponent(item.audioUrl)}`}
-                                                                        alt={item.content}
-                                                                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                                                                        draggable={false}
-                                                                    />
-                                                                    <span className="absolute bottom-1 left-1 text-[10px] text-white/90 truncate bg-black/50 px-1 rounded max-w-full">{item.content}</span>
+                                                                    {item.type === 'scene' || (item.content && (item.content.toLowerCase().endsWith('.mp4') || item.content.toLowerCase().endsWith('.mov'))) ? (
+                                                                        <video
+                                                                            src={`/api/asset-proxy?url=${encodeURIComponent(item.audioUrl)}#t=0.1`}
+                                                                            className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                                                                            draggable={false}
+                                                                            muted
+                                                                            preload="metadata"
+                                                                        />
+                                                                    ) : (
+                                                                        <img
+                                                                            src={`/api/asset-proxy?url=${encodeURIComponent(item.audioUrl)}`}
+                                                                            alt={item.content}
+                                                                            className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                                                                            draggable={false}
+                                                                        />
+                                                                    )}
+
+                                                                    <div className="absolute bottom-1 left-1 flex flex-col max-w-full pointer-events-none">
+                                                                        {item.type === 'scene' && (
+                                                                            <span className="text-[9px] bg-blue-600/80 text-white px-1 rounded mb-0.5 w-fit">VIDEO</span>
+                                                                        )}
+                                                                        <span className="text-[10px] text-white/90 truncate bg-black/50 px-1 rounded">{item.content}</span>
+                                                                    </div>
                                                                 </>
                                                             ) : (
                                                                 <span className="text-xs truncate px-2">{item.content}</span>

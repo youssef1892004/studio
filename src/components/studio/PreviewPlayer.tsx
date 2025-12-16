@@ -1,32 +1,71 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Maximize, Volume2 } from 'lucide-react';
 
 interface PreviewPlayerProps {
-    currentImageSrc?: string | null;
+    activeMedia?: { url: string; type: string; start: number } | null;
     isPlaying?: boolean;
     currentTime?: number;
     onPlayPause?: () => void;
     onSeek?: (time: number) => void;
 }
 
-const PreviewPlayer: React.FC<PreviewPlayerProps> = ({ currentImageSrc, isPlaying = false, currentTime = 0, onPlayPause, onSeek }) => {
+const PreviewPlayer: React.FC<PreviewPlayerProps> = ({ activeMedia, isPlaying = false, currentTime = 0, onPlayPause, onSeek }) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    // Sync video player
+    useEffect(() => {
+        if (activeMedia?.type === 'video' && videoRef.current) {
+            const vid = videoRef.current;
+            // Calculate local time within the clip
+            const targetTime = Math.max(0, currentTime - activeMedia.start);
+
+            // Sync play state
+            if (isPlaying && vid.paused) {
+                vid.play().catch(e => {
+                    // Autoplay policy might block unmuted
+                    console.warn("Autoplay blocked", e);
+                });
+            } else if (!isPlaying && !vid.paused) {
+                vid.pause();
+            }
+
+            // Sync time if drift > 0.2s (allow some rubber banding)
+            // Or if we just seeked (large jump)
+            if (Math.abs(vid.currentTime - targetTime) > 0.2) {
+                vid.currentTime = targetTime;
+            }
+        }
+    }, [activeMedia, isPlaying, currentTime]);
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
+
     return (
         <div className="flex-1 bg-black/20 flex flex-col items-center justify-center relative p-4 min-h-[300px]">
             {/* Main Preview Area */}
             <div className="w-full h-full max-w-4xl bg-studio-panel dark:bg-studio-panel rounded-lg shadow-2xl overflow-hidden relative aspect-video flex items-center justify-center border border-studio-border dark:border-studio-border">
-                {/* Image Preview */}
-                {currentImageSrc ? (
-                    <img
-                        src={`/api/asset-proxy?url=${encodeURIComponent(currentImageSrc)}`}
-                        alt="Preview"
-                        className="w-full h-full object-contain bg-black"
-                    />
+                {/* Media Preview */}
+                {activeMedia ? (
+                    activeMedia.type === 'video' ? (
+                        <video
+                            ref={videoRef}
+                            src={`/api/asset-proxy?url=${encodeURIComponent(activeMedia.url)}`}
+                            className="w-full h-full object-contain bg-black"
+                            muted={true} // Force mute to ensure autoplay works in all browsers
+                            autoPlay
+                            playsInline
+                            preload="auto"
+                        />
+                    ) : (
+                        <img
+                            src={`/api/asset-proxy?url=${encodeURIComponent(activeMedia.url)}`}
+                            alt="Preview"
+                            className="w-full h-full object-contain bg-black"
+                        />
+                    )
                 ) : (
                     /* Placeholder Content */
                     <div className="text-center">
@@ -38,7 +77,7 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({ currentImageSrc, isPlayin
                 )}
 
                 {/* Overlay Controls (Bottom) */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300">
+                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300 pointer-events-auto z-10">
                     <div className="flex items-center justify-between text-white">
                         <div className="flex items-center gap-4">
                             <button className="hover:text-studio-accent transition-colors"><SkipBack className="w-5 h-5" /></button>
