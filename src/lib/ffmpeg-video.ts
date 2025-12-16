@@ -19,12 +19,9 @@ export async function renderTimelineToVideo(
     if (!ffmpeg) {
         ffmpeg = new FFmpeg();
     }
-
     const { width = 1280, height = 720, fps = 30 } = opt;
 
-    // Load FFmpeg
     if (!ffmpeg.loaded) {
-        // Load locally from public/ffmpeg
         const baseURL = '/ffmpeg';
         await ffmpeg.load({
             coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
@@ -32,185 +29,159 @@ export async function renderTimelineToVideo(
         });
     }
 
-    // --- 1. Prepare Inputs ---
+    const videoSegments: string[] = [];
+    const audioSources: { filename: string, start: number, volume?: number }[] = [];
 
-    // A. Process Video/Images
-    // We will create a "inputs.txt" for the concat demuxer or use a complex filter.
-    // Concat demuxer is safer for images to avoid massive filter graphs, but it requires same resolution/format.
-    // For simplicity with variable inputs, we'll try to use a filter complex, but if it gets too long, we might hit CLI limits.
-    // Given it's WASM, let's try the safer "concat" approach by normalizing inputs first.
+    // Helper to generate black segment
+    const createBlackSegment = async (duration: number, name: string) => {
+        // Minimum duration safety
+        const safeDur = Math.max(0.1, duration);
+        await ffmpeg!.exec([
+            '-f', 'lavfi',
+            '-i', `color=c=black:s=${width}x${height}:r=${fps}`,
+            '-t', safeDur.toFixed(3),
+            '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p',
+            name
+        ]);
+        return name;
+    };
 
-    // Write all image files to MemFS
-    const imageInputs: { filename: string, duration: number }[] = [];
-
-    // Sort items by start time
+    // --- 1. Process Video Track (Visuals + Video Audio) ---
     const sortedVideoItems = [...videoItems].sort((a, b) => a.start - b.start);
+    let currentVideoCursor = 0;
 
     for (let i = 0; i < sortedVideoItems.length; i++) {
         const item = sortedVideoItems[i];
-        if (!item.audioUrl) continue; // Skip placeholders
-
-        // Filename
-        const ext = item.type === 'scene' ? 'mp4' : 'png';
-        const filename = `v_input_${i}.${ext}`;
-
-        try {
-            // Fetch and Write
-            // Use proxy if needed to bypass CORS
-            let url = item.audioUrl;
-            if (url.startsWith('http')) {
-                url = `/api/proxy-audio?url=${encodeURIComponent(url)}`;
-            }
-
-            const data = await fetchFile(url);
-            await ffmpeg.writeFile(filename, data);
-
-            imageInputs.push({
-                filename,
-                duration: item.duration
-            });
-
-        } catch (e) {
-            console.error(`Failed to load asset ${item.audioUrl}`, e);
-        }
-    }
-
-    if (imageInputs.length === 0) {
-        throw new Error("No visual assets found to render.");
-    }
-
-    // --- 2. Create Video Stream ---
-
-    // Since images might have different sizes, we must scale them.
-    // We will run a command to convert EACH input to a standardized raw video segment, then concat them.
-    // This is slower but robust.
-
-    const videoSegments: string[] = [];
-
-    for (let i = 0; i < imageInputs.length; i++) {
-        const input = imageInputs[i];
-        const segName = `seg_${i}.ts`; // Transport Stream is good for concatenation
-
-        // Command to scale and pad to target resolution, and set duration
-        // -loop 1 for images effectively makes them video. -t sets duration.
-
-        // Note: For video inputs (mp4), -loop 1 is bad. Check extension.
-        const isVideo = input.filename.endsWith('mp4');
-        const inputArgs = isVideo ? ['-i', input.filename] : ['-loop', '1', '-t', input.duration.toString(), '-i', input.filename];
-
-        // Filter to scale/pad
-        const filter = `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
-
-        // If it's a video item, we might need to trim it if duration differs? 
-        // For now assume user wants full clip or handled by timeline logic. 
-        // We strictly enforce duration -t.
-
-        // We use .mp4 segments for intermediate to ensure compatibility
-        // But re-encoding every time is slow.
-        // Let's try to map to a common format.
-
-        await ffmpeg.exec([
-            ...inputArgs,
-            '-vf', filter,
-            '-c:v', 'libx264',
-            '-t', input.duration.toString(),
-            '-r', fps.toString(),
-            '-pix_fmt', 'yuv420p',
-            '-shortest', // Stop if audio/video mismatch (for loops)
-            segName
-        ]);
-
-        videoSegments.push(segName);
-    }
-
-    // Concat Videos
-    const fileList = videoSegments.map(f => `file '${f}'`).join('\n');
-    await ffmpeg.writeFile('files.txt', fileList);
-
-    await ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', 'files.txt', '-c', 'copy', 'video_only.mp4']);
-
-
-    // --- 3. Process Audio ---
-    // Perform simple mix or concat. 
-    // If audio tracks are sequential, we can just concat.
-    // If they overlap, we need amix.
-    // Assuming sequential for now based on previous implementation logic.
-
-    const audioSegments: string[] = [];
-    const sortedAudioItems = [...audioItems].sort((a, b) => a.start - b.start);
-
-    // Create a silent filler if there are gaps? 
-    // For MVP, just concat the audio files present.
-    // Better: Generate a complex filter to place audio at specific times.
-    // adelay=start_time_ms|start_time_ms
-
-    // We will build a complex filter for audio mixing.
-    // inputs: [0:a] [1:a] ...
-    // filters: [0:a]adelay=1000[a0]; [1:a]adelay=5000[a1]; [a0][a1]amix=inputs=2[aout]
-
-    let audioFilterComplex = "";
-    const validAudioInputs: string[] = [];
-
-    for (let i = 0; i < sortedAudioItems.length; i++) {
-        const item = sortedAudioItems[i];
         if (!item.audioUrl) continue;
 
-        const filename = `a_input_${i}.mp3`;
-        // Fetch and Write
-        let url = item.audioUrl;
-        if (url.startsWith('http')) {
-            url = `/api/proxy-audio?url=${encodeURIComponent(url)}`;
+        // A. Handle Gap (Black Screen)
+        if (item.start > currentVideoCursor + 0.1) {
+            const gapDur = item.start - currentVideoCursor;
+            const gapName = `gap_${i}.ts`;
+            await createBlackSegment(gapDur, gapName);
+            videoSegments.push(gapName);
+            currentVideoCursor = item.start; // Update cursor
         }
-        const data = await fetchFile(url);
-        await ffmpeg.writeFile(filename, data);
 
-        validAudioInputs.push(filename);
+        // B. Process Item
+        const isVideo = item.type === 'scene' || item.content?.toLowerCase().endsWith('.mp4') || item.content?.toLowerCase().endsWith('.mov');
+        const ext = isVideo ? 'mp4' : 'png';
+        const inputName = `v_in_${i}.${ext}`;
+        const segName = `seg_${i}.ts`;
 
-        const delay = Math.round(item.start * 1000); // ms
-        audioFilterComplex += `[${i}:a]adelay=${delay}|${delay}[a${i}];`;
+        let url = item.audioUrl;
+        if (url.startsWith('http')) url = `/api/proxy-audio?url=${encodeURIComponent(url)}`;
+
+        try {
+            await ffmpeg.writeFile(inputName, await fetchFile(url));
+
+            // Standardize Video Segment
+            const filter = `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
+            const commonOut = ['-vf', filter, '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-f', 'mpegts'];
+
+            // We must strictly trim/limit duration to item.duration
+            if (isVideo) {
+                // Convert video to TS
+                await ffmpeg.exec(['-i', inputName, '-t', item.duration.toFixed(3), ...commonOut, segName]);
+
+                // Extract Audio
+                const audName = `v_aud_${i}.wav`;
+                try {
+                    // Extract audio
+                    await ffmpeg.exec(['-i', inputName, '-t', item.duration.toFixed(3), '-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2', audName]);
+                    // Verify file creation involved? ffmpeg throws if fail usually.
+                    audioSources.push({ filename: audName, start: item.start, volume: item.volume });
+                } catch (e) { /* Ignore if no audio */ }
+
+            } else {
+                // Convert image to TS video
+                await ffmpeg.exec(['-loop', '1', '-t', item.duration.toFixed(3), '-i', inputName, ...commonOut, segName]);
+            }
+
+            videoSegments.push(segName);
+            currentVideoCursor += item.duration; // Use strict addition for precision tracking
+
+        } catch (err) {
+            console.error(`Error processing item ${i}`, err);
+        }
     }
 
-    let hasAudio = validAudioInputs.length > 0;
-
-    if (hasAudio) {
-        const inputs = validAudioInputs.map((_, i) => `[a${i}]`).join('');
-        audioFilterComplex += `${inputs}amix=inputs=${validAudioInputs.length}:dropout_transition=0[aout]`;
-
-        // Render Audio Mix
-        const audioArgs = validAudioInputs.flatMap(f => ['-i', f]);
-
-        await ffmpeg.exec([
-            ...audioArgs,
-            '-filter_complex', audioFilterComplex,
-            '-map', '[aout]',
-            'mixed_audio.mp3'
-        ]);
+    // --- 2. Process Voice Track ---
+    let maxAudioEnd = 0;
+    for (let i = 0; i < audioItems.length; i++) {
+        const item = audioItems[i];
+        const name = `voice_${i}.mp3`;
+        let url = item.audioUrl || "";
+        if (url.startsWith('http')) url = `/api/proxy-audio?url=${encodeURIComponent(url)}`;
+        try {
+            await ffmpeg.writeFile(name, await fetchFile(url));
+            audioSources.push({ filename: name, start: item.start, volume: item.volume });
+            maxAudioEnd = Math.max(maxAudioEnd, item.start + item.duration);
+        } catch (e) {
+            console.error(`Error processing voice ${i}`, e);
+        }
     }
 
-    // --- 4. Merge Video and Audio ---
+    // --- 3. Fill Final Gap (if Audio is longer than Video) ---
+    if (maxAudioEnd > currentVideoCursor + 0.1) {
+        const finalGap = maxAudioEnd - currentVideoCursor;
+        const finalGapName = 'gap_final.ts';
+        await createBlackSegment(finalGap, finalGapName);
+        videoSegments.push(finalGapName);
+    }
 
-    const finalArgs = [
-        '-i', 'video_only.mp4'
-    ];
-
-    if (hasAudio) {
-        finalArgs.push('-i', 'mixed_audio.mp3');
-        finalArgs.push('-c:v', 'copy');
-        finalArgs.push('-c:a', 'aac');
-        finalArgs.push('-map', '0:v:0');
-        finalArgs.push('-map', '1:a:0');
-        finalArgs.push('-shortest'); // Cut to shortest stream (usually video)
+    // --- 4. Concat Video ---
+    if (videoSegments.length > 0) {
+        const concatList = videoSegments.map(f => `file '${f}'`).join('\n');
+        await ffmpeg.writeFile('concat_list.txt', concatList);
+        await ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', 'concat_list.txt', '-c', 'copy', 'video_only.mp4']);
     } else {
-        finalArgs.push('-c', 'copy');
+        // Fallback checks
+        if (audioSources.length === 0) throw new Error("No content to export.");
+        // Audio only export? Create black video for full duration
+        await createBlackSegment(maxAudioEnd || 10, 'video_only.mp4');
     }
 
-    finalArgs.push('output.mp4');
+    // --- 5. Mix Audio ---
+    let hasAudio = audioSources.length > 0;
+    if (hasAudio) {
+        let filter = "";
+        // Sort audio sources just in case, though play order doesn't matter for amix, adelay handles it.
+        // It's safer to not sort and rely on index mapping in filter.
 
-    await ffmpeg.exec(finalArgs);
+        audioSources.forEach((src, i) => {
+            const delay = Math.round(src.start * 1000);
+            const vol = src.volume !== undefined ? src.volume : 1;
+            filter += `[${i}:a]volume=${vol},adelay=${delay}|${delay}[a${i}];`;
+        });
+        audioSources.forEach((_, i) => filter += `[a${i}]`);
+        // Use 'longest' duration for amix to ensure it doesn't cut short? 
+        // default duration is 'longest'. dropout_transition helps smoothness.
+        filter += `amix=inputs=${audioSources.length}:dropout_transition=0:duration=longest[out]`;
 
-    // Read result
+        const inputs = audioSources.flatMap(s => ['-i', s.filename]);
+        await ffmpeg.exec([...inputs, '-filter_complex', filter, '-map', '[out]', 'mixed_audio.mp3']);
+    }
+
+    // --- 6. Final Merge ---
+    const args = ['-i', 'video_only.mp4'];
+    if (hasAudio) {
+        args.push('-i', 'mixed_audio.mp3');
+        args.push('-c:v', 'copy');
+        args.push('-c:a', 'aac'); // Re-encode audio to AAC for MP4 compatibility
+        args.push('-map', '0:v:0');
+        args.push('-map', '1:a:0');
+        args.push('-shortest');
+    } else {
+        args.push('-c', 'copy');
+    }
+
+    // Clean output
+    // await ffmpeg.deleteFile('output.mp4'); // if exists
+    args.push('output.mp4');
+
+    await ffmpeg.exec(args);
+
     const data = await ffmpeg.readFile('output.mp4');
-    const blob = new Blob([data as any], { type: 'video/mp4' });
-
-    return blob;
+    return new Blob([data as any], { type: 'video/mp4' });
 }

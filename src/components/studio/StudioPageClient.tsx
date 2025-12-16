@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import { fetchVoices } from '@/lib/tts';
@@ -23,6 +23,7 @@ import Timeline, { TimelineHandle, TimelineItem } from '@/components/Timeline';
 import CenteredLoader from '@/components/CenteredLoader';
 import PreviewPlayer from '@/components/studio/PreviewPlayer';
 import DynamicPanel from '@/components/studio/DynamicPanel';
+import StudioContextMenu from '@/components/studio/StudioContextMenu';
 
 import { getApiUrl } from '@/lib/tts';
 import { notFound } from 'next/navigation';
@@ -123,7 +124,7 @@ export default function StudioPageClient() {
 
     const [loadingMessage, setLoadingMessage] = useState("يتم تحميل المشروع...");
     const [loadingProgress, setLoadingProgress] = useState(0);
-    const [activeMedia, setActiveMedia] = useState<{ url: string; type: string; start: number } | null>(null);
+    const [activeMedia, setActiveMedia] = useState<{ url: string; type: string; start: number; volume?: number } | null>(null);
 
     // Playback State
     const [isPlaying, setIsPlaying] = useState(false);
@@ -137,12 +138,190 @@ export default function StudioPageClient() {
 
     const [timelineLoaded, setTimelineLoaded] = useState(false);
     const dynamicPanelRef = useRef<HTMLDivElement>(null);
+    const [playbackRate, setPlaybackRate] = useState(1);
+
+    const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
 
     const scrollToTop = () => {
         if (dynamicPanelRef.current) {
             dynamicPanelRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } else {
             window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
+    // Context Menu State
+    const [contextMenu, setContextMenu] = useState({
+        visible: false,
+        x: 0,
+        y: 0,
+        type: 'general' as 'general' | 'item' | 'block'
+    });
+    const [studioClipboard, setStudioClipboard] = useState<{ type: string, data: any } | null>(null);
+
+    const currentMenuVolume = useMemo(() => {
+        if (activeVideoId) return videoTrackItems.find(i => i.id === activeVideoId)?.volume ?? 1;
+        if (activeCardId) return cards.find(c => c.id === activeCardId)?.volume ?? 1;
+        return 1;
+    }, [activeVideoId, activeCardId, videoTrackItems, cards]);
+
+    // Global Context Menu Handler
+    useEffect(() => {
+        const handleContextMenu = (e: MouseEvent) => {
+            e.preventDefault(); // This effectively disables "Inspect" via right click
+
+            let menuType: 'general' | 'item' | 'block' = 'general';
+            if (activeVideoId) menuType = 'item';
+            else if (activeCardId) menuType = 'block';
+
+            setContextMenu({
+                visible: true,
+                x: e.clientX,
+                y: e.clientY,
+                type: menuType
+            });
+        };
+
+        const handleClick = () => {
+            if (contextMenu.visible) setContextMenu(prev => ({ ...prev, visible: false }));
+        };
+
+        window.addEventListener('contextmenu', handleContextMenu);
+        window.addEventListener('click', handleClick);
+        return () => {
+            window.removeEventListener('contextmenu', handleContextMenu);
+            window.removeEventListener('click', handleClick);
+        };
+    }, [contextMenu.visible]);
+
+    const handleVideoSelect = (id: string) => {
+        setActiveVideoId(id);
+        setActiveCardId(null);
+    };
+
+    const handleBlockClick = (blockId: string) => {
+        setActiveCardId(blockId);
+        setActiveVideoId(null); // Deselect video
+        setActiveLeftTool('voice');
+        setIsSidebarOpen(true);
+    };
+
+    const handleContextAction = (action: string, value?: any) => {
+        switch (action) {
+            case 'volume':
+                if (typeof value === 'number') {
+                    if (activeVideoId) {
+                        setVideoTrackItems(prev => prev.map(item =>
+                            item.id === activeVideoId ? { ...item, volume: value } : item
+                        ));
+                    } else if (activeCardId) {
+                        setCards(prev => prev.map(c =>
+                            c.id === activeCardId ? { ...c, volume: value } : c
+                        ));
+                    }
+                }
+                break;
+            case 'delete':
+                if (activeCardId) {
+                    setCards(prev => prev.filter(c => c.id !== activeCardId));
+                    setActiveCardId(null);
+                    toast.success('تم الحذف');
+                } else if (activeVideoId) {
+                    setVideoTrackItems(prev => prev.filter(i => i.id !== activeVideoId));
+                    setActiveVideoId(null);
+                    toast.success('تم حذف العنصر');
+                }
+                break;
+            case 'copy':
+                if (activeCardId) {
+                    const card = cards.find(c => c.id === activeCardId);
+                    if (card) {
+                        setStudioClipboard({ type: 'block', data: card });
+                        toast.success('تم النسخ');
+                    }
+                } else if (activeVideoId) {
+                    const item = videoTrackItems.find(i => i.id === activeVideoId);
+                    if (item) {
+                        setStudioClipboard({ type: 'video', data: item });
+                        toast.success('تم نسخ العنصر');
+                    }
+                } else {
+                    toast("لم يتم تحديد عنصر");
+                }
+                break;
+            case 'cut':
+                if (activeCardId) {
+                    const card = cards.find(c => c.id === activeCardId);
+                    if (card) {
+                        setStudioClipboard({ type: 'block', data: card });
+                        setCards(prev => prev.filter(c => c.id !== activeCardId));
+                        setActiveCardId(null);
+                        toast.success('تم القص');
+                    }
+                } else if (activeVideoId) {
+                    const item = videoTrackItems.find(i => i.id === activeVideoId);
+                    if (item) {
+                        setStudioClipboard({ type: 'video', data: item });
+                        setVideoTrackItems(prev => prev.filter(i => i.id !== activeVideoId));
+                        setActiveVideoId(null);
+                        toast.success('تم قص العنصر');
+                    }
+                }
+                break;
+            case 'paste':
+                if (studioClipboard) {
+                    if (studioClipboard.type === 'block') {
+                        const newId = uuidv4();
+                        const newBlock = { ...studioClipboard.data, id: newId };
+                        setCards(prev => [...prev, newBlock]);
+                        toast.success('تم اللصق');
+                    } else if (studioClipboard.type === 'video') {
+                        const newId = uuidv4();
+                        const newItem = {
+                            ...studioClipboard.data,
+                            id: newId,
+                            start: currentTime // Paste at Playhead
+                        };
+                        setVideoTrackItems(prev => [...prev, newItem]);
+                        toast.success('تم لصق العنصر');
+                    }
+                } else {
+                    toast("الحافظة فارغة");
+                }
+                break;
+            case 'duplicate':
+                if (activeCardId) {
+                    const card = cards.find(c => c.id === activeCardId);
+                    if (card) {
+                        const newId = uuidv4();
+                        const newBlock = { ...card, id: newId };
+                        // Insert after current
+                        const index = cards.findIndex(c => c.id === activeCardId);
+                        const newCards = [...cards];
+                        newCards.splice(index + 1, 0, newBlock);
+                        setCards(newCards);
+                        toast.success('تم التكرار');
+                    }
+                } else if (activeVideoId) {
+                    const item = videoTrackItems.find(i => i.id === activeVideoId);
+                    if (item) {
+                        const newId = uuidv4();
+                        const newItem = { ...item, id: newId, start: item.start + item.duration };
+                        setVideoTrackItems(prev => [...prev, newItem]);
+                        toast.success('تم تكرار العنصر');
+                    }
+                }
+                break;
+            case 'info':
+                if (activeCardId) {
+                    const card = cards.find(c => c.id === activeCardId);
+                    toast(`Block ID: ${card?.id}\nVoice: ${card?.voice}`);
+                } else if (activeVideoId) {
+                    const item = videoTrackItems.find(i => i.id === activeVideoId);
+                    toast(`Type: ${item?.type}\nContent: ${item?.content}\nDuration: ${item?.duration}s`);
+                } else {
+                    toast(`Project: ${projectTitle}\nBlocks: ${cards.length}\nDuration: ${videoTrackItems.length > 0 ? '...' : '0s'}`);
+                }
+                break;
         }
     };
 
@@ -982,11 +1161,10 @@ export default function StudioPageClient() {
         return null;
     }
 
-    const handleBlockClick = (blockId: string) => {
-        setActiveCardId(blockId);
-        setActiveLeftTool('voice');
-        setIsSidebarOpen(true);
-    };
+
+
+
+
 
     return (
         <>
@@ -1046,6 +1224,7 @@ export default function StudioPageClient() {
                                         activeMedia={activeMedia}
                                         isPlaying={isPlaying}
                                         currentTime={currentTime}
+                                        playbackRate={playbackRate}
                                         onPlayPause={() => timelineRef.current?.togglePlayPause()}
                                         onSeek={(t) => timelineRef.current?.seek(t)}
                                     />
@@ -1085,6 +1264,9 @@ export default function StudioPageClient() {
                                     onActiveMediaChange={setActiveMedia}
                                     onTimeUpdate={setCurrentTime}
                                     onIsPlayingChange={setIsPlaying}
+                                    activeVideoId={activeVideoId}
+                                    onVideoClick={handleVideoSelect}
+                                    onPlaybackRateChange={setPlaybackRate}
                                     ref={timelineRef}
                                 />
                             </div>
@@ -1092,6 +1274,16 @@ export default function StudioPageClient() {
                     </div>
                 </div>
             )}
+
+            <StudioContextMenu
+                visible={contextMenu.visible}
+                x={contextMenu.x}
+                y={contextMenu.y}
+                type={contextMenu.type}
+                onClose={() => setContextMenu(prev => ({ ...prev, visible: false }))}
+                onAction={handleContextAction}
+                currentVolume={currentMenuVolume}
+            />
         </>
     );
 }

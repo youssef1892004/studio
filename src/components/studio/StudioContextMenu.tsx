@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Copy, ClipboardPaste, Scissors, CopyPlus, Info, X } from 'lucide-react';
+import { Copy, ClipboardPaste, Scissors, CopyPlus, Info, X, Trash2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 interface ContextMenuProps {
@@ -8,10 +8,11 @@ interface ContextMenuProps {
     visible: boolean;
     type: 'general' | 'item' | 'block' | 'text';
     onClose: () => void;
-    onAction: (action: string) => void;
+    onAction: (action: string, value?: any) => void;
+    currentVolume?: number;
 }
 
-const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, visible, type, onClose, onAction }) => {
+const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, visible, type, onClose, onAction, currentVolume = 1 }) => {
     const menuRef = useRef<HTMLDivElement>(null);
 
     // Close on click outside
@@ -68,6 +69,24 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, visible, type, onClose,
             style={style}
             onContextMenu={(e) => e.preventDefault()}
         >
+            {(type === 'item' || type === 'block') && (
+                <div className="px-3 py-2 flex flex-col gap-1 border-b border-[#333] mb-1">
+                    <div className="flex justify-between text-xs text-gray-400">
+                        <span>Volume</span>
+                        <span>{Math.round(currentVolume * 100)}%</span>
+                    </div>
+                    <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={currentVolume}
+                        onChange={(e) => onAction('volume', parseFloat(e.target.value))}
+                        className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-[#F48969]"
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                </div>
+            )}
             <MenuItem icon={Copy} label="Copy" action="copy" />
             <MenuItem icon={Scissors} label="Cut" action="cut" />
             <MenuItem icon={ClipboardPaste} label="Paste" action="paste" />
@@ -75,6 +94,9 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, visible, type, onClose,
 
             <div className="h-px bg-[#333] my-1" />
 
+            <div className="h-px bg-[#333] my-1" />
+
+            <MenuItem icon={Trash2} label="Delete" action="delete" danger />
             <MenuItem icon={Info} label="Info" action="info" />
         </div>,
         document.body

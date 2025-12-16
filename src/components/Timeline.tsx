@@ -34,6 +34,7 @@ export interface TimelineItem {
     blockId?: string;
     audioUrl?: string;
     isGenerating?: boolean; // Added loading state
+    volume?: number; // 0-1
 }
 
 // --- Helper Components ---
@@ -138,9 +139,12 @@ interface TimelineProps {
     videoTrackItems?: TimelineItem[];
     onVideoTrackUpdate?: (items: TimelineItem[]) => void;
     activeBlockId?: string | null;
-    onActiveMediaChange?: (media: { url: string; type: string; start: number } | null) => void;
+    onActiveMediaChange?: (media: { url: string; type: string; start: number; volume?: number } | null) => void;
     onTimeUpdate?: (time: number) => void;
     onIsPlayingChange?: (isPlaying: boolean) => void;
+    onPlaybackRateChange?: (rate: number) => void;
+    activeVideoId?: string | null;
+    onVideoClick?: (id: string) => void;
 }
 
 export interface TimelineHandle {
@@ -150,7 +154,7 @@ export interface TimelineHandle {
     togglePlayPause: () => void;
 }
 
-const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voices, onCardsUpdate, isBlocksProcessing, onBlockClick, onAddBlock, onGenerateAll, videoTrackItems = [], onVideoTrackUpdate, activeBlockId, onActiveMediaChange, onTimeUpdate, onIsPlayingChange }, ref) => {
+const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voices, onCardsUpdate, isBlocksProcessing, onBlockClick, onAddBlock, onGenerateAll, videoTrackItems = [], onVideoTrackUpdate, activeBlockId, onActiveMediaChange, onTimeUpdate, onIsPlayingChange, activeVideoId, onVideoClick, onPlaybackRateChange }, ref) => {
 
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
@@ -158,12 +162,22 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
     const [totalDuration, setTotalDuration] = useState(30); // Default 30s
     const [scrollLeft, setScrollLeft] = useState(0);
     const [currentCardIndex, setCurrentCardIndex] = useState(0);
+    const [playbackRate, setPlaybackRate] = useState(1);
+
+    // Resizing State
+    const [isResizing, setIsResizing] = useState(false);
+    const [resizeItem, setResizeItem] = useState<TimelineItem | null>(null);
+    const [resizeHandle, setResizeHandle] = useState<'start' | 'end' | null>(null);
+    const [initialMouseX, setInitialMouseX] = useState(0);
+    const [initialItemStart, setInitialItemStart] = useState(0);
+    const [initialItemDuration, setInitialItemDuration] = useState(0);
 
     const audioRef = useRef<HTMLAudioElement>(null);
     const timelineScrollRef = useRef<HTMLDivElement>(null);
     const headersScrollRef = useRef<HTMLDivElement>(null);
     const animationFrameRef = useRef<number>();
     const lastActiveItemIdRef = useRef<string | null>(null);
+    const lastActiveVolumeRef = useRef<number | undefined>(undefined);
     const lastTimestampRef = useRef<number>(0);
 
     // Imperative Handle
@@ -178,10 +192,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
     const [dragTargetIndex, setDragTargetIndex] = useState<number | null>(null);
 
     // Resize State
-    const [resizingItemId, setResizingItemId] = useState<string | null>(null);
-    const [resizeDirection, setResizeDirection] = useState<'start' | 'end' | null>(null);
-    const [resizeStartX, setResizeStartX] = useState<number>(0);
-    const [resizeStartItem, setResizeStartItem] = useState<TimelineItem | null>(null);
+
 
     // --- Data Preparation ---
 
@@ -272,57 +283,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
     // --- Drag and Drop Handlers ---
     // --- Drag and Drop Handlers ---
 
-    // Resize Handler
-    const handleResizeStart = (e: React.MouseEvent, item: TimelineItem, direction: 'start' | 'end') => {
-        e.preventDefault();
-        e.stopPropagation();
-        setResizingItemId(item.id);
-        setResizeDirection(direction);
-        setResizeStartX(e.clientX);
-        setResizeStartItem(item);
-    };
 
-    // Resize Effect
-    useEffect(() => {
-        if (!resizingItemId || !resizeStartItem || !resizeDirection || !onVideoTrackUpdate) return;
-
-        const handleMouseMove = (e: MouseEvent) => {
-            const deltaX = e.clientX - resizeStartX;
-            const deltaSeconds = deltaX / zoomLevel;
-
-            let newStart = resizeStartItem.start;
-            let newDuration = resizeStartItem.duration;
-
-            if (resizeDirection === 'end') {
-                newDuration = Math.max(0.2, resizeStartItem.duration + deltaSeconds);
-                // Optional: Snap to next item or total duration?
-            } else {
-                const originalEnd = resizeStartItem.start + resizeStartItem.duration;
-                newStart = Math.max(0, resizeStartItem.start + deltaSeconds);
-                newDuration = Math.max(0.2, originalEnd - newStart);
-            }
-
-            const updatedItems = videoTrackItems?.map(item =>
-                item.id === resizingItemId
-                    ? { ...item, start: newStart, duration: newDuration }
-                    : item
-            ) || [];
-            onVideoTrackUpdate(updatedItems);
-        };
-
-        const handleMouseUp = () => {
-            setResizingItemId(null);
-            setResizeDirection(null);
-            setResizeStartItem(null);
-        };
-
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mouseup', handleMouseUp);
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [resizingItemId, resizeStartItem, resizeDirection, resizeStartX, zoomLevel, videoTrackItems, onVideoTrackUpdate]);
 
     const handleDragStart = (e: React.DragEvent, id: string, type: TrackType) => {
         setDraggingItemId(id);
@@ -523,18 +484,30 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                     audioRef.current.currentTime = trackOffset;
                 }
 
+                // Sync Volume
+                const vol = activeAudioItem.volume !== undefined ? activeAudioItem.volume : 1;
+                if (Math.abs(audioRef.current.volume - vol) > 0.01) {
+                    audioRef.current.volume = vol;
+                }
+
+                // Sync Speed
+                if (Math.abs(audioRef.current.playbackRate - playbackRate) > 0.01) {
+                    audioRef.current.playbackRate = playbackRate;
+                }
+
                 if (audioRef.current.paused) {
                     audioRef.current.play().catch(e => { });
                 }
+            } else {
+                // Gap...
             }
         } else {
             // Gap: Pause audio
-            // If we are in a gap, just pause. Clock keeps ticking.
             if (audioRef.current && !audioRef.current.paused) {
                 audioRef.current.pause();
             }
         }
-    }, [currentTime, isPlaying, voiceTrackItems]);
+    }, [currentTime, isPlaying, voiceTrackItems, playbackRate]);
 
     // Update loop
     // 2. Master Clock Loop
@@ -546,8 +519,9 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
 
             if (!lastTimestampRef.current) lastTimestampRef.current = timestamp;
 
-            const delta = (timestamp - lastTimestampRef.current) / 1000;
-            const clampedDelta = Math.min(delta, 0.1); // Prevent jumps from lag
+            const rawDelta = (timestamp - lastTimestampRef.current) / 1000;
+            const delta = rawDelta * playbackRate; // Apply Speed
+            const clampedDelta = Math.min(delta, 0.1 * playbackRate); // Scale clamp too?
 
             lastTimestampRef.current = timestamp;
 
@@ -584,7 +558,12 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
         return () => {
             if (animationFrame) cancelAnimationFrame(animationFrame);
         };
-    }, [isPlaying, maxContentTime, zoomLevel]);
+    }, [isPlaying, maxContentTime, zoomLevel, playbackRate]);
+
+    // Notify Rate Change
+    useEffect(() => {
+        onPlaybackRateChange?.(playbackRate);
+    }, [playbackRate, onPlaybackRateChange]);
 
     // Sync Active Media Item (Image or Video)
     useEffect(() => {
@@ -593,14 +572,21 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
         );
 
         const currentId = currentVideoItem?.id || null;
+        const currentVolume = currentVideoItem?.volume;
 
-        if (currentId !== lastActiveItemIdRef.current) {
+        // Check ID or Volume change
+        const idChanged = currentId !== lastActiveItemIdRef.current;
+        const volChanged = Math.abs((currentVolume ?? 1) - (lastActiveVolumeRef.current ?? 1)) > 0.01;
+
+        if (idChanged || volChanged) {
             lastActiveItemIdRef.current = currentId;
+            lastActiveVolumeRef.current = currentVolume;
             if (currentVideoItem && currentVideoItem.audioUrl) {
                 onActiveMediaChange?.({
                     url: currentVideoItem.audioUrl,
                     type: currentVideoItem.type === 'scene' || (currentVideoItem.content && (currentVideoItem.content.toLowerCase().endsWith('.mp4') || currentVideoItem.content.toLowerCase().endsWith('.mov'))) ? 'video' : 'image',
-                    start: currentVideoItem.start
+                    start: currentVideoItem.start,
+                    volume: currentVideoItem.volume ?? 1
                 });
             } else {
                 onActiveMediaChange?.(null);
@@ -625,7 +611,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
 
     const handleSeek = (time: number) => {
         setCurrentTime(time);
-        // Find corresponding card index
+
         const index = voiceTrackItems.findIndex(item => time >= item.start && time < item.start + item.duration);
         if (index !== -1) {
             setCurrentCardIndex(index);
@@ -636,6 +622,68 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
         setZoomLevel(prev => Math.max(10, Math.min(200, direction === 'in' ? prev * 1.2 : prev / 1.2)));
     };
 
+    const toggleSpeed = () => {
+        const rates = [0.5, 1, 1.5, 2];
+        const next = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
+        setPlaybackRate(next);
+    };
+
+    const handleResizeStart = (e: React.MouseEvent, item: TimelineItem, handle: 'start' | 'end') => {
+        e.stopPropagation();
+        setIsResizing(true);
+        setResizeItem(item);
+        setResizeHandle(handle);
+        setInitialMouseX(e.clientX);
+        setInitialItemStart(item.start);
+        setInitialItemDuration(item.duration);
+    };
+
+    const handleResize = useCallback((e: MouseEvent) => {
+        if (!isResizing || !resizeItem || !resizeHandle || !onVideoTrackUpdate) return;
+
+        const deltaX = (e.clientX - initialMouseX) / zoomLevel; // Convert pixel delta to time delta
+
+        onVideoTrackUpdate(prevItems => prevItems.map(item => {
+            if (item.id === resizeItem.id) {
+                let newStart = initialItemStart;
+                let newDuration = initialItemDuration;
+
+                if (resizeHandle === 'start') {
+                    newStart = Math.max(0, initialItemStart + deltaX);
+                    newDuration = initialItemDuration - (newStart - initialItemStart);
+                    if (newDuration < 0.1) { // Minimum duration
+                        newDuration = 0.1;
+                        newStart = initialItemStart + initialItemDuration - newDuration;
+                    }
+                } else { // 'end' handle
+                    newDuration = Math.max(0.1, initialItemDuration + deltaX);
+                }
+
+                return { ...item, start: newStart, duration: newDuration };
+            }
+            return item;
+        }));
+    }, [isResizing, resizeItem, resizeHandle, initialMouseX, initialItemStart, initialItemDuration, zoomLevel, onVideoTrackUpdate]);
+
+    const handleResizeEnd = useCallback(() => {
+        setIsResizing(false);
+        setResizeItem(null);
+        setResizeHandle(null);
+    }, []);
+
+    useEffect(() => {
+        if (isResizing) {
+            window.addEventListener('mousemove', handleResize);
+            window.addEventListener('mouseup', handleResizeEnd);
+        } else {
+            window.removeEventListener('mousemove', handleResize);
+            window.removeEventListener('mouseup', handleResizeEnd);
+        }
+        return () => {
+            window.removeEventListener('mousemove', handleResize);
+            window.removeEventListener('mouseup', handleResizeEnd);
+        };
+    }, [isResizing, handleResize, handleResizeEnd]);
 
 
     const handleTrim = useCallback((segmentId: string, startTime: number, endTime: number) => {
@@ -652,14 +700,14 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
             }
             return card;
         }));
-        setIsPlaying(false);
+        // setIsPlaying(false); // This state is not defined in this component
         alert(`✅ Trimmed: ${(endTime - startTime).toFixed(2)}s`);
     }, [onCardsUpdate]);
 
     const handleDelete = useCallback((segmentId: string) => {
         if (!onCardsUpdate) return;
         onCardsUpdate(prevCards => prevCards.filter(card => card.id !== segmentId));
-        setIsPlaying(false);
+        // setIsPlaying(false); // This state is not defined in this component
         // alert(`🗑️ Deleted segment.`);
     }, [onCardsUpdate]);
 
@@ -712,7 +760,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isPlaying, currentTime, totalDuration]);
+    }, [isPlaying, currentTime, totalDuration, handlePlayPause, handleSeek]);
 
 
     // --- Render ---
@@ -724,30 +772,35 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
 
             {/* Toolbar */}
             <div className="h-12 bg-[#2A2A2A] border-b border-[#8E8D8D] flex items-center justify-between px-4 z-30 shadow-md">
+                <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" className="h-10 w-10 p-0 text-gray-300 hover:text-white hover:bg-white/10 rounded-full" onClick={() => handleSeek(0)}>
+                        <SkipBack size={24} />
+                    </Button>
+                    <Button
+                        variant="primary"
+                        size="sm"
+                        className="h-12 w-12 p-0 rounded-full bg-[#F48969] hover:bg-[#E07858] text-white shadow-lg shadow-[#F48969]/20 flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
+                        onClick={handlePlayPause}
+                    >
+                        {isPlaying ? (
+                            <Pause size={28} fill="currentColor" className="text-white" />
+                        ) : (
+                            <Play size={28} fill="currentColor" className="ml-1 text-white" />
+                        )}
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-10 w-10 p-0 text-gray-300 hover:text-white hover:bg-white/10 rounded-full" onClick={() => handleSeek(totalDuration)}>
+                        <SkipForward size={24} />
+                    </Button>
+                </div>
+
                 <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm" className="h-10 w-10 p-0 text-gray-300 hover:text-white hover:bg-white/10 rounded-full" onClick={() => handleSeek(0)}>
-                            <SkipBack size={24} />
-                        </Button>
-                        <Button
-                            variant="primary"
-                            size="sm"
-                            className="h-12 w-12 p-0 rounded-full bg-[#F48969] hover:bg-[#E07858] text-white shadow-lg shadow-[#F48969]/20 flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
-                            onClick={handlePlayPause}
-                        >
-                            {isPlaying ? (
-                                <Pause size={28} fill="currentColor" className="text-white" />
-                            ) : (
-                                <Play size={28} fill="currentColor" className="ml-1 text-white" />
-                            )}
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-10 w-10 p-0 text-gray-300 hover:text-white hover:bg-white/10 rounded-full" onClick={() => handleSeek(totalDuration)}>
-                            <SkipForward size={24} />
-                        </Button>
-                    </div>
                     <div className="bg-black/30 px-3 py-1 rounded text-xs font-mono text-[#F48969] border border-[#F48969]/20 shadow-inner">
                         {formatTimeFull(currentTime)}
                     </div>
+                    {/* Speed Toggle Button */}
+                    <Button variant="ghost" size="sm" onClick={toggleSpeed} title="Playback Speed" className="min-w-[40px] h-8 px-2 text-gray-300 hover:text-white hover:bg-white/10 rounded-md">
+                        <span className="text-xs font-bold">{playbackRate}x</span>
+                    </Button>
                     {onGenerateAll && (
                         <Button
                             variant="ghost"
@@ -847,12 +900,20 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                                                 key={item.id}
                                                 draggable={true}
                                                 onDragStart={(e) => handleDragStart(e, item.blockId || item.id, track.type)}
-                                                className={`absolute top-2 bottom-2 rounded-lg overflow-hidden transition-all border cursor-move group/item ${isSelected ? 'border-[#F48969] ring-2 ring-[#F48969] z-10' : 'border-[#8E8D8D] hover:border-gray-400'
-                                                    } ${track.type === 'voice' ? 'bg-[#706F6F]' :
-                                                        track.type === 'image' ? 'bg-[#4A4A4A]' :
-                                                            track.type === 'scene' ? 'bg-[#3D3D3D]' : 'bg-[#555555]'
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (track.type === 'image') onVideoClick?.(item.id);
+                                                    else if (track.type === 'voice') onBlockClick?.(item.blockId!);
+                                                }}
+                                                className={`absolute top-1 bottom-1 rounded-md overflow-hidden cursor-move group select-none transition-all ${(track.type === 'voice' && activeBlockId === item.blockId) || (track.type === 'image' && activeVideoId === item.id)
+                                                    ? 'ring-2 ring-white z-20 shadow-xl'
+                                                    : 'hover:ring-1 hover:ring-white/50 z-10'
                                                     } ${draggingItemId === (item.blockId || item.id) ? 'opacity-50' : ''}`}
-                                                style={{ left: `${left}px`, width: `${width}px` }}
+                                                style={{
+                                                    left: `${left}px`,
+                                                    width: `${width}px`,
+                                                    backgroundColor: track.type === 'voice' ? '#4A4A4A' : '#333',
+                                                }}
                                             >
                                                 {/* Item Content */}
                                                 <div className="h-full w-full relative">

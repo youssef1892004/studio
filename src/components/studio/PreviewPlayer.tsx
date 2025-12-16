@@ -2,14 +2,15 @@ import React, { useRef, useEffect } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Maximize, Volume2 } from 'lucide-react';
 
 interface PreviewPlayerProps {
-    activeMedia?: { url: string; type: string; start: number } | null;
+    activeMedia?: { url: string; type: string; start: number; volume?: number } | null;
     isPlaying?: boolean;
     currentTime?: number;
     onPlayPause?: () => void;
     onSeek?: (time: number) => void;
+    playbackRate?: number;
 }
 
-const PreviewPlayer: React.FC<PreviewPlayerProps> = ({ activeMedia, isPlaying = false, currentTime = 0, onPlayPause, onSeek }) => {
+const PreviewPlayer: React.FC<PreviewPlayerProps> = ({ activeMedia, isPlaying = false, currentTime = 0, onPlayPause, onSeek, playbackRate = 1 }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
 
     // Sync video player
@@ -34,8 +35,20 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({ activeMedia, isPlaying = 
             if (Math.abs(vid.currentTime - targetTime) > 0.2) {
                 vid.currentTime = targetTime;
             }
+
+            // Sync Volume
+            if (activeMedia.volume !== undefined) {
+                vid.volume = activeMedia.volume;
+            } else {
+                vid.volume = 1;
+            }
+
+            // Sync Speed
+            if (activeMedia?.type === 'video' && Math.abs(vid.playbackRate - playbackRate) > 0.01) {
+                vid.playbackRate = playbackRate;
+            }
         }
-    }, [activeMedia, isPlaying, currentTime]);
+    }, [activeMedia, isPlaying, currentTime, playbackRate]);
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -54,8 +67,7 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({ activeMedia, isPlaying = 
                             ref={videoRef}
                             src={`/api/asset-proxy?url=${encodeURIComponent(activeMedia.url)}`}
                             className="w-full h-full object-contain bg-black"
-                            muted={true} // Force mute to ensure autoplay works in all browsers
-                            autoPlay
+                            muted={false} // Enable audio mixing
                             playsInline
                             preload="auto"
                         />

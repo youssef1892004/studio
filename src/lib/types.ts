@@ -40,6 +40,7 @@ export interface StudioBlock {
   // Require explicit user selection before generation
   voiceSelected?: boolean;
   error?: string;
+  volume?: number;
 }
 
 export interface User {
