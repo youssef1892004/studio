@@ -1,7 +1,7 @@
 'use client';
 
 import { Voice, StudioBlock } from '@/lib/types';
-import { Play, Pause, ZoomIn, ZoomOut, Volume2, VolumeX, Eye, EyeOff, Lock, Unlock, Scissors, ChevronRight, ChevronLeft, Settings, SkipBack, SkipForward, Plus, Wand2, Trash2 } from 'lucide-react';
+import { Play, Pause, ZoomIn, ZoomOut, Volume2, VolumeX, Eye, EyeOff, Lock, Unlock, Scissors, ChevronRight, ChevronLeft, Settings, SkipBack, SkipForward, Plus, Wand2, Trash2, Undo2, Redo2, MousePointer2 } from 'lucide-react';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import dynamic from 'next/dynamic';
@@ -30,6 +30,7 @@ export interface TimelineItem {
     duration: number;
     content: string; // Text, Image URL, or Effect Name
     type: TrackType;
+    mediaStartOffset?: number; // Offset into the media file (seconds)
     // For voice items, we link back to the StudioBlock
     blockId?: string;
     audioUrl?: string;
@@ -138,14 +139,22 @@ interface TimelineProps {
     onAddBlock?: () => void;
     onGenerateAll?: () => void;
     videoTrackItems?: TimelineItem[];
-    onVideoTrackUpdate?: (items: TimelineItem[] | ((prev: TimelineItem[]) => TimelineItem[])) => void;
+    onVideoTrackUpdate?: (items: TimelineItem[] | ((prev: TimelineItem[]) => TimelineItem[]), commit?: boolean) => void;
     activeBlockId?: string | null;
-    onActiveMediaChange?: (media: { id?: string; url: string; type: string; start: number; volume?: number } | null) => void;
+    onActiveMediaChange: (media: { id: string, type: string, url: string, isPlaying?: boolean, start: number, volume?: number, mediaStartOffset?: number } | null) => void;
     onTimeUpdate?: (time: number) => void;
     onIsPlayingChange?: (isPlaying: boolean) => void;
     onPlaybackRateChange?: (rate: number) => void;
     activeVideoId?: string | null;
     onVideoClick?: (id: string) => void;
+    activeTool?: 'select' | 'razor';
+    onSplit?: (itemId: string, splitTime: number, trackType: TrackType) => void;
+    onToolChange?: (tool: 'select' | 'razor') => void;
+    onDelete?: () => void;
+    onUndo?: () => void;
+    onRedo?: () => void;
+    canUndo?: boolean;
+    canRedo?: boolean;
 }
 
 export interface TimelineHandle {
@@ -155,7 +164,7 @@ export interface TimelineHandle {
     togglePlayPause: () => void;
 }
 
-const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voices, onCardsUpdate, isBlocksProcessing, onBlockClick, onAddBlock, onGenerateAll, videoTrackItems = [], onVideoTrackUpdate, activeBlockId, onActiveMediaChange, onTimeUpdate, onIsPlayingChange, activeVideoId, onVideoClick, onPlaybackRateChange }, ref) => {
+const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voices, onCardsUpdate, isBlocksProcessing, onBlockClick, onAddBlock, onGenerateAll, videoTrackItems = [], onVideoTrackUpdate, activeBlockId, onActiveMediaChange, onTimeUpdate, onIsPlayingChange, activeVideoId, onVideoClick, onPlaybackRateChange, activeTool, onSplit, onToolChange, onDelete, onUndo, onRedo, canUndo, canRedo }, ref) => {
 
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
@@ -172,6 +181,8 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
     const [initialMouseX, setInitialMouseX] = useState(0);
     const [initialItemStart, setInitialItemStart] = useState(0);
     const [initialItemDuration, setInitialItemDuration] = useState(0);
+
+    const [mouseTime, setMouseTime] = useState(0); // For razor cursor
 
     const audioRef = useRef<HTMLAudioElement>(null);
     const timelineScrollRef = useRef<HTMLDivElement>(null);
@@ -215,7 +226,8 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                     audioUrl: card.audioUrl,
                     isGenerating: card.isGenerating, // Map loading state
                     volume: card.volume,
-                    playbackRate: card.playbackRate
+                    playbackRate: card.playbackRate,
+                    mediaStartOffset: card.trimStart || 0
                 };
                 currentStart += duration;
                 return item;
@@ -481,7 +493,8 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                 }
 
                 // Sync Time
-                const trackOffset = Math.max(0, currentTime - activeAudioItem.start);
+                const itemOffset = activeAudioItem.mediaStartOffset || 0;
+                const trackOffset = Math.max(0, currentTime - activeAudioItem.start + itemOffset);
                 // Only seek if drift > 0.25s
                 if (Math.abs(audioRef.current.currentTime - trackOffset) > 0.25) {
                     audioRef.current.currentTime = trackOffset;
@@ -592,7 +605,8 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                     url: currentVideoItem.audioUrl,
                     type: currentVideoItem.type === 'scene' || (currentVideoItem.content && (currentVideoItem.content.toLowerCase().endsWith('.mp4') || currentVideoItem.content.toLowerCase().endsWith('.mov'))) ? 'video' : 'image',
                     start: currentVideoItem.start,
-                    volume: currentVideoItem.volume ?? 1
+                    volume: currentVideoItem.volume ?? 1,
+                    mediaStartOffset: currentVideoItem.mediaStartOffset
                 });
             } else {
                 onActiveMediaChange?.(null);
@@ -605,6 +619,50 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
 
 
     // --- Interaction Handlers ---
+
+    // Unified Mouse Move
+    const handleMouseMove = useCallback((e: React.MouseEvent) => {
+        if (!timelineScrollRef.current) return;
+        const rect = timelineScrollRef.current.getBoundingClientRect();
+        // Mouse X relative to the visible viewport
+        const relativeX = e.clientX - rect.left;
+        // Absolute X in the scrollable content
+        const absoluteX = relativeX + scrollLeft;
+
+        // Update Razor Cursor
+        if (activeTool === 'razor') {
+            setMouseTime(absoluteX / zoomLevel);
+        }
+    }, [activeTool, zoomLevel, scrollLeft]);
+
+    const handleContainerMouseMove = (e: React.MouseEvent) => {
+        handleMouseMove(e);
+    };
+
+    const handleContainerClick = (e: React.MouseEvent) => {
+        if (activeTool === 'razor' && onSplit) {
+            if (!timelineScrollRef.current) return;
+            const rect = timelineScrollRef.current.getBoundingClientRect();
+            const x = e.clientX - rect.left + scrollLeft;
+            const clickTime = Math.max(0, x / zoomLevel);
+
+            // Find which item was clicked
+            for (const track of tracks) {
+                for (const item of track.items) {
+                    if (clickTime >= item.start && clickTime <= item.start + item.duration) {
+                        // Only split if the item is currently selected
+                        const isSelected = (track.type === 'voice' && activeBlockId === item.blockId) ||
+                            (track.type !== 'voice' && activeVideoId === item.id);
+
+                        if (isSelected) {
+                            onSplit(item.blockId || item.id, clickTime, track.type);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+    };
 
     const handlePlayPause = () => {
         setIsPlaying(!isPlaying);
@@ -668,14 +726,17 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                 return { ...item, start: newStart, duration: newDuration };
             }
             return item;
-        }));
+        }), false); // Do not commit to history during drag
     }, [isResizing, resizeItem, resizeHandle, initialMouseX, initialItemStart, initialItemDuration, zoomLevel, onVideoTrackUpdate]);
 
     const handleResizeEnd = useCallback(() => {
         setIsResizing(false);
         setResizeItem(null);
         setResizeHandle(null);
-    }, []);
+        if (onVideoTrackUpdate) {
+            onVideoTrackUpdate(videoTrackItems, true); // Commit final state to history
+        }
+    }, [videoTrackItems, onVideoTrackUpdate]);
 
     useEffect(() => {
         if (isResizing) {
@@ -732,8 +793,17 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
             if (index === -1) return prevCards;
 
             const card = prevCards[index];
-            // Only update if difference > 0.2s to prevent infinite loops from micro-adjustments
-            if (Math.abs((card.duration || 0) - duration) > 0.2) {
+            const currentDuration = card.duration || 0;
+
+            // Logic: 
+            // - If uninitialized (0), align with file duration.
+            // - If current > duration (file is shorter than block), snap to file length.
+            // - If current < duration (block is shorter than file), assume USER TRIMMED it. Do not extend.
+
+            const shouldUpdate = currentDuration === 0 ||
+                (Math.abs(currentDuration - duration) > 0.2 && currentDuration > duration);
+
+            if (shouldUpdate) {
                 const newCards = [...prevCards];
                 newCards[index] = { ...card, duration: duration };
                 return newCards;
@@ -777,59 +847,85 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
             <audio ref={audioRef} className="hidden" />
 
             {/* Toolbar */}
-            <div className="h-12 bg-[#2A2A2A] border-b border-[#8E8D8D] flex items-center justify-between px-4 z-30 shadow-md">
-                <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" className="h-10 w-10 p-0 text-gray-300 hover:text-white hover:bg-white/10 rounded-full" onClick={() => handleSeek(0)}>
-                        <SkipBack size={24} />
+            <div className="h-16 bg-[#1a1a1a] border-b border-[#333] flex items-center justify-between px-4 z-30 shadow-md relative">
+
+                {/* Left: Tools & History */}
+                <div className="flex items-center gap-4">
+                    {/* History Group */}
+                    <div className="flex items-center gap-1 bg-[#252525] p-1 rounded-lg border border-[#333]">
+                        <button onClick={onUndo} disabled={!canUndo} className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-md disabled:opacity-30 transition-colors" title="Undo (Ctrl+Z)">
+                            <Undo2 size={18} />
+                        </button>
+                        <button onClick={onRedo} disabled={!canRedo} className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-md disabled:opacity-30 transition-colors" title="Redo (Ctrl+Y)">
+                            <Redo2 size={18} />
+                        </button>
+                    </div>
+
+                    <div className="w-px h-8 bg-[#333]" />
+
+                    {/* Tools Group */}
+                    <div className="flex items-center gap-1 bg-[#252525] p-1 rounded-lg border border-[#333]">
+                        <button
+                            onClick={() => onToolChange?.('select')}
+                            className={`p-2 rounded-md transition-all flex items-center justify-center ${activeTool === 'select' || !activeTool ? 'bg-[#333] text-white shadow-inner' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+                            title="Select Tool (V)"
+                        >
+                            <MousePointer2 size={18} />
+                        </button>
+                        <button
+                            onClick={() => onToolChange?.('razor')}
+                            className={`p-2 rounded-md transition-all flex items-center justify-center ${activeTool === 'razor' ? 'bg-[#F48969] text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+                            title="Split Tool (C)"
+                        >
+                            <Scissors size={18} />
+                        </button>
+                        <button onClick={onDelete} className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-400/10 rounded-md transition-colors flex items-center justify-center" title="Delete (Del)">
+                            <Trash2 size={18} />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Center: Playback (Absolute Centered) */}
+                <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center gap-4">
+                    <Button variant="ghost" size="sm" className="h-10 w-10 rounded-full hover:bg-white/5 text-gray-300 hover:text-white" onClick={() => handleSeek(0)}>
+                        <SkipBack size={22} className="fill-current" />
                     </Button>
-                    <Button
-                        variant="primary"
-                        size="sm"
-                        className="h-12 w-12 p-0 rounded-full bg-[#F48969] hover:bg-[#E07858] text-white shadow-lg shadow-[#F48969]/20 flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
+                    <button
                         onClick={handlePlayPause}
+                        className="h-12 w-12 flex items-center justify-center rounded-full bg-[#F48969] hover:bg-[#E07858] text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
                     >
-                        {isPlaying ? (
-                            <Pause size={28} fill="currentColor" className="text-white" />
-                        ) : (
-                            <Play size={28} fill="currentColor" className="ml-1 text-white" />
-                        )}
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-10 w-10 p-0 text-gray-300 hover:text-white hover:bg-white/10 rounded-full" onClick={() => handleSeek(totalDuration)}>
-                        <SkipForward size={24} />
+                        {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
+                    </button>
+                    <Button variant="ghost" size="sm" className="h-10 w-10 rounded-full hover:bg-white/5 text-gray-300 hover:text-white" onClick={() => handleSeek(totalDuration)}>
+                        <SkipForward size={22} className="fill-current" />
                     </Button>
                 </div>
 
+                {/* Right: Info & Zoom */}
                 <div className="flex items-center gap-4">
-                    <div className="bg-black/30 px-3 py-1 rounded text-xs font-mono text-[#F48969] border border-[#F48969]/20 shadow-inner">
+                    <div className="bg-[#151515] px-3 py-1.5 rounded-md font-mono text-[#F48969] border border-[#F48969]/20 shadow-inner text-sm tracking-wider">
                         {formatTimeFull(currentTime)}
                     </div>
-                    {/* Speed Toggle Button */}
-                    <Button variant="ghost" size="sm" onClick={toggleSpeed} title="Playback Speed" className="min-w-[40px] h-8 px-2 text-gray-300 hover:text-white hover:bg-white/10 rounded-md">
-                        <span className="text-xs font-bold">{playbackRate}x</span>
+                    <Button variant="ghost" size="sm" onClick={toggleSpeed} title="Playback Speed" className="text-xs font-bold text-gray-400 hover:text-white">
+                        {playbackRate}x
                     </Button>
-                    {onGenerateAll && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 gap-2 text-[#F48969] hover:text-[#F48969] hover:bg-[#F48969]/10"
-                            onClick={onGenerateAll}
-                            title="توليد الكل (Generate All)"
+                    <div className="hidden md:flex items-center gap-1 bg-[#252525] rounded-lg p-1 border border-[#333]">
+                        <button
+                            className="h-8 w-8 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-all flex items-center justify-center p-0"
+                            onClick={() => handleZoom('out')}
+                            title="Zoom Out"
                         >
-                            <Wand2 size={16} />
-                            <span className="text-xs font-bold">توليد الكل</span>
-                        </Button>
-                    )}
-                </div>
-
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 bg-black/20 rounded-lg p-1">
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleZoom('out')}><ZoomOut size={14} /></Button>
-                        <span className="text-xs w-12 text-center">{Math.round(zoomLevel)}%</span>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleZoom('in')}><ZoomIn size={14} /></Button>
+                            <ZoomOut size={16} />
+                        </button>
+                        <span className="text-xs w-10 text-center text-gray-500 font-medium select-none">{Math.round(zoomLevel)}%</span>
+                        <button
+                            className="h-8 w-8 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-all flex items-center justify-center p-0"
+                            onClick={() => handleZoom('in')}
+                            title="Zoom In"
+                        >
+                            <ZoomIn size={16} />
+                        </button>
                     </div>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-gray-400 hover:text-white">
-                        <Settings size={18} />
-                    </Button>
                 </div>
             </div>
 
@@ -863,6 +959,9 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                     }}
                     onDragOver={handleDragOver}
                     onDrop={handleDrop}
+                    onMouseMove={handleContainerMouseMove}
+                    onMouseLeave={() => setMouseTime(-1)}
+                    onClick={handleContainerClick}
                 >
                     {/* Time Ruler */}
                     <div className="sticky top-0 z-10">
@@ -882,6 +981,18 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                             className="absolute top-0 bottom-0 w-px bg-[#F48969] z-30 pointer-events-none shadow-[0_0_10px_rgba(244,137,105,0.5)]"
                             style={{ left: `${currentTime * zoomLevel}px` }}
                         />
+
+                        {/* Razor Cursor */}
+                        {activeTool === 'razor' && mouseTime >= 0 && (
+                            <div
+                                className="absolute top-0 bottom-0 border-l border-dashed border-red-500/70 pointer-events-none z-50 flex flex-col items-center"
+                                style={{ left: `${mouseTime * zoomLevel}px` }}
+                            >
+                                <div className="absolute -top-4 text-red-500 bg-white dark:bg-black rounded-full p-0.5 shadow-sm border border-red-500/20">
+                                    <Scissors size={14} />
+                                </div>
+                            </div>
+                        )}
 
                         {/* Tracks */}
                         <div className="flex flex-col">
@@ -904,17 +1015,31 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                                         return (
                                             <div
                                                 key={item.id}
-                                                draggable={true}
-                                                onDragStart={(e) => handleDragStart(e, item.blockId || item.id, track.type)}
+                                                draggable={activeTool !== 'razor'} // Disable drag if razor tool is active
+                                                onDragStart={(e) => activeTool !== 'razor' && handleDragStart(e, item.blockId || item.id, track.type)}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    if (track.type === 'image') onVideoClick?.(item.id);
-                                                    else if (track.type === 'voice') onBlockClick?.(item.blockId!);
+                                                    if (activeTool === 'razor' && onSplit) {
+                                                        const isSelected = (track.type === 'voice' && activeBlockId === item.blockId) ||
+                                                            (track.type !== 'voice' && activeVideoId === item.id);
+
+                                                        if (isSelected) {
+                                                            if (!timelineScrollRef.current) return;
+                                                            const rect = timelineScrollRef.current.getBoundingClientRect();
+                                                            const x = e.clientX - rect.left + scrollLeft;
+                                                            const clickTime = Math.max(0, x / zoomLevel);
+
+                                                            onSplit(item.blockId || item.id, clickTime, track.type);
+                                                        }
+                                                    } else {
+                                                        if (track.type === 'image') onVideoClick?.(item.id);
+                                                        else if (track.type === 'voice') onBlockClick?.(item.blockId!);
+                                                    }
                                                 }}
                                                 className={`absolute top-1 bottom-1 rounded-md overflow-hidden cursor-move group select-none transition-all ${(track.type === 'voice' && activeBlockId === item.blockId) || (track.type === 'image' && activeVideoId === item.id)
                                                     ? 'ring-2 ring-white z-20 shadow-xl'
                                                     : 'hover:ring-1 hover:ring-white/50 z-10'
-                                                    } ${draggingItemId === (item.blockId || item.id) ? 'opacity-50' : ''}`}
+                                                    } ${draggingItemId === (item.blockId || item.id) ? 'opacity-50' : ''} ${activeTool === 'razor' ? 'cursor-crosshair' : ''}`}
                                                 style={{
                                                     left: `${left}px`,
                                                     width: `${width}px`,

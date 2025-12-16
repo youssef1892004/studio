@@ -10,6 +10,8 @@ interface ToolbarProps {
     canRedo?: boolean;
     enableTashkeel?: boolean;
     onToggleTashkeel?: () => void;
+    activeTool?: 'select' | 'razor';
+    onToolChange?: (tool: 'select' | 'razor') => void;
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({
@@ -21,6 +23,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
     canRedo = false,
     enableTashkeel = true,
     onToggleTashkeel,
+    activeTool = 'select',
+    onToolChange,
 }) => {
     return (
         <div className="h-14 bg-studio-bg-light dark:bg-studio-bg border-b border-studio-border-light dark:border-studio-border flex items-center justify-between px-4 shadow-sm z-10">
@@ -50,8 +54,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
                 <div className="flex items-center gap-1">
                     <button
-                        className="p-2 rounded-md text-studio-text-light dark:text-studio-text hover:bg-studio-panel-light dark:hover:bg-studio-panel hover:text-studio-accent transition-all"
-                        title="قص / تقسيم (Split/Cut)"
+                        onClick={() => onToolChange?.(activeTool === 'razor' ? 'select' : 'razor')}
+                        className={`p-2 rounded-md transition-all ${activeTool === 'razor'
+                                ? 'bg-studio-accent text-white shadow-inner'
+                                : 'text-studio-text-light dark:text-studio-text hover:bg-studio-panel-light dark:hover:bg-studio-panel hover:text-studio-accent'
+                            }`}
+                        title="قص / تقسيم (Split/Cut) [C]"
                     >
                         <Scissors className="w-4 h-4" />
                     </button>
@@ -71,8 +79,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
                     <button
                         onClick={onToggleTashkeel}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${enableTashkeel
-                                ? 'bg-studio-accent/10 text-studio-accent border border-studio-accent/20'
-                                : 'text-studio-text-light dark:text-studio-text hover:bg-studio-panel-light dark:hover:bg-studio-panel'
+                            ? 'bg-studio-accent/10 text-studio-accent border border-studio-accent/20'
+                            : 'text-studio-text-light dark:text-studio-text hover:bg-studio-panel-light dark:hover:bg-studio-panel'
                             }`}
                         title="تشكيل تلقائي (Auto Tashkeel)"
                     >

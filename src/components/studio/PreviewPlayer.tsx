@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Maximize, Volume2 } from 'lucide-react';
 
 interface PreviewPlayerProps {
-    activeMedia?: { id?: string; url: string; type: string; start: number; volume?: number } | null;
+    activeMedia?: { id?: string; url: string; type: string; start: number; volume?: number; mediaStartOffset?: number } | null;
     isPlaying?: boolean;
     currentTime?: number;
     onPlayPause?: () => void;
@@ -27,8 +27,9 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({ activeMedia, isPlaying = 
     useEffect(() => {
         if (activeMedia?.type === 'video' && videoRef.current) {
             const vid = videoRef.current;
-            // Calculate local time within the clip
-            const targetTime = Math.max(0, currentTime - activeMedia.start);
+            // Calculate local time within the clip (timeline time - clip start + clip internal offset)
+            const offset = activeMedia.mediaStartOffset || 0;
+            const targetTime = Math.max(0, currentTime - activeMedia.start + offset);
 
             // Sync play state
             if (isPlaying && vid.paused) {

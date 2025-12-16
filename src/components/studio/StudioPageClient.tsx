@@ -24,7 +24,8 @@ import CenteredLoader from '@/components/CenteredLoader';
 import PreviewPlayer from '@/components/studio/PreviewPlayer';
 import DynamicPanel from '@/components/studio/DynamicPanel';
 import StudioContextMenu from '@/components/studio/StudioContextMenu';
-import PropertiesPanel from '@/components/studio/PropertiesPanel'; // New Import
+import PropertiesPanel from '@/components/studio/PropertiesPanel';
+import { useStudioHistory } from '@/hooks/useStudioHistory';
 
 import { getApiUrl } from '@/lib/tts';
 import { notFound } from 'next/navigation';
@@ -40,6 +41,49 @@ export default function StudioPageClient() {
     const [cards, setCards] = useState<StudioBlock[]>([]);
     const [isExporting, setIsExporting] = useState(false);
     const [videoTrackItems, setVideoTrackItems] = useState<TimelineItem[]>([]);
+
+    // Undo/Redo History
+    const {
+        undo: undoHistory,
+        redo: redoHistory,
+        pushState,
+        canUndo,
+        canRedo,
+        resetHistory
+    } = useStudioHistory<{ cards: StudioBlock[], videoTrackItems: TimelineItem[] }>({ cards: [], videoTrackItems: [] });
+
+    // History Helper
+    const recordHistory = (newCards: StudioBlock[], newItems: TimelineItem[]) => {
+        pushState({ cards: newCards, videoTrackItems: newItems });
+    };
+
+    const handleUndo = () => {
+        const state = undoHistory();
+        if (state) {
+            setCards(state.cards);
+            setVideoTrackItems(state.videoTrackItems);
+        }
+    };
+
+    const handleRedo = () => {
+        const state = redoHistory();
+        if (state) {
+            setCards(state.cards);
+            setVideoTrackItems(state.videoTrackItems);
+        }
+    };
+
+    // Wrapper for Timeline updates
+    const handleVideoTrackUpdate = (newItems: TimelineItem[] | ((prev: TimelineItem[]) => TimelineItem[]), commit = true) => {
+        setVideoTrackItems(prev => {
+            const next = typeof newItems === 'function' ? newItems(prev) : newItems;
+            if (commit) {
+                console.log(`[UndoRedo] TrackUpdate: ${prev.length} -> ${next.length} items`);
+                recordHistory(cards, next); // Record change
+            }
+            return next;
+        });
+    };
 
     const handleExportVideo = async () => {
         setIsExporting(true);
@@ -105,6 +149,7 @@ export default function StudioPageClient() {
     const [activeLeftTool, setActiveLeftTool] = useState('voice');
     const [activeCardId, setActiveCardId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [activeTool, setActiveTool] = useState<'select' | 'razor'>('select');
 
     const addNewBlock = () => {
         if (voices.length > 0) {
@@ -114,6 +159,17 @@ export default function StudioPageClient() {
         }
     };
 
+    // Tools Shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLDivElement && e.target.isContentEditable) return;
+
+            if (e.key.toLowerCase() === 'v') setActiveTool('select');
+            if (e.key.toLowerCase() === 'c') setActiveTool('razor');
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
     const isInitialLoad = useRef(true);
 
     const [languageFilter, setLanguageFilter] = useState('all');
@@ -125,7 +181,7 @@ export default function StudioPageClient() {
 
     const [loadingMessage, setLoadingMessage] = useState("يتم تحميل المشروع...");
     const [loadingProgress, setLoadingProgress] = useState(0);
-    const [activeMedia, setActiveMedia] = useState<{ id?: string; url: string; type: string; start: number; volume?: number } | null>(null);
+    const [activeMedia, setActiveMedia] = useState<{ id?: string; url: string; type: string; start: number; volume?: number; mediaStartOffset?: number } | null>(null);
 
     // Playback State
     const [isPlaying, setIsPlaying] = useState(false);
@@ -220,19 +276,39 @@ export default function StudioPageClient() {
 
     const handleUpdateItemSpeed = (rate: number) => {
         if (activeVideoId) {
-            setVideoTrackItems(prev => prev.map(item => item.id === activeVideoId ? { ...item, playbackRate: rate } : item));
+            setVideoTrackItems(prev => {
+                const next = prev.map(item => item.id === activeVideoId ? { ...item, playbackRate: rate } : item);
+                recordHistory(cards, next);
+                return next;
+            });
         } else if (activeCardId) {
-            setCards(prev => prev.map(c => c.id === activeCardId ? { ...c, playbackRate: rate } : c));
+            setCards(prev => {
+                const next = prev.map(c => c.id === activeCardId ? { ...c, playbackRate: rate } : c);
+                recordHistory(next, videoTrackItems);
+                return next;
+            });
         }
     };
 
     const handleUpdateVolume = (vol: number) => {
         if (activeVideoId) {
-            setVideoTrackItems(prev => prev.map(item => item.id === activeVideoId ? { ...item, volume: vol } : item));
+            setVideoTrackItems(prev => {
+                const next = prev.map(item => item.id === activeVideoId ? { ...item, volume: vol } : item);
+                recordHistory(cards, next);
+                return next;
+            });
         } else if (activeCardId) {
-            setCards(prev => prev.map(c => c.id === activeCardId ? { ...c, volume: vol } : c));
+            setCards(prev => {
+                const next = prev.map(c => c.id === activeCardId ? { ...c, volume: vol } : c);
+                recordHistory(next, videoTrackItems);
+                return next;
+            });
         } else if (activeMedia?.id) {
-            setVideoTrackItems(prev => prev.map(item => item.id === activeMedia.id ? { ...item, volume: vol } : item));
+            setVideoTrackItems(prev => {
+                const next = prev.map(item => item.id === activeMedia.id ? { ...item, volume: vol } : item);
+                recordHistory(cards, next);
+                return next;
+            });
         }
     };
 
@@ -257,11 +333,19 @@ export default function StudioPageClient() {
                 break;
             case 'delete':
                 if (activeCardId) {
-                    setCards(prev => prev.filter(c => c.id !== activeCardId));
+                    setCards(prev => {
+                        const next = prev.filter(c => c.id !== activeCardId);
+                        recordHistory(next, videoTrackItems);
+                        return next;
+                    });
                     setActiveCardId(null);
                     toast.success('تم الحذف');
                 } else if (activeVideoId) {
-                    setVideoTrackItems(prev => prev.filter(i => i.id !== activeVideoId));
+                    setVideoTrackItems(prev => {
+                        const next = prev.filter(i => i.id !== activeVideoId);
+                        recordHistory(cards, next);
+                        return next;
+                    });
                     setActiveVideoId(null);
                     toast.success('تم حذف العنصر');
                 }
@@ -288,7 +372,11 @@ export default function StudioPageClient() {
                     const card = cards.find(c => c.id === activeCardId);
                     if (card) {
                         setStudioClipboard({ type: 'block', data: card });
-                        setCards(prev => prev.filter(c => c.id !== activeCardId));
+                        setCards(prev => {
+                            const next = prev.filter(c => c.id !== activeCardId);
+                            recordHistory(next, videoTrackItems);
+                            return next;
+                        });
                         setActiveCardId(null);
                         toast.success('تم القص');
                     }
@@ -296,7 +384,11 @@ export default function StudioPageClient() {
                     const item = videoTrackItems.find(i => i.id === activeVideoId);
                     if (item) {
                         setStudioClipboard({ type: 'video', data: item });
-                        setVideoTrackItems(prev => prev.filter(i => i.id !== activeVideoId));
+                        setVideoTrackItems(prev => {
+                            const next = prev.filter(i => i.id !== activeVideoId);
+                            recordHistory(cards, next);
+                            return next;
+                        });
                         setActiveVideoId(null);
                         toast.success('تم قص العنصر');
                     }
@@ -307,7 +399,11 @@ export default function StudioPageClient() {
                     if (studioClipboard.type === 'block') {
                         const newId = uuidv4();
                         const newBlock = { ...studioClipboard.data, id: newId };
-                        setCards(prev => [...prev, newBlock]);
+                        setCards(prev => {
+                            const next = [...prev, newBlock];
+                            recordHistory(next, videoTrackItems);
+                            return next;
+                        });
                         toast.success('تم اللصق');
                     } else if (studioClipboard.type === 'video') {
                         const newId = uuidv4();
@@ -316,7 +412,11 @@ export default function StudioPageClient() {
                             id: newId,
                             start: currentTime // Paste at Playhead
                         };
-                        setVideoTrackItems(prev => [...prev, newItem]);
+                        setVideoTrackItems(prev => {
+                            const next = [...prev, newItem];
+                            recordHistory(cards, next);
+                            return next;
+                        });
                         toast.success('تم لصق العنصر');
                     }
                 } else {
@@ -331,9 +431,12 @@ export default function StudioPageClient() {
                         const newBlock = { ...card, id: newId };
                         // Insert after current
                         const index = cards.findIndex(c => c.id === activeCardId);
-                        const newCards = [...cards];
-                        newCards.splice(index + 1, 0, newBlock);
-                        setCards(newCards);
+                        setCards(prev => {
+                            const newCards = [...prev];
+                            newCards.splice(index + 1, 0, newBlock);
+                            recordHistory(newCards, videoTrackItems);
+                            return newCards;
+                        });
                         toast.success('تم التكرار');
                     }
                 } else if (activeVideoId) {
@@ -341,7 +444,11 @@ export default function StudioPageClient() {
                     if (item) {
                         const newId = uuidv4();
                         const newItem = { ...item, id: newId, start: item.start + item.duration };
-                        setVideoTrackItems(prev => [...prev, newItem]);
+                        setVideoTrackItems(prev => {
+                            const next = [...prev, newItem];
+                            recordHistory(cards, next);
+                            return next;
+                        });
                         toast.success('تم تكرار العنصر');
                     }
                 }
@@ -413,7 +520,11 @@ export default function StudioPageClient() {
                 setProjectTitle(projectData.name || "Untitled Project");
                 setProjectDescription(projectData.description || "");
                 setVoices(allVoices);
-                setCards(blocksData
+                setProjectTitle(projectData.name || "Untitled Project");
+                setProjectDescription(projectData.description || "");
+                setVoices(allVoices);
+
+                const processedCards = blocksData
                     .filter((b: any) => {
                         if (b.id === 'merge' || b.block_index === 'merge' || b.block_index === 'record' || b.block_index === 'merged_blocks') return false;
                         if (b.s3_url && (typeof b.s3_url === 'string') && (b.s3_url.includes('_block') || b.s3_url.includes('_final'))) return false;
@@ -440,10 +551,19 @@ export default function StudioPageClient() {
                             duration: card.duration ? (card.duration > 100 ? card.duration / 1000 : card.duration) : card.duration,
                             isGenerating: false
                         };
-                    }));
+                    });
+
+                setCards(processedCards);
+
                 if (blocksData.length > 0) {
                     setActiveCardId(blocksData[0].id);
                 }
+
+                // Initialize History with loaded data
+                resetHistory({
+                    cards: processedCards,
+                    videoTrackItems: (projectData.blocks_json && Array.isArray(projectData.blocks_json)) ? projectData.blocks_json : []
+                });
 
             } catch (err) {
                 console.error("Failed to fetch project data:", err);
@@ -683,7 +803,9 @@ export default function StudioPageClient() {
                 isArabic: enableTashkeel,
                 voiceSelected: false,
             };
-            return [...prevCards, newCard];
+            const next = [...prevCards, newCard];
+            recordHistory(next, videoTrackItems);
+            return next;
         });
         setActiveCardId(newCardId);
     }, [voices, projectId, enableTashkeel]);
@@ -1097,7 +1219,7 @@ export default function StudioPageClient() {
                 isGenerating: false,
                 isArabic: enableTashkeel,
                 voiceSelected: true,
-                duration: 5, // Default placeholder duration
+                duration: 0, // 0 indicates uninitialized duration (will be auto-updated on load)
             };
             return [...prevCards, newCard];
         });
@@ -1177,6 +1299,89 @@ export default function StudioPageClient() {
         });
     };
 
+    const handleSplit = useCallback((itemId: string, splitTime: number, trackType: string) => {
+        if (trackType === 'voice') {
+            // Sort cards by block_index to ensure we split the correct visual item in sequence
+            const sortedCards = [...cards].sort((a, b) => parseInt(a.block_index) - parseInt(b.block_index));
+
+            const cardIndex = sortedCards.findIndex(c => c.id === itemId);
+            if (cardIndex === -1) return;
+            const card = sortedCards[cardIndex];
+
+            // Calculate start time of this card
+            let currentStart = 0;
+            for (let i = 0; i < cardIndex; i++) {
+                currentStart += (sortedCards[i].duration || 0);
+            }
+
+            const splitPointInItem = splitTime - currentStart;
+            const cardDuration = card.duration || 0;
+
+            if (splitPointInItem <= 0.1 || splitPointInItem >= cardDuration - 0.1) {
+                toast.error("Split point too close to edge.");
+                return;
+            }
+
+            const firstPart: StudioBlock = {
+                ...card,
+                duration: splitPointInItem
+            };
+
+            const secondPart: StudioBlock = {
+                ...card,
+                id: uuidv4(),
+                created_at: new Date().toISOString(),
+                // block_index will be recalculated by index in array ideally, or we just stringify it
+                block_index: (parseInt(card.block_index) + 1).toString(),
+                duration: cardDuration - splitPointInItem,
+                trimStart: (card.trimStart || 0) + splitPointInItem
+            };
+
+            const newCards = [...sortedCards];
+            newCards.splice(cardIndex, 1, firstPart, secondPart);
+
+            // Recalculate indexes
+            newCards.forEach((c, i) => c.block_index = i.toString());
+
+            setCards(newCards);
+            recordHistory(newCards, videoTrackItems);
+            toast.success('Voice block split!');
+
+        } else {
+            // Video/Image Split
+            const itemToSplit = videoTrackItems.find(item => item.id === itemId);
+            if (!itemToSplit) return;
+
+            const splitPointInItem = splitTime - itemToSplit.start;
+
+            if (splitPointInItem <= 0.1 || splitPointInItem >= itemToSplit.duration - 0.1) {
+                toast.error("Split point too close to edge.");
+                return;
+            }
+
+            const firstPart: TimelineItem = {
+                ...itemToSplit,
+                duration: splitPointInItem,
+            };
+
+            const secondPart: TimelineItem = {
+                ...itemToSplit,
+                id: uuidv4(),
+                start: splitTime,
+                duration: itemToSplit.duration - splitPointInItem,
+                mediaStartOffset: (itemToSplit.mediaStartOffset || 0) + splitPointInItem
+            };
+
+            const newItems = videoTrackItems.flatMap(item =>
+                item.id === itemId ? [firstPart, secondPart] : item
+            );
+
+            setVideoTrackItems(newItems);
+            recordHistory(cards, newItems);
+            toast.success('Item split successfully!');
+        }
+    }, [cards, videoTrackItems, recordHistory]);
+
     const languages = Array.from(new Map(voices.map(v => [v.languageCode, { code: v.languageCode, name: v.languageName }])).values());
     const countries = Array.from(new Map(voices.map(v => [v.countryCode, { code: v.countryCode, name: v.countryName }])).values()).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
     const providers = Array.from(new Set(voices.map(v => v.provider))).filter(p => p);
@@ -1238,87 +1443,94 @@ export default function StudioPageClient() {
                     {/* Main Content Area */}
                     <div className="flex-1 flex flex-col overflow-hidden">
                         {/* Top Toolbar */}
+                        {/* Top Toolbar */}
                         <Toolbar
                             onExport={handleDownloadAll}
                             onExportVideo={handleExportVideo}
-                            onUndo={() => { }}
-                            onRedo={() => { }}
-                            canUndo={false}
-                            canRedo={false}
+                            onUndo={handleUndo}
+                            onRedo={handleRedo}
+                            canUndo={canUndo}
+                            canRedo={canRedo}
                             enableTashkeel={enableTashkeel}
                             onToggleTashkeel={() => setEnableTashkeel(!enableTashkeel)}
+                            activeTool={activeTool}
+                            onToolChange={setActiveTool}
                         />
 
+                        {/* Middle Area: Split View (Left Panel + Center Player + Right Properties) */}
+                        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
 
-                        <div className="flex-1 flex flex-col overflow-hidden relative">
-                            {/* Middle Area: Split View (Preview + Dynamic Panel) */}
-                            {/* Middle Area: Split View (Left Panel + Center Player + Right Properties) */}
-                            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-
-                                {/* Right: Properties Panel (Now First in Source -> Right in RTL) */}
-                                <div className="w-full lg:w-[300px] flex-shrink-0 bg-[#1E1E1E] border-l border-studio-border z-10 overflow-y-auto">
-                                    <PropertiesPanel
-                                        selectedItem={selectedItem}
-                                        currentGlobalSpeed={selectedItem?.playbackRate ?? playbackRate}
-                                        onUpdateVolume={handleUpdateVolume}
-                                        onUpdateSpeed={handleUpdateItemSpeed}
-                                        onDelete={handleDeleteSelection}
-                                    />
-                                </div>
-
-                                {/* Center: Preview Player */}
-                                <div className="flex-1 flex flex-col relative bg-black/20 overflow-hidden">
-                                    <PreviewPlayer
-                                        activeMedia={activeMedia}
-                                        isPlaying={isPlaying}
-                                        currentTime={currentTime}
-                                        playbackRate={playbackRate}
-                                        onPlayPause={() => timelineRef.current?.togglePlayPause()}
-                                        onSeek={(t) => timelineRef.current?.seek(t)}
-                                        onVolumeChange={handleUpdateVolume}
-                                    />
-                                </div>
-
-                                {/* Left: Dynamic Panel (Now Last in Source -> Left in RTL) */}
-                                <div ref={dynamicPanelRef} className={`w-full lg:w-[340px] flex-shrink-0 bg-studio-bg-light dark:bg-studio-bg border-r border-studio-border-light dark:border-studio-border z-10 overflow-y-auto ${!activeLeftTool ? 'hidden' : ''}`}>
-                                    <DynamicPanel
-                                        voices={voices}
-                                        activeTool={activeLeftTool}
-                                        onGenerateVoice={handleCreateAndGenerateVoice}
-                                        activeBlock={activeCard}
-                                        blockIndex={activeCardId ? (cards.findIndex(c => c.id === activeCardId) + 1) : undefined}
-                                        onUpdateBlock={handleUpdateBlock}
-                                        onDeleteBlock={handleDeleteBlock}
-                                        onClearSelection={() => setActiveCardId(null)}
-                                        onAddGhostBlock={handleAddGhostBlock}
-                                        project={project}
-                                        onAssetsUpdated={handleAssetsUpdated}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Timeline Area */}
-                            <div className="h-[180px] md:h-[250px] flex-shrink-0 border-t border-studio-border-light dark:border-studio-border bg-studio-panel-light dark:bg-studio-panel z-10">
-                                <Timeline
-                                    cards={cards}
-                                    voices={voices}
-                                    onCardsUpdate={setCards}
-                                    isBlocksProcessing={isGenerating}
-                                    onBlockClick={handleBlockClick}
-                                    onAddBlock={addNewBlock}
-                                    onGenerateAll={handleGenerateAll}
-                                    videoTrackItems={videoTrackItems}
-                                    onVideoTrackUpdate={setVideoTrackItems}
-                                    activeBlockId={activeCardId}
-                                    onActiveMediaChange={setActiveMedia}
-                                    onTimeUpdate={setCurrentTime}
-                                    onIsPlayingChange={setIsPlaying}
-                                    activeVideoId={activeVideoId}
-                                    onVideoClick={handleVideoSelect}
-                                    onPlaybackRateChange={setPlaybackRate}
-                                    ref={timelineRef}
+                            {/* Right: Properties Panel (Now First in Source -> Right in RTL) */}
+                            <div className="w-full lg:w-[300px] flex-shrink-0 bg-[#1E1E1E] border-l border-studio-border z-10 overflow-y-auto">
+                                <PropertiesPanel
+                                    selectedItem={selectedItem}
+                                    currentGlobalSpeed={selectedItem?.playbackRate ?? playbackRate}
+                                    onUpdateVolume={handleUpdateVolume}
+                                    onUpdateSpeed={handleUpdateItemSpeed}
+                                    onDelete={handleDeleteSelection}
                                 />
                             </div>
+
+                            {/* Center: Preview Player */}
+                            <div className="flex-1 flex flex-col relative bg-black/20 overflow-hidden">
+                                <PreviewPlayer
+                                    activeMedia={activeMedia}
+                                    isPlaying={isPlaying}
+                                    currentTime={currentTime}
+                                    playbackRate={playbackRate}
+                                    onPlayPause={() => timelineRef.current?.togglePlayPause()}
+                                    onSeek={(t) => timelineRef.current?.seek(t)}
+                                    onVolumeChange={handleUpdateVolume}
+                                />
+                            </div>
+
+                            {/* Left: Dynamic Panel (Now Last in Source -> Left in RTL) */}
+                            <div ref={dynamicPanelRef} className={`w-full lg:w-[340px] flex-shrink-0 bg-studio-bg-light dark:bg-studio-bg border-r border-studio-border-light dark:border-studio-border z-10 overflow-y-auto ${!activeLeftTool ? 'hidden' : ''}`}>
+                                <DynamicPanel
+                                    voices={voices}
+                                    activeTool={activeLeftTool}
+                                    onGenerateVoice={handleCreateAndGenerateVoice}
+                                    activeBlock={activeCard}
+                                    blockIndex={activeCardId ? (cards.findIndex(c => c.id === activeCardId) + 1) : undefined}
+                                    onUpdateBlock={handleUpdateBlock}
+                                    onDeleteBlock={handleDeleteBlock}
+                                    onClearSelection={() => setActiveCardId(null)}
+                                    onAddGhostBlock={handleAddGhostBlock}
+                                    project={project}
+                                    onAssetsUpdated={handleAssetsUpdated}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Timeline Area */}
+                        <div className="h-[180px] md:h-[250px] flex-shrink-0 border-t border-studio-border-light dark:border-studio-border bg-studio-panel-light dark:bg-studio-panel z-10">
+                            <Timeline
+                                cards={cards}
+                                voices={voices}
+                                onCardsUpdate={setCards}
+                                isBlocksProcessing={isGenerating}
+                                onBlockClick={handleBlockClick}
+                                onAddBlock={addNewBlock}
+                                onGenerateAll={handleGenerateAll}
+                                videoTrackItems={videoTrackItems}
+                                onVideoTrackUpdate={handleVideoTrackUpdate}
+                                activeBlockId={activeCardId}
+                                onActiveMediaChange={setActiveMedia}
+                                onTimeUpdate={setCurrentTime}
+                                onIsPlayingChange={setIsPlaying}
+                                activeVideoId={activeVideoId}
+                                onVideoClick={handleVideoSelect}
+                                onPlaybackRateChange={setPlaybackRate}
+                                activeTool={activeTool}
+                                onSplit={handleSplit}
+                                onToolChange={setActiveTool}
+                                onDelete={handleDeleteSelection}
+                                onUndo={handleUndo}
+                                onRedo={handleRedo}
+                                canUndo={canUndo}
+                                canRedo={canRedo}
+                                ref={timelineRef}
+                            />
                         </div>
                     </div>
                 </div>

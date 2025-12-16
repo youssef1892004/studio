@@ -81,14 +81,17 @@ export async function renderTimelineToVideo(
 
             // We must strictly trim/limit duration to item.duration
             if (isVideo) {
-                // Convert video to TS
-                await ffmpeg.exec(['-i', inputName, '-t', item.duration.toFixed(3), ...commonOut, segName]);
+                const offset = (item.mediaStartOffset || 0).toFixed(3);
+                const duration = item.duration.toFixed(3);
+
+                // Convert video to TS with Seek
+                await ffmpeg.exec(['-ss', offset, '-i', inputName, '-t', duration, ...commonOut, segName]);
 
                 // Extract Audio
                 const audName = `v_aud_${i}.wav`;
                 try {
-                    // Extract audio
-                    await ffmpeg.exec(['-i', inputName, '-t', item.duration.toFixed(3), '-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2', audName]);
+                    // Extract audio with Seek
+                    await ffmpeg.exec(['-ss', offset, '-i', inputName, '-t', duration, '-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2', audName]);
                     // Verify file creation involved? ffmpeg throws if fail usually.
                     audioSources.push({ filename: audName, start: item.start, volume: item.volume });
                 } catch (e) { /* Ignore if no audio */ }
@@ -111,10 +114,19 @@ export async function renderTimelineToVideo(
     for (let i = 0; i < audioItems.length; i++) {
         const item = audioItems[i];
         const name = `voice_${i}.mp3`;
+        const rawName = `raw_${name}`;
         let url = item.audioUrl || "";
         if (url.startsWith('http')) url = `/api/proxy-audio?url=${encodeURIComponent(url)}`;
         try {
-            await ffmpeg.writeFile(name, await fetchFile(url));
+            await ffmpeg.writeFile(rawName, await fetchFile(url));
+
+            // Trim/Cut Audio Segment
+            const offset = (item.mediaStartOffset || 0).toFixed(3);
+            const duration = item.duration.toFixed(3);
+
+            // Cut and save to 'name'
+            await ffmpeg.exec(['-ss', offset, '-t', duration, '-i', rawName, '-vn', name]);
+
             audioSources.push({ filename: name, start: item.start, volume: item.volume });
             maxAudioEnd = Math.max(maxAudioEnd, item.start + item.duration);
         } catch (e) {
