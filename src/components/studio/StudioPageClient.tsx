@@ -41,6 +41,8 @@ export default function StudioPageClient() {
     const [cards, setCards] = useState<StudioBlock[]>([]);
     const [isExporting, setIsExporting] = useState(false);
     const [videoTrackItems, setVideoTrackItems] = useState<TimelineItem[]>([]);
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [exportSettings, setExportSettings] = useState({ resolution: '720p', fps: 30 });
 
     // Undo/Redo History
     const {
@@ -85,7 +87,12 @@ export default function StudioPageClient() {
         });
     };
 
-    const handleExportVideo = async () => {
+    const handleExportClick = () => {
+        setShowExportModal(true);
+    };
+
+    const confirmExport = async () => {
+        setShowExportModal(false);
         setIsExporting(true);
         const toastId = toast.loading('Initializing video export engine (WASM)...');
 
@@ -121,20 +128,28 @@ export default function StudioPageClient() {
             // Visual items (exclude music)
             const visualItems = videoTrackItems.filter(i => i.type !== 'music');
 
-            toast.loading('Rendering video in browser... this may take a moment.', { id: toastId });
+            toast.loading(`Rendering video (${exportSettings.resolution} @ ${exportSettings.fps}fps)...`, { id: toastId });
+
+            // Resolve Settings
+            let width = 1280, height = 720;
+            if (exportSettings.resolution === '1080p') { width = 1920; height = 1080; }
+            if (exportSettings.resolution === '480p') { width = 854; height = 480; }
 
             // 3. Render
             const blob = await renderTimelineToVideo(visualItems, allAudioItems, {
-                width: 1280, // Default 720p for performance
-                height: 720,
-                fps: 30
+                width,
+                height,
+                fps: exportSettings.fps,
+                onProgress: (p) => {
+                    toast.loading(`Rendering video (${exportSettings.resolution}) ... ${p}%`, { id: toastId });
+                }
             });
 
             // 4. Download
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${projectTitle || 'video'}_export.mp4`;
+            a.download = `${projectTitle || 'video'}_${exportSettings.resolution}.mp4`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -1564,7 +1579,7 @@ export default function StudioPageClient() {
                         {/* Top Toolbar */}
                         <Toolbar
                             onExport={handleDownloadAll}
-                            onExportVideo={handleExportVideo}
+                            onExportVideo={handleExportClick}
                             onUndo={handleUndo}
                             onRedo={handleRedo}
                             canUndo={canUndo}
@@ -1653,6 +1668,73 @@ export default function StudioPageClient() {
                                 canRedo={canRedo}
                                 ref={timelineRef}
                             />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showExportModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-[#1E1E1E] p-6 rounded-xl border border-[#333] shadow-2xl w-[400px] flex flex-col gap-6 animate-in fade-in zoom-in duration-200">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-xl font-bold text-white">Export Settings</h2>
+                            <button onClick={() => setShowExportModal(false)} className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-white/10">
+                                <span className="sr-only">Close</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                            </button>
+                        </div>
+
+                        <div className="flex flex-col gap-4">
+                            <div className="flex flex-col gap-2">
+                                <label className="text-sm font-medium text-gray-400 border-b border-white/5 pb-1 mb-1">Resolution (Quality)</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {['480p', '720p', '1080p'].map((res) => (
+                                        <button
+                                            key={res}
+                                            onClick={() => setExportSettings(s => ({ ...s, resolution: res }))}
+                                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${exportSettings.resolution === res
+                                                ? 'bg-[#F48969] text-white shadow-lg ring-1 ring-[#F48969]'
+                                                : 'bg-[#2A2A2A] text-gray-300 hover:bg-[#333] hover:text-white'
+                                                }`}
+                                        >
+                                            {res}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col gap-2">
+                                <label className="text-sm font-medium text-gray-400 border-b border-white/5 pb-1 mb-1">Frame Rate</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {[24, 30, 60].map((fps) => (
+                                        <button
+                                            key={fps}
+                                            onClick={() => setExportSettings(s => ({ ...s, fps: fps }))}
+                                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${exportSettings.fps === fps
+                                                ? 'bg-[#F48969] text-white shadow-lg ring-1 ring-[#F48969]'
+                                                : 'bg-[#2A2A2A] text-gray-300 hover:bg-[#333] hover:text-white'
+                                                }`}
+                                        >
+                                            {fps} FPS
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 mt-2">
+                            <button
+                                onClick={() => setShowExportModal(false)}
+                                className="flex-1 px-4 py-2.5 rounded-lg bg-[#2A2A2A] text-gray-300 hover:bg-[#333] font-medium transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmExport}
+                                className="flex-1 px-4 py-2.5 rounded-lg bg-[#F48969] hover:bg-[#E07858] text-white font-bold shadow-lg shadow-[#F48969]/20 transition-all active:scale-95"
+                            >
+                                Start Export
+                            </button>
                         </div>
                     </div>
                 </div>

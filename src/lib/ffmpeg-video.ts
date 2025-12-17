@@ -9,6 +9,7 @@ interface RenderOptions {
     width?: number;
     height?: number;
     fps?: number;
+    onProgress?: (progress: number) => void;
 }
 
 export async function renderTimelineToVideo(
@@ -19,7 +20,7 @@ export async function renderTimelineToVideo(
     if (!ffmpeg) {
         ffmpeg = new FFmpeg();
     }
-    const { width = 1280, height = 720, fps = 30 } = opt;
+    const { width = 1280, height = 720, fps = 30, onProgress } = opt;
 
     if (!ffmpeg.loaded) {
         const baseURL = '/ffmpeg';
@@ -31,7 +32,8 @@ export async function renderTimelineToVideo(
 
     // Attach Loggers
     ffmpeg.on('log', ({ message }) => console.log('[FFmpeg]:', message));
-    ffmpeg.on('progress', ({ progress }) => console.log(`[FFmpeg] Progress: ${(progress * 100).toFixed(0)}%`));
+    // We handle progress manually via loops for better UX
+    // ffmpeg.on('progress', ({ progress }) => ... );
 
     const videoSegments: string[] = [];
     const audioSources: { filename: string, start: number, volume?: number }[] = [];
@@ -54,11 +56,18 @@ export async function renderTimelineToVideo(
     const visualItems = videoItems.filter(i => i.type !== 'text');
     const textItems = videoItems.filter(i => i.type === 'text');
 
-    // --- 1. Process Video Track (Visuals + Video Audio) ---
     const sortedVisualItems = [...visualItems].sort((a, b) => a.start - b.start);
     let currentVideoCursor = 0;
+    const totalSteps = sortedVisualItems.length + audioItems.length + 5; // approx
+    let completedSteps = 0;
+
+    const reportProgress = () => {
+        if (onProgress) onProgress(Math.min(99, Math.round((completedSteps / totalSteps) * 100)));
+    }
 
     for (let i = 0; i < sortedVisualItems.length; i++) {
+        completedSteps++;
+        reportProgress();
         const item = sortedVisualItems[i];
 
         // A. Handle Gap (Black Screen)
@@ -76,8 +85,8 @@ export async function renderTimelineToVideo(
         const inputName = `v_in_${i}.${ext}`;
         const segName = `seg_visual_${i}.ts`;
 
-        let url = item.content || ""; // Use item.content for visual items
-        if (url.startsWith('http')) url = `/api/proxy-asset?url=${encodeURIComponent(url)}`; // Assuming a proxy for assets
+        let url = item.audioUrl || item.content || ""; // Use audioUrl as priority for visual assets ensuring correct path
+        if (url.startsWith('http')) url = `/api/asset-proxy?url=${encodeURIComponent(url)}`; // Correct API endpoint
 
         try {
             console.time(`fetch_${i}`);
@@ -123,6 +132,10 @@ export async function renderTimelineToVideo(
             }
 
             videoSegments.push(segName);
+
+            // cleanup input immediately
+            try { await ffmpeg.deleteFile(inputName); } catch (e) { }
+
             currentVideoCursor += item.duration; // Use strict addition for precision tracking
 
         } catch (err) {
@@ -133,6 +146,8 @@ export async function renderTimelineToVideo(
     // --- 2. Process Voice Track ---
     let maxAudioEnd = 0;
     for (let i = 0; i < audioItems.length; i++) {
+        completedSteps++;
+        reportProgress();
         const item = audioItems[i];
         const name = `voice_${i}.mp3`;
         const rawName = `raw_${name}`;
@@ -149,6 +164,10 @@ export async function renderTimelineToVideo(
             await ffmpeg.exec(['-ss', offset, '-t', duration, '-i', rawName, '-vn', name]);
 
             audioSources.push({ filename: name, start: item.start, volume: item.volume });
+
+            // cleanup raw audio input
+            try { await ffmpeg.deleteFile(rawName); } catch (e) { }
+
             maxAudioEnd = Math.max(maxAudioEnd, item.start + item.duration);
         } catch (e) {
             console.error(`Error processing voice ${i}`, e);
@@ -170,6 +189,12 @@ export async function renderTimelineToVideo(
         const concatList = videoSegments.map(f => `file '${f}'`).join('\n');
         await ffmpeg.writeFile('concat_list.txt', concatList);
         await ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', 'concat_list.txt', '-c', 'copy', 'visual_out.mp4']);
+
+        // Cleanup segments
+        try { await ffmpeg.deleteFile('concat_list.txt'); } catch (e) { }
+        for (const seg of videoSegments) {
+            try { await ffmpeg.deleteFile(seg); } catch (e) { }
+        }
     } else {
         if (audioSources.length === 0) throw new Error("No content to export.");
         const duration = maxAudioEnd || 10;
@@ -222,22 +247,31 @@ export async function renderTimelineToVideo(
 
         const createTextImage = (item: TimelineItem): string => {
             const canvas = document.createElement('canvas');
-            canvas.width = 1920;
-            canvas.height = 1080;
+            // Use actual dynamic export resolution
+            canvas.width = width;
+            canvas.height = height;
             const ctx = canvas.getContext('2d');
             if (!ctx) return '';
 
             const style = item.textStyle || {};
-            const fontSize = (style.fontSize || 24) * 2; // Scale for 1080p
+            const scaleFactor = height / 720; // Scale relative to 720p baseline
+            const fontSize = (style.fontSize || 24) * scaleFactor;
 
             ctx.font = `${style.fontWeight || 'normal'} ${fontSize}px ${style.fontFamily || 'Arial'}`;
             ctx.textAlign = style.textAlign || 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = style.color || '#ffffff';
 
-            // Y Position
+            // Positional Logic
             const y = (style.yPosition !== undefined ? style.yPosition : 50) / 100 * canvas.height;
-            const x = canvas.width / 2;
+            let x = canvas.width / 2;
+            if (style.xPosition !== undefined) {
+                x = (style.xPosition / 100) * canvas.width;
+            } else {
+                // Fallback helpers
+                if (ctx.textAlign === 'left') x = canvas.width * 0.05;
+                if (ctx.textAlign === 'right') x = canvas.width * 0.95;
+            }
 
             // Text/Shadow
             ctx.shadowColor = 'rgba(0,0,0,0.5)';
