@@ -119,24 +119,24 @@ export default function RootLayout({
       <body className={cairo.className}>
         <EnvInjector
           env={{
-            NEXT_PUBLIC_HASURA_GRAPHQL_URL: process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL,
-            NEXT_PUBLIC_HASURA_ADMIN_SECRET: process.env.NEXT_PUBLIC_HASURA_ADMIN_SECRET,
-            NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
-            NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
-            NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
-            NEXT_PUBLIC_WEBSITE_IS_FREE: process.env.NEXT_PUBLIC_WEBSITE_IS_FREE,
+            NEXT_PUBLIC_HASURA_GRAPHQL_URL: process.env['NEXT_PUBLIC_HASURA_GRAPHQL_URL'],
+            NEXT_PUBLIC_HASURA_ADMIN_SECRET: process.env['NEXT_PUBLIC_HASURA_ADMIN_SECRET'],
+            NEXT_PUBLIC_BASE_URL: process.env['NEXT_PUBLIC_BASE_URL'],
+            NEXT_PUBLIC_POSTHOG_KEY: process.env['NEXT_PUBLIC_POSTHOG_KEY'],
+            NEXT_PUBLIC_POSTHOG_HOST: process.env['NEXT_PUBLIC_POSTHOG_HOST'],
+            NEXT_PUBLIC_WEBSITE_IS_FREE: process.env['NEXT_PUBLIC_WEBSITE_IS_FREE'],
           }}
         />
 
         <ClientLayout>
           {children}
         </ClientLayout>
-        {/* Umami Analytics */}
-        <Script
+        {/* Umami Analytics - Commented out to prevent CORP errors for now */}
+        {/* <Script
           src="https://cloud.umami.is/script.js"
           data-website-id="b3c8b995-c0f2-4e86-b0ce-a937cda2e208"
           strategy="afterInteractive"
-        />
+        /> */}
         {/* Schema Markup for SEO */}
         <Script
           id="schema-markup"

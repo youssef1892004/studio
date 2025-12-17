@@ -36,7 +36,7 @@ COPY . .
 # Copy Built WASM from Rust Stage
 COPY --from=rust-builder /app/public/wasm ./public/wasm
 
-# Build Environment Variables
+# Build Arguments
 ARG NEXT_PUBLIC_HASURA_GRAPHQL_URL
 ARG NEXT_PUBLIC_HASURA_ADMIN_SECRET
 ARG NEXT_PUBLIC_BASE_URL
@@ -75,7 +75,8 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # Copy Public Assets
-COPY --from=builder /app/public ./public
+# Copy Public Assets
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 # Copy Standalone Build
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

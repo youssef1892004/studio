@@ -7,7 +7,6 @@ interface PreviewPlayerProps {
     currentTime?: number;
     onPlayPause?: () => void;
     onSeek?: (time: number) => void;
-    onSeek?: (time: number) => void;
     onVolumeChange?: (volume: number) => void;
     playbackRate?: number;
     activeTextItems?: { id: string; content: string; style: any }[];

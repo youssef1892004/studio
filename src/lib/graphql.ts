@@ -3,8 +3,22 @@ import { SubscriptionClient } from 'subscriptions-transport-ws';
 import { Project, StudioBlock } from "./types";
 import { getEnv } from "./env";
 
-const HASURA_GRAPHQL_URL = getEnv('NEXT_PUBLIC_HASURA_GRAPHQL_URL');
-const HASURA_ADMIN_SECRET = getEnv('NEXT_PUBLIC_HASURA_ADMIN_SECRET');
+// Helper to get config dynamically
+const getConfig = () => {
+  // 1. Try Runtime Env (Docker/Window Client Side)
+  if (typeof window !== 'undefined' && (window as any).__ENV) {
+    return {
+      HASURA_GRAPHQL_URL: (window as any).__ENV.NEXT_PUBLIC_HASURA_GRAPHQL_URL,
+      HASURA_ADMIN_SECRET: (window as any).__ENV.NEXT_PUBLIC_HASURA_ADMIN_SECRET,
+    };
+  }
+  // 2. Fallback to Server Env / Build Support
+  // On server, prefer private env var if available, else public (accessed safely)
+  return {
+    HASURA_GRAPHQL_URL: process.env.HASURA_GRAPHQL_URL || process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL,
+    HASURA_ADMIN_SECRET: process.env.HASURA_ADMIN_SECRET || process.env.NEXT_PUBLIC_HASURA_ADMIN_SECRET
+  };
+};
 
 interface GraphQLResponse<T> {
   data?: T;
@@ -38,6 +52,8 @@ function normalizeBlockContent(raw: any) {
 }
 
 async function fetchGraphQL<T>(query: string, variables: Record<string, any>): Promise<GraphQLResponse<T>> {
+  const { HASURA_GRAPHQL_URL, HASURA_ADMIN_SECRET } = getConfig();
+
   if (!HASURA_GRAPHQL_URL || !HASURA_ADMIN_SECRET) {
     throw new Error("Required Hasura environment variables (NEXT_PUBLIC_HASURA_GRAPHQL_URL, NEXT_PUBLIC_HASURA_ADMIN_SECRET) are not set. Please check your environment variable configuration (.env.local for local development, or your hosting provider settings for production).");
   }
@@ -65,6 +81,8 @@ interface ExecuteGraphQLOptions {
 }
 
 export async function executeGraphQL<T>({ query, variables, headers = {} }: ExecuteGraphQLOptions): Promise<GraphQLResponse<T>> {
+  const { HASURA_GRAPHQL_URL, HASURA_ADMIN_SECRET } = getConfig();
+
   if (!HASURA_GRAPHQL_URL) {
     throw new Error("Required Hasura environment variable (NEXT_PUBLIC_HASURA_GRAPHQL_URL) is not set.");
   }
@@ -462,6 +480,8 @@ export const deleteBlockByIndex = async (projectId: string, blockIndex: string):
 // --- Subscription Function ---
 
 export const subscribeToBlocks = (projectId: string, callback: (blocks: StudioBlock[]) => void, onError?: (error: any) => void) => {
+  const { HASURA_GRAPHQL_URL, HASURA_ADMIN_SECRET } = getConfig();
+
   if (!HASURA_GRAPHQL_URL || !HASURA_ADMIN_SECRET) {
     throw new Error("Hasura environment variables are not configured");
   }
