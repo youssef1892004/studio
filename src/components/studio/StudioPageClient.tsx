@@ -1588,6 +1588,7 @@ export default function StudioPageClient() {
                             onToggleTashkeel={() => setEnableTashkeel(!enableTashkeel)}
                             activeTool={activeTool}
                             onToolChange={setActiveTool}
+                            onBack={() => router.push('/projects')}
                         />
 
                         {/* Middle Area: Split View (Left Panel + Center Player + Right Properties) */}

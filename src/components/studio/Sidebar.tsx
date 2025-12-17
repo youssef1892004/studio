@@ -1,5 +1,6 @@
 import React from 'react';
 import { Image, Mic, Upload, FolderOpen, Type } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 interface SidebarItem {
     id: string;
@@ -30,10 +31,38 @@ const StudioSidebar: React.FC<StudioSidebarProps> = ({
                 const Icon = item.icon;
                 const isActive = activeItem === item.id;
 
+                const handleClick = () => {
+                    if (item.id === 'image') {
+                        toast((t) => (
+                            <div className="flex flex-col gap-1 min-w-[200px]">
+                                <span className="font-bold text-base flex items-center gap-2">
+                                    🚧 قريباً جداً
+                                </span>
+                                <span className="text-sm opacity-90">
+                                    ميزة توليد الصور قيد التطوير حالياً وستكون متاحة في التحديث القادم!
+                                </span>
+                            </div>
+                        ), {
+                            style: {
+                                background: '#1E1E1E',
+                                color: '#fff',
+                                border: '1px solid #F48969',
+                                padding: '16px',
+                            },
+                            iconTheme: {
+                                primary: '#F48969',
+                                secondary: '#FFFAEE',
+                            },
+                        });
+                        return;
+                    }
+                    onItemClick?.(item.id);
+                };
+
                 return (
                     <button
                         key={item.id}
-                        onClick={() => onItemClick?.(item.id)}
+                        onClick={handleClick}
                         className={`
               group relative w-12 h-12 rounded-xl flex flex-col items-center justify-center gap-1
               transition-all duration-300 ease-out

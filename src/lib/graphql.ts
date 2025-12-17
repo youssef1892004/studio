@@ -139,9 +139,13 @@ export const INSERT_ASSET = `
     `;
 
 export const insertProject = async (name: string, description: string, userId: string): Promise<Project> => {
+  // Ensure name is present and not just whitespace
+  if (!name || !name.trim()) throw new Error("Project name is required");
+
+  // Use distinct variable names to avoid any potential binding conflicts
   const mutation = `
-      mutation InsertProjects($description: String, $name: String, $crated_at: timestamptz!, $user_id: uuid!) {
-        insert_Voice_Studio_projects(objects: {description: $description, name: $name, crated_at: $crated_at, user_id: $user_id}) {
+      mutation InsertProjects($desc: String, $projectName: String, $createdAt: timestamptz!, $userId: uuid!) {
+        insert_Voice_Studio_projects(objects: {description: $desc, name: $projectName, crated_at: $createdAt, user_id: $userId}) {
           returning {
             id
             name
@@ -152,18 +156,24 @@ export const insertProject = async (name: string, description: string, userId: s
         }
       }
     `;
+
   const variables = {
-    name: name,
-    description: description,
-    crated_at: new Date().toISOString(),
-    user_id: userId,
+    projectName: name.trim(), // Trim to ensure no empty strings
+    desc: description || "",
+    createdAt: new Date().toISOString(),
+    userId: userId,
   };
+
   const response = await executeGraphQL<{ insert_Voice_Studio_projects: { returning: Project[] } }>({
     query: mutation,
     variables,
-    // Using Admin Secret via defaultHeaders in executeGraphQL by omitting Authorization
   });
-  if (response.errors) throw new Error(response.errors[0].message);
+
+  if (response.errors) {
+    console.error("Insert Project Errors:", response.errors);
+    throw new Error(response.errors[0].message);
+  }
+
   return response.data!.insert_Voice_Studio_projects.returning[0];
 };
 
@@ -276,7 +286,7 @@ export const updateProject = async (projectId: string, name: string, description
     query: mutation,
     variables,
     headers: {
-      'Authorization': `Bearer ${token} `
+      'Authorization': `Bearer ${token}`
     }
   });
   if (response.errors) throw new Error(response.errors[0].message);
@@ -296,7 +306,7 @@ export const deleteProject = async (projectId: string, token: string): Promise<{
     query: mutation,
     variables,
     headers: {
-      'Authorization': `Bearer ${token} `
+      'Authorization': `Bearer ${token}`
     }
   });
   if (response.errors) throw new Error(response.errors[0].message);

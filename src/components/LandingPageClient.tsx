@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useContext, useEffect } from "react";
-import { ArrowLeft, Mic, Code, Database, Shield, Download, DollarSign, Gift, Zap, Sparkles, Globe, Layers, Image as ImageIcon, Video, Clapperboard, Wand2, Cpu } from "lucide-react";
+import { ArrowLeft, Mic, Code, Database, Shield, Download, DollarSign, Gift, Zap, Sparkles, Globe, Layers, Image as ImageIcon, Video, Clapperboard, Wand2, Cpu, Music, Settings, Rocket } from "lucide-react";
 import Image from 'next/image';
 import { AuthContext } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -52,41 +52,41 @@ export default function LandingPageClient() {
 
             {/* Left Column: Text & CTA */}
             <div className="text-center lg:text-left space-y-8 animate-in fade-in slide-in-from-bottom-10 duration-700">
-              <div className="inline-flex items-center gap-2 bg-muted/50 border border-primary/20 rounded-full px-4 py-1.5 text-sm font-medium text-primary mb-2 shadow-sm shadow-primary/10 backdrop-blur-sm">
-                <Sparkles className="w-4 h-4" />
-                <span>مستقبل صناعة المحتوى العربي</span>
+              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-primary/20 rounded-full px-4 py-1.5 text-sm font-medium text-primary mb-2 shadow-sm shadow-primary/10 backdrop-blur-sm ring-1 ring-primary/20">
+                <Rocket className="w-4 h-4 animate-pulse" />
+                <span>الإصدار الجديد 2.0 متاح الآن!</span>
               </div>
 
               <h1 className="text-4xl sm:text-5xl lg:text-7xl font-extrabold tracking-tight text-white drop-shadow-sm flex flex-col gap-4 items-center lg:items-start">
-                <span>استوديو شامل لـ</span>
+                <span>اصنع فيديوهاتك بـ</span>
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-orange-400 relative px-2 leading-relaxed pb-1">
-                  الصوت، الصورة، والفيديو
+                  ذكاء وقوة لا مثيل لها
                   {/* Underline decoration */}
                   <svg className="absolute w-full h-3 -bottom-1 right-0 text-primary opacity-50" viewBox="0 0 200 9" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2.00025 6.99997C25.7509 2.49997 73.2509 1.49997 121.75 3.99997C153.383 5.63066 183.5 7.99997 198 7.99997" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>
                 </span>
               </h1>
 
               <p className="text-lg sm:text-xl text-muted-foreground/90 max-w-2xl mx-auto lg:mx-0 leading-relaxed font-light">
-                منصة MuejamStudio تجمع لك أقوى أدوات الذكاء الاصطناعي في مكان واحد. حول نصوصك إلى أصوات واقعية، أنشئ صوراً مذهلة، وصمم فيديوهات احترافية بمحرر واحد متكامل.
+                استوديو MuejamStudio الجديد كلياً. هندسة صوتية دقيقة، خط زمن (Timeline) متعدد المسارات، وتصدير بجودة 1080p فوراً من متصفحك. كل ما تحتاجه لصناعة محتوى يبهر جمهورك.
               </p>
 
               <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-4">
                 <button
                   onClick={() => router.push(projectLink)}
-                  className="btn btn-primary text-lg px-8 py-4 w-full sm:w-auto hover:scale-105 transition-transform shadow-xl shadow-primary/25"
+                  className="btn btn-primary text-lg px-8 py-4 w-full sm:w-auto hover:scale-105 transition-all shadow-xl shadow-primary/25 ring-2 ring-transparent hover:ring-primary/50"
                 >
-                  <span className="flex items-center gap-2">
-                    جرب المحرر الشامل
+                  <span className="flex items-center gap-2 font-bold">
+                    جرب الاستوديو مجاناً
                     <ArrowLeft className="w-5 h-5" />
                   </span>
                 </button>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-4 text-sm text-muted-foreground bg-white/5 px-4 py-2 rounded-full border border-white/5 hover:bg-white/10 transition-colors cursor-default">
                   <div className="flex -space-x-2">
                     {[1, 2, 3].map(i => (
                       <div key={i} className="w-8 h-8 rounded-full border-2 border-background bg-zinc-700 flex items-center justify-center text-xs text-white">U{i}</div>
                     ))}
                   </div>
-                  <p>انضم لـ 10,000+ صانع محتوى</p>
+                  <p>انضم لـ 10,000+ مبدع</p>
                 </div>
               </div>
             </div>
@@ -102,83 +102,94 @@ export default function LandingPageClient() {
 
       {/* Features Grid - REFINED */}
       <section className="py-24 bg-muted/20 relative">
-        <div className="container mx-auto px-6">
+        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-[0.03] pointer-events-none"></div>
+        <div className="container mx-auto px-6 relative">
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <h2 className="text-3xl font-bold mb-4 text-foreground">لماذا تختار MuejamStudio؟</h2>
-            <p className="text-muted-foreground text-lg">أكثر من مجرد أداة صوت. نحن نبني المحرر العربي الأول المتكامل للوسائط المتعددة.</p>
+            <h2 className="text-3xl font-bold mb-4 text-foreground">قوة سطح المكتب، بمرونة المتصفح</h2>
+            <p className="text-muted-foreground text-lg">لم تعد بحاجة لتحميل برامج ثقيلة. MuejamStudio يضع بين يديك أدوات المونتاج الاحترافية في مكان واحد.</p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Card 1: Audio Engine */}
+            {/* Card 1: Multi-Track Timeline */}
             <div className="bg-card border border-border/50 p-8 rounded-2xl hover:bg-muted/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl group relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-primary/10 rounded-bl-[100px] -mr-4 -mt-4 transition-transform group-hover:scale-150"></div>
-              <div className="w-14 h-14 bg-gradient-to-br from-primary to-orange-500 rounded-xl flex items-center justify-center text-white mb-6 shadow-lg shadow-primary/20">
-                <Mic className="w-7 h-7" />
-              </div>
-              <h3 className="text-xl font-bold mb-3 text-foreground">محرك صوتي حصري</h3>
-              <p className="text-muted-foreground leading-relaxed mb-4">
-                نمتلك 3 موديلات ذكاء اصطناعي حصرية تم تطويرها خصيصاً في MuejamStudio، بالإضافة لنموذج رابع احترافي للأداء العالي.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-md font-medium">100% عربي</span>
-                <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-md font-medium">لهجات متعددة</span>
-              </div>
-            </div>
-
-            {/* Card 2: Image Gen (Coming Soon) */}
-            <div className="bg-card border border-border/50 p-8 rounded-2xl hover:bg-muted/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl group relative overflow-hidden">
-              <div className="absolute top-4 left-4 bg-zinc-800 text-white text-[10px] font-bold px-2 py-1 rounded-full border border-zinc-700">قريباً</div>
-              <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-xl flex items-center justify-center text-white mb-6 shadow-lg shadow-purple-500/20">
-                <ImageIcon className="w-7 h-7" />
-              </div>
-              <h3 className="text-xl font-bold mb-3 text-foreground">توليد الصور والمشاهد</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                حوّل أفكارك إلى لوحات فنية ومشاهد واقعية. سنمكنك قريباً من بناء هوية بصرية كاملة لمشروعك بضغطة زر.
-              </p>
-            </div>
-
-            {/* Card 3: Video Editor (Coming Soon) */}
-            <div className="bg-card border border-border/50 p-8 rounded-2xl hover:bg-muted/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl group relative overflow-hidden">
-              <div className="absolute top-4 left-4 bg-zinc-800 text-white text-[10px] font-bold px-2 py-1 rounded-full border border-zinc-700">قريباً</div>
-              <div className="w-14 h-14 bg-gradient-to-br from-rose-500 to-pink-500 rounded-xl flex items-center justify-center text-white mb-6 shadow-lg shadow-rose-500/20">
-                <Clapperboard className="w-7 h-7" />
-              </div>
-              <h3 className="text-xl font-bold mb-3 text-foreground">صناعة الفيديو</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                المحرر الشامل سيسمح لك بدمج الصوت والصورة وتحريكهم لإنتاج فيديوهات احترافية لليوتيوب والتيك توك دون مغادرة المنصة.
-              </p>
-            </div>
-
-            {/* Card 4: Editor Interface */}
-            <div className="bg-card border border-border/50 p-8 rounded-2xl hover:bg-muted/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl group">
-              <div className="w-14 h-14 bg-zinc-800 rounded-xl flex items-center justify-center text-white mb-6 shadow-lg">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary/20 to-transparent rounded-bl-[100px] -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center text-white mb-6 shadow-lg shadow-blue-500/20 ring-1 ring-white/10">
                 <Layers className="w-7 h-7" />
               </div>
-              <h3 className="text-xl font-bold mb-3 text-foreground">محرر متكامل (Editor)</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                واجهة تحرير سهلة وقوية تشبه برامج المونتاج العالمية، صممت لتكون بسيطة للمبتدئين وقوية للمحترفين.
+              <h3 className="text-xl font-bold mb-3 text-foreground">Timeline متعدد المسارات</h3>
+              <p className="text-muted-foreground leading-relaxed mb-4">
+                تحكم كامل في الفيديو: مسارات منفصلة للفيديو، النصوص، المؤثرات الصوتية، والموسيقى. رتب أفكارك بدقة المحترفين.
               </p>
-            </div>
-
-            {/* Card 5: Performance */}
-            <div className="bg-card border border-border/50 p-8 rounded-2xl hover:bg-muted/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl group">
-              <div className="w-14 h-14 bg-zinc-800 rounded-xl flex items-center justify-center text-white mb-6 shadow-lg">
-                <Cpu className="w-7 h-7" />
+              <div className="flex flex-wrap gap-2">
+                <span className="text-xs bg-blue-500/10 text-blue-500 px-2 py-1 rounded-md font-medium">Drag & Drop</span>
+                <span className="text-xs bg-blue-500/10 text-blue-500 px-2 py-1 rounded-md font-medium">Split & Trim</span>
               </div>
-              <h3 className="text-xl font-bold mb-3 text-foreground">سرعة ومعالجة فائقة</h3>
+            </div>
+
+            {/* Card 2: Advanced Audio */}
+            <div className="bg-card border border-border/50 p-8 rounded-2xl hover:bg-muted/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl group relative overflow-hidden">
+              <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center text-white mb-6 shadow-lg shadow-orange-500/20 ring-1 ring-white/10">
+                <Music className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-foreground">هندسة صوتية ذكية</h3>
+              <p className="text-muted-foreground leading-relaxed mb-4">
+                لا مزيد من تداخل الأصوات. نظام ذكي يفصل صوت التعليق عن الموسيقى الخلفية مع عرض الموجات الصوتية (Waveforms) للمزامنة الدقيقة.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <span className="text-xs bg-orange-500/10 text-orange-500 px-2 py-1 rounded-md font-medium">Music Track</span>
+                <span className="text-xs bg-orange-500/10 text-orange-500 px-2 py-1 rounded-md font-medium">Auto-Duration</span>
+              </div>
+            </div>
+
+            {/* Card 3: Video Export */}
+            <div className="bg-card border border-border/50 p-8 rounded-2xl hover:bg-muted/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl group relative overflow-hidden">
+              <div className="absolute top-4 left-4 bg-green-500/10 text-green-500 text-[10px] font-bold px-2 py-1 rounded-full border border-green-500/20 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Live
+              </div>
+              <div className="w-14 h-14 bg-gradient-to-br from-rose-500 to-pink-500 rounded-xl flex items-center justify-center text-white mb-6 shadow-lg shadow-rose-500/20 ring-1 ring-white/10">
+                <Download className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-foreground">تصدير بجودة سينمائية</h3>
+              <p className="text-muted-foreground leading-relaxed mb-4">
+                صدر فيديوهاتك بجودة تصل إلى 1080p و 60 إطار في الثانية (FPS). تحكم كامل في حجم الملف والجودة قبل التصدير.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <span className="text-xs bg-rose-500/10 text-rose-500 px-2 py-1 rounded-md font-medium">1080p FHD</span>
+                <span className="text-xs bg-rose-500/10 text-rose-500 px-2 py-1 rounded-md font-medium">60 FPS</span>
+              </div>
+            </div>
+
+            {/* Card 4: Audio Engine (Original) */}
+            <div className="bg-card border border-border/50 p-8 rounded-2xl hover:bg-muted/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl group">
+              <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-xl flex items-center justify-center text-white mb-6 shadow-lg shadow-purple-500/20">
+                <Mic className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-foreground">أصوات عربية حصرية</h3>
               <p className="text-muted-foreground leading-relaxed">
-                بنية تحتية قوية تضمن توليد المحتوى (Rendering) في ثوانٍ معدودة، مع دعم التصدير بأعلى جودة ممكنة.
+                مكتبة ضخمة من الأصوات العربية والخليجية والمصرية المطورة بالذكاء الاصطناعي، تمنح محتواك هوية فريدة لا تتوفر في أي مكان آخر.
               </p>
             </div>
 
-            {/* Card 6: Ownership */}
+            {/* Card 5: Performance & Privacy */}
             <div className="bg-card border border-border/50 p-8 rounded-2xl hover:bg-muted/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl group">
-              <div className="w-14 h-14 bg-zinc-800 rounded-xl flex items-center justify-center text-white mb-6 shadow-lg">
+              <div className="w-14 h-14 bg-zinc-800 rounded-xl flex items-center justify-center text-white mb-6 shadow-lg ring-1 ring-white/10">
                 <Shield className="w-7 h-7" />
               </div>
-              <h3 className="text-xl font-bold mb-3 text-foreground">حقوق ملكية وتجارية</h3>
+              <h3 className="text-xl font-bold mb-3 text-foreground">سرعة وخصوصية قصوى</h3>
               <p className="text-muted-foreground leading-relaxed">
-                كل ما تنتجه على منصة MuejamStudio هو ملك لك 100%. استخدمه في مشاريعك التجارية، إعلاناتك، أو قنواتك بحرية تامة.
+                تقنية WebAssembly (WASM) تسمح بمعالجة وتصدير الفيديو داخل جهازك مباشرة. ملفاتك لا تغادر متصفحك أبداً أثناء الدمج، لسرعة وأمان تام.
+              </p>
+            </div>
+
+            {/* Card 6: Image Gen */}
+            <div className="bg-card border border-border/50 p-8 rounded-2xl hover:bg-muted/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl group relative overflow-hidden">
+              <div className="absolute top-4 left-4 bg-zinc-800 text-white text-[10px] font-bold px-2 py-1 rounded-full border border-zinc-700">تحديث قادم</div>
+              <div className="w-14 h-14 bg-zinc-800 rounded-xl flex items-center justify-center text-white mb-6 shadow-lg">
+                <ImageIcon className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-foreground">توليد الصور بالذكاء الاصطناعي</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                نعمل حالياً على دمج أقوى نماذج توليد الصور مباشرة داخل المحرر، لتبني هوية بصرية كاملة لمشروعك بضغطة زر.
               </p>
             </div>
 
@@ -190,16 +201,16 @@ export default function LandingPageClient() {
       <section className="py-24 relative overflow-hidden">
         <div className="container mx-auto px-6 relative z-10">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4 text-foreground">كيف يعمل MuejamStudio؟</h2>
-            <p className="text-muted-foreground">خطوات بسيطة تفصلك عن إنتاج محتواك القادم</p>
+            <h2 className="text-3xl font-bold mb-4 text-foreground">كيف يعمل الاستوديو؟</h2>
+            <p className="text-muted-foreground">ثلاث خطوات بسيطة لتحويل فكرتك إلى فيديو احترافي</p>
           </div>
           {/* Steps Grid - Updated Icons */}
           <div className="grid md:grid-cols-3 gap-12 relative">
             <div className="hidden md:block absolute top-12 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-border to-transparent -z-10" />
             {[
-              { step: "01", icon: <Mic className="w-6 h-6" />, title: "ابدأ بالصوت", desc: "اختر المؤدي الصوتي واكتب النص، وسيقوم محركنا الذكي بالأداء." },
-              { step: "02", icon: <ImageIcon className="w-6 h-6" />, title: "أضف الصورة (قريباً)", desc: "ولد شخصيات ومشاهد تناسب النص الخاص بك لتعزيز القصة." },
-              { step: "03", icon: <Clapperboard className="w-6 h-6" />, title: "انتج الفيديو (قريباً)", desc: "ادمج العناصر معاً في المحرر وقم بتصدير فيديو كامل." }
+              { step: "01", icon: <Mic className="w-6 h-6" />, title: "أنشئ الصوت", desc: "اكتب النص واختر صوتاً من مكتبتنا الحصرية، وسيقوم الـ AI بتوليده فوراً." },
+              { step: "02", icon: <Layers className="w-6 h-6" />, title: "رتب المشاهد", desc: "اسحب الصور، الفيديوهات، والموسيقى إلى Timeline ورتبها بتناغم تام." },
+              { step: "03", icon: <Download className="w-6 h-6" />, title: "تصدير فوري", desc: "اضغط تصدير، اختر الجودة (حتى 1080p)، وحمل الفيديو جاهزاً للنشر." }
             ].map((s, i) => (
               <div key={i} className="text-center relative bg-background p-4 rounded-3xl border border-transparent hover:border-border/50 transition-colors">
                 <div className="w-16 h-16 mx-auto bg-card border-2 border-primary text-primary rounded-2xl flex items-center justify-center text-2xl font-bold mb-6 shadow-lg shadow-primary/10 relative z-10 hover:rotate-6 transition-transform duration-300">
@@ -213,10 +224,8 @@ export default function LandingPageClient() {
         </div>
       </section>
 
-      {/* Editor Showcase Section */}
+      {/* Legacy/Other Sections kept for completeness */}
       <EditorShowcase />
-
-      {/* Fluid CTA Section */}
       <FluidCta />
 
       {/* Footer */}
@@ -239,8 +248,7 @@ export default function LandingPageClient() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><a href="#" className="hover:text-primary transition-colors">Text to Speech</a></li>
                 <li><a href="#" className="hover:text-primary transition-colors">Voice Cloning</a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">Image Gen <span className="text-[10px] bg-primary/20 text-primary px-1 rounded ml-1">Soon</span></a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">Video Editor <span className="text-[10px] bg-primary/20 text-primary px-1 rounded ml-1">Soon</span></a></li>
+                <li><a href="#" className="hover:text-primary transition-colors">Video Editor <span className="text-[10px] bg-green-500/20 text-green-500 px-1 rounded ml-1">New</span></a></li>
               </ul>
             </div>
             <div>
@@ -249,7 +257,6 @@ export default function LandingPageClient() {
                 <li><a href="#" className="hover:text-primary transition-colors">المدونة</a></li>
                 <li><a href="#" className="hover:text-primary transition-colors">التوثيق</a></li>
                 <li><a href="#" className="hover:text-primary transition-colors">مساعدة</a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">المجتمع</a></li>
               </ul>
             </div>
             <div>
@@ -257,7 +264,6 @@ export default function LandingPageClient() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><a href="#" className="hover:text-primary transition-colors">الخصوصية</a></li>
                 <li><a href="#" className="hover:text-primary transition-colors">الشروط</a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">الأمان</a></li>
               </ul>
             </div>
           </div>
@@ -267,10 +273,10 @@ export default function LandingPageClient() {
         </div>
       </footer>
 
-      {/* Sticky Bottom CTA (Optional) */}
+      {/* Sticky Bottom CTA */}
       <div className="fixed bottom-0 w-full p-4 bg-background/80 backdrop-blur-lg border-t border-border md:hidden z-50">
         <button onClick={() => router.push(projectLink)} className="btn btn-primary w-full shadow-lg shadow-primary/20">
-          جرب مجاناً الآن
+          جرب الاستوديو مجاناً الآن
         </button>
       </div>
 
