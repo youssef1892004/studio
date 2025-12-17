@@ -5,6 +5,7 @@ import { Play, Pause, ZoomIn, ZoomOut, Volume2, VolumeX, Eye, EyeOff, Lock, Unlo
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import dynamic from 'next/dynamic';
+import toast from 'react-hot-toast';
 import Button from '@/components/ui/Button';
 
 // Import WaveformSegment dynamically
@@ -12,7 +13,7 @@ const WaveformSegment = dynamic(() => import('./WaveformSegment').then(mod => mo
 
 // --- Types & Mock Data ---
 
-type TrackType = 'image' | 'scene' | 'voice' | 'effect';
+type TrackType = 'image' | 'scene' | 'voice' | 'effect' | 'text' | 'music';
 
 interface Track {
     id: string;
@@ -37,6 +38,17 @@ export interface TimelineItem {
     isGenerating?: boolean; // Added loading state
     volume?: number; // 0-1
     playbackRate?: number;
+    textStyle?: {
+        fontSize?: number;
+        color?: string;
+        backgroundColor?: string;
+        fontFamily?: string;
+        fontWeight?: 'normal' | 'bold';
+        textAlign?: 'left' | 'center' | 'right';
+        backgroundOpacity?: number;
+        yPosition?: number; // % from top
+        xPosition?: number; // % from left
+    };
 }
 
 // --- Helper Components ---
@@ -185,6 +197,9 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
     const [mouseTime, setMouseTime] = useState(0); // For razor cursor
 
     const audioRef = useRef<HTMLAudioElement>(null);
+    const musicAudioRef = useRef<HTMLAudioElement>(null); // NEW: Music Player Ref
+    const activeVoiceIdRef = useRef<string | null>(null);
+    const activeMusicIdRef = useRef<string | null>(null);
     const timelineScrollRef = useRef<HTMLDivElement>(null);
     const headersScrollRef = useRef<HTMLDivElement>(null);
     const animationFrameRef = useRef<number>();
@@ -281,10 +296,16 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
     // Tracks configuration
     const tracks: Track[] = useMemo(() => [
         {
-            id: 't-images',
+            id: 't-text',
+            type: 'text',
+            name: 'Text / Titles',
+            items: videoTrackItems.filter(i => i.type === 'text')
+        },
+        {
+            id: 't-video',
             type: 'image',
             name: 'Video / Images',
-            items: videoTrackItems
+            items: videoTrackItems.filter(i => i.type !== 'text' && i.type !== 'music')
         },
         {
             id: 't-voice',
@@ -292,8 +313,13 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
             name: 'Voiceover',
             items: displayVoiceItems // Use the display (reordered) items
         },
-        // { id: 't-music', type: 'music', name: 'Background Music', items: [] },
-    ], [displayVoiceItems, videoTrackItems]); // Update dependency
+        {
+            id: 't-music',
+            type: 'music',
+            name: 'Music / SFX',
+            items: videoTrackItems.filter(i => i.type === 'music')
+        }
+    ], [displayVoiceItems, videoTrackItems]);
 
     // --- Drag and Drop Handlers ---
     // --- Drag and Drop Handlers ---
@@ -332,7 +358,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
         }
     };
 
-    const handleDrop = async (e: React.DragEvent) => {
+    const handleDrop = async (e: React.DragEvent, trackType?: string) => {
         e.preventDefault();
 
         const dataStr = e.dataTransfer.getData('application/json');
@@ -383,6 +409,85 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
             if (!isValid) return;
 
             const data = JSON.parse(dataStr);
+
+            // Handle Audio Drop on Music Track
+            if (trackType === 'music' && data.type?.startsWith('audio') && onVideoTrackUpdate) {
+                const rect = timelineScrollRef.current?.getBoundingClientRect();
+                if (!rect) return;
+                const x = e.clientX - rect.left + scrollLeft;
+                const dropTime = Math.max(0, x / zoomLevel);
+
+                const newItem: TimelineItem = {
+                    id: uuidv4(),
+                    start: dropTime,
+                    duration: 5, // Default placeholder
+                    content: data.name,
+                    type: 'music',
+                    audioUrl: data.url,
+                    volume: 1
+                };
+
+                // Optimistically add
+                onVideoTrackUpdate(prev => [...prev, newItem]);
+
+                // Fetch actual duration if it's music/audio
+                if (data.url) {
+                    const tempAudio = new Audio(data.url);
+                    tempAudio.onloadedmetadata = () => {
+                        onVideoTrackUpdate(current => current.map(i =>
+                            i.id === newItem.id ? { ...i, duration: tempAudio.duration } : i
+                        ));
+                    };
+                }
+                return;
+            }
+
+            // Handle Audio Drop on Voice Track
+            if (trackType === 'voice' && data.type?.startsWith('audio') && onCardsUpdate) {
+                const rect = timelineScrollRef.current?.getBoundingClientRect();
+                if (!rect) return;
+                const x = e.clientX - rect.left + scrollLeft;
+                const dropTime = Math.max(0, x / zoomLevel);
+
+                // Find insertion index based on time
+                let currentDuration = 0;
+                let insertIndex = voiceTrackItems?.length || 0;
+
+                if (voiceTrackItems) {
+                    for (let i = 0; i < voiceTrackItems.length; i++) {
+                        const itemDuration = voiceTrackItems[i].duration;
+                        if (dropTime < currentDuration + itemDuration / 2) {
+                            insertIndex = i;
+                            break;
+                        }
+                        currentDuration += itemDuration;
+                    }
+                }
+
+                // Create new Audio Card
+                const newCard: any = {
+                    id: uuidv4(),
+                    content: { blocks: [{ type: 'paragraph', data: { text: `Audio: ${data.name}` } }] },
+                    voice: 'Imported',
+                    provider: 'audio-file',
+                    audioUrl: data.url,
+                    duration: 5, // Default, waveform will adjust
+                    block_index: insertIndex.toString(),
+                    created_at: new Date().toISOString(),
+                    isGenerating: false,
+                    project_id: 'temp' // Will be ignored/overwritten on save?
+                };
+
+                onCardsUpdate(prev => {
+                    const newCards = [...prev];
+                    newCards.splice(insertIndex, 0, newCard);
+                    return newCards.map((c, i) => ({ ...c, block_index: i.toString() }));
+                });
+
+                toast.success('Audio added to timeline');
+                return;
+            }
+
             if (data.type !== 'reorder' && onVideoTrackUpdate && data.url) {
                 const rect = timelineScrollRef.current?.getBoundingClientRect();
                 if (!rect) return;
@@ -412,12 +517,38 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                 const newItem: TimelineItem = {
                     id: uuidv4(),
                     start: dropTime,
-                    duration: 5,
+                    duration: 5, // Placeholder
                     content: data.name,
-                    type: data.type?.startsWith('video') ? 'scene' : 'image',
+                    type: data.type?.startsWith('audio') ? 'music' : (data.type?.startsWith('video') ? 'scene' : 'image'),
                     audioUrl: data.url
                 };
-                onVideoTrackUpdate([...videoTrackItems, newItem]);
+
+                // 1. Add item immediately
+                onVideoTrackUpdate(prev => [...prev, newItem]);
+
+                // 2. Async fetch duration for music/videeo
+                if (data.url && (newItem.type === 'music' || newItem.type === 'scene')) {
+                    const tempMedia = new Audio();
+                    // Removed crossOrigin to avoid potential CORS blocking for simple metadata/duration
+                    tempMedia.src = data.url;
+
+                    tempMedia.onloadedmetadata = () => {
+                        const actualDuration = tempMedia.duration;
+                        console.log("Audio Metadata Loaded:", actualDuration);
+                        if (actualDuration && isFinite(actualDuration)) {
+                            onVideoTrackUpdate(current =>
+                                current.map(i => i.id === newItem.id ? { ...i, duration: actualDuration } : i)
+                            );
+                        }
+                    };
+
+                    tempMedia.onerror = (e) => {
+                        console.warn("Failed to load metadata for duration check", data.url, e);
+                        toast.error("Could not detect audio duration automatically");
+                    };
+
+                    tempMedia.load();
+                }
             } else if (data.type === 'move-video' && onVideoTrackUpdate) {
                 const rect = timelineScrollRef.current?.getBoundingClientRect();
                 if (!rect) return;
@@ -428,7 +559,17 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                 const movingItem = videoTrackItems.find(i => i.id === data.id);
                 if (movingItem) {
                     const duration = movingItem.duration;
-                    const others = videoTrackItems.filter(i => i.id !== movingItem.id);
+
+                    // Filter others based on track type
+                    const isTextItem = movingItem.type === 'text';
+                    const isMusicItem = movingItem.type === 'music';
+
+                    const others = videoTrackItems.filter(i =>
+                        i.id !== movingItem.id &&
+                        (isTextItem ? i.type === 'text' :
+                            isMusicItem ? i.type === 'music' :
+                                (i.type !== 'text' && i.type !== 'music'))
+                    );
 
                     // Sort others by start time for consistent checking
                     others.sort((a, b) => a.start - b.start);
@@ -470,11 +611,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
 
     // 1. Sync Audio to Clock (Replaces old Sync)
     useEffect(() => {
-        if (!isPlaying) {
-            audioRef.current?.pause();
-            return;
-        }
-
+        // --- Sync Voice Track ---
         const activeAudioItem = voiceTrackItems.find(item =>
             currentTime >= item.start && currentTime < (item.start + item.duration)
         );
@@ -485,11 +622,13 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                 : activeAudioItem.audioUrl;
 
             if (audioRef.current) {
-                // Switch source if needed
-                if (!audioRef.current.src.includes(encodeURIComponent(activeAudioItem.audioUrl))) {
+                // Switch source if needed (Check ID first for stability)
+                if (activeVoiceIdRef.current !== activeAudioItem.id || !audioRef.current.src) {
+                    activeVoiceIdRef.current = activeAudioItem.id;
                     audioRef.current.src = targetSrc;
-                    audioRef.current.load();
-                    audioRef.current.play().catch(e => { });
+                    if (isPlaying) {
+                        audioRef.current.play().catch(() => { });
+                    }
                 }
 
                 // Sync Time
@@ -513,19 +652,67 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                     audioRef.current.playbackRate = finalRate;
                 }
 
-                if (audioRef.current.paused) {
+                if (isPlaying && audioRef.current.paused) {
                     audioRef.current.play().catch(e => { });
+                } else if (!isPlaying && !audioRef.current.paused) {
+                    audioRef.current.pause();
                 }
-            } else {
-                // Gap...
             }
         } else {
             // Gap: Pause audio
+            activeVoiceIdRef.current = null;
             if (audioRef.current && !audioRef.current.paused) {
                 audioRef.current.pause();
             }
         }
-    }, [currentTime, isPlaying, voiceTrackItems, playbackRate]);
+
+        // --- NEW: Sync Music Track ---
+        // Find active music item (filtered from videoTrackItems)
+        const activeMusicItem = videoTrackItems.find(item =>
+            item.type === 'music' &&
+            currentTime >= item.start && currentTime < (item.start + item.duration)
+        );
+
+        if (activeMusicItem && activeMusicItem.audioUrl) {
+            const musicSrc = activeMusicItem.audioUrl.startsWith('http')
+                ? `/api/proxy-audio?url=${encodeURIComponent(activeMusicItem.audioUrl)}`
+                : activeMusicItem.audioUrl;
+
+            if (musicAudioRef.current) {
+                // Check if Src changed (ID Check)
+                if (activeMusicIdRef.current !== activeMusicItem.id || !musicAudioRef.current.src) {
+                    activeMusicIdRef.current = activeMusicItem.id;
+                    musicAudioRef.current.src = musicSrc;
+                    // musicAudioRef.current.load(); // Not strictly needed if src set
+                    if (isPlaying) musicAudioRef.current.play().catch(() => { });
+                }
+
+                const musicOffset = Math.max(0, currentTime - activeMusicItem.start);
+
+                // Sync Time
+                if (Math.abs(musicAudioRef.current.currentTime - musicOffset) > 0.25) {
+                    musicAudioRef.current.currentTime = musicOffset;
+                }
+
+                // Play/Pause
+                if (isPlaying && musicAudioRef.current.paused) {
+                    musicAudioRef.current.play().catch(() => { });
+                } else if (!isPlaying && !musicAudioRef.current.paused) {
+                    musicAudioRef.current.pause();
+                }
+
+                // Sync Volume
+                if (activeMusicItem.volume !== undefined) {
+                    musicAudioRef.current.volume = activeMusicItem.volume;
+                }
+            }
+        } else {
+            // No active music
+            activeMusicIdRef.current = null;
+            musicAudioRef.current?.pause();
+        }
+
+    }, [isPlaying, currentTime, voiceTrackItems, videoTrackItems, playbackRate]); // Added videoTrackItems dependency
 
     // Update loop
     // 2. Master Clock Loop
@@ -585,7 +772,9 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
 
     // Sync Active Media Item (Image or Video)
     useEffect(() => {
+        // Find specifically Visual items (Image/Video), ignoring Text
         const currentVideoItem = videoTrackItems.find(item =>
+            item.type !== 'text' &&
             currentTime >= item.start && currentTime < (item.start + item.duration)
         );
 
@@ -843,8 +1032,9 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
 
     return (
         <div className="flex flex-col h-full bg-[#1E1E1E] text-gray-300 select-none" dir="ltr">
-            {/* Hidden Audio Element */}
+            {/* Hidden Audio Players */}
             <audio ref={audioRef} className="hidden" />
+            <audio ref={musicAudioRef} className="hidden" />
 
             {/* Toolbar */}
             <div className="h-16 bg-[#1a1a1a] border-b border-[#333] flex items-center justify-between px-4 z-30 shadow-md relative">
@@ -997,7 +1187,12 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                         {/* Tracks */}
                         <div className="flex flex-col">
                             {tracks.map(track => (
-                                <div key={track.id} className="h-20 border-b border-[#8E8D8D]/20 relative bg-[#2F2F2F] group">
+                                <div
+                                    key={track.id}
+                                    className="h-20 border-b border-[#8E8D8D]/20 relative bg-[#2F2F2F] group"
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={(e) => handleDrop(e, track.type)}
+                                >
                                     {/* Grid Lines */}
                                     <div className="absolute inset-0 pointer-events-none opacity-5"
                                         style={{
@@ -1021,7 +1216,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                                                     e.stopPropagation();
                                                     if (activeTool === 'razor' && onSplit) {
                                                         const isSelected = (track.type === 'voice' && activeBlockId === item.blockId) ||
-                                                            (track.type !== 'voice' && activeVideoId === item.id);
+                                                            ((track.type === 'image' || track.type === 'text' || track.type === 'music') && activeVideoId === item.id);
 
                                                         if (isSelected) {
                                                             if (!timelineScrollRef.current) return;
@@ -1032,18 +1227,18 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                                                             onSplit(item.blockId || item.id, clickTime, track.type);
                                                         }
                                                     } else {
-                                                        if (track.type === 'image') onVideoClick?.(item.id);
+                                                        if (track.type === 'image' || track.type === 'text' || track.type === 'music') onVideoClick?.(item.id);
                                                         else if (track.type === 'voice') onBlockClick?.(item.blockId!);
                                                     }
                                                 }}
-                                                className={`absolute top-1 bottom-1 rounded-md overflow-hidden cursor-move group select-none transition-all ${(track.type === 'voice' && activeBlockId === item.blockId) || (track.type === 'image' && activeVideoId === item.id)
+                                                className={`absolute top-1 bottom-1 rounded-md overflow-hidden cursor-move group select-none transition-all ${(track.type === 'voice' && activeBlockId === item.blockId) || ((track.type === 'image' || track.type === 'text' || track.type === 'music') && activeVideoId === item.id)
                                                     ? 'ring-2 ring-white z-20 shadow-xl'
                                                     : 'hover:ring-1 hover:ring-white/50 z-10'
                                                     } ${draggingItemId === (item.blockId || item.id) ? 'opacity-50' : ''} ${activeTool === 'razor' ? 'cursor-crosshair' : ''}`}
                                                 style={{
                                                     left: `${left}px`,
                                                     width: `${width}px`,
-                                                    backgroundColor: track.type === 'voice' ? '#4A4A4A' : '#333',
+                                                    backgroundColor: track.type === 'voice' ? '#4A4A4A' : (track.type === 'music' ? '#3B5360' : '#333'),
                                                 }}
                                             >
                                                 {/* Item Content */}
@@ -1061,7 +1256,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                                                             <Trash2 size={12} />
                                                         </button>
                                                     )}
-                                                    {track.type === 'voice' ? (
+                                                    {track.type === 'voice' || track.type === 'music' ? (
                                                         item.audioUrl ? (
                                                             // Use Real WaveformSegment
                                                             <WaveformSegment

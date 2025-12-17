@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Maximize, Volume2 } from 'lucide-react';
 
 interface PreviewPlayerProps {
@@ -7,13 +7,41 @@ interface PreviewPlayerProps {
     currentTime?: number;
     onPlayPause?: () => void;
     onSeek?: (time: number) => void;
+    onSeek?: (time: number) => void;
     onVolumeChange?: (volume: number) => void;
     playbackRate?: number;
+    activeTextItems?: { id: string; content: string; style: any }[];
+    onTextUpdate?: (id: string, newStyle: any) => void;
 }
 
-const PreviewPlayer: React.FC<PreviewPlayerProps> = ({ activeMedia, isPlaying = false, currentTime = 0, onPlayPause, onSeek, onVolumeChange, playbackRate = 1 }) => {
+const PreviewPlayer: React.FC<PreviewPlayerProps> = ({ activeMedia, isPlaying = false, currentTime = 0, onPlayPause, onSeek, onVolumeChange, playbackRate = 1, activeTextItems = [], onTextUpdate }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const [draggingId, setDraggingId] = useState<string | null>(null);
+
+    const handleTextMouseDown = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        e.preventDefault();
+        setDraggingId(id);
+    };
+
+    const handleMouseMove = (e: React.MouseEvent) => {
+        if (!draggingId || !containerRef.current || !onTextUpdate) return;
+
+        const rect = containerRef.current.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 100;
+        const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+        const item = activeTextItems.find(i => i.id === draggingId);
+        if (item) {
+            onTextUpdate(draggingId, { ...item.style, xPosition: x, yPosition: y });
+        }
+    };
+
+    const handleMouseUp = () => {
+        setDraggingId(null);
+    };
+
 
     const toggleFullscreen = () => {
         if (!document.fullscreenElement) {
@@ -68,7 +96,12 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({ activeMedia, isPlaying = 
     };
 
     return (
-        <div className="flex-1 bg-black/20 flex flex-col items-center justify-center relative p-4 min-h-[300px]">
+        <div
+            className="flex-1 bg-black/20 flex flex-col items-center justify-center relative p-4 min-h-[300px]"
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+        >
             {/* Main Preview Area */}
             <div ref={containerRef} className="w-full h-full max-w-4xl bg-studio-panel dark:bg-studio-panel rounded-lg shadow-2xl overflow-hidden relative aspect-video flex items-center justify-center border border-studio-border dark:border-studio-border group">
                 {/* Media Preview */}
@@ -98,6 +131,34 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({ activeMedia, isPlaying = 
                         <p className="text-studio-text-light dark:text-studio-text opacity-50">No preview available</p>
                     </div>
                 )}
+
+                {/* Text Layer */}
+                {activeTextItems?.map((text, idx) => (
+                    <div
+                        key={idx}
+                        onMouseDown={(e) => handleTextMouseDown(e, text.id)}
+                        style={{
+                            position: 'absolute',
+                            top: `${text.style?.yPosition !== undefined ? text.style.yPosition : 50}%`,
+                            left: `${text.style?.xPosition !== undefined ? text.style.xPosition : 50}%`,
+                            transform: 'translate(-50%, -50%)',
+                            color: text.style?.color || 'white',
+                            fontSize: `${(text.style?.fontSize || 24) * 1.5}px`,
+                            fontWeight: text.style?.fontWeight || 'normal',
+                            textAlign: text.style?.textAlign || 'center',
+                            fontFamily: text.style?.fontFamily || 'sans-serif',
+                            zIndex: 30,
+                            cursor: 'move',
+                            pointerEvents: 'auto', // Enable interaction
+                            textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+                            whiteSpace: 'pre-wrap',
+                            border: draggingId === text.id ? '1px dashed #F48969' : 'none',
+                            padding: '4px'
+                        }}
+                    >
+                        {text.content}
+                    </div>
+                ))}
 
                 {/* Overlay Controls (Bottom) */}
                 <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-auto z-10">

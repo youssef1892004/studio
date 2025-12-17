@@ -18,14 +18,17 @@ interface PropertiesPanelProps {
         // Actually, if I look at the screenshot, "Speed" is next to volume.
         // I will implement it as global speed control for now, but placed in this panel.
         name?: string;
+        content?: string;
+        textStyle?: any;
     } | null;
     currentGlobalSpeed: number;
     onUpdateVolume: (val: number) => void;
     onUpdateSpeed: (val: number) => void;
     onDelete: () => void;
+    onUpdateText?: (content: string, style: any) => void;
 }
 
-const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, currentGlobalSpeed, onUpdateVolume, onUpdateSpeed, onDelete }) => {
+const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, currentGlobalSpeed, onUpdateVolume, onUpdateSpeed, onDelete, onUpdateText }) => {
 
     // If no item selected, what to show? Maybe "Project Settings" or empty state.
     // For now, let's show "Project Properties" if nothing selected, or just empty.
@@ -70,6 +73,73 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, current
                     </div>
                 )}
 
+                {/* Text Controls */}
+                {selectedItem.type === 'text' && onUpdateText && (
+                    <div className="flex flex-col gap-4">
+                        {/* Content */}
+                        <div className="flex flex-col gap-2">
+                            <span className="text-xs text-gray-400">Content</span>
+                            <textarea
+                                value={selectedItem.content || ''}
+                                onChange={(e) => onUpdateText(e.target.value, selectedItem.textStyle)}
+                                className="w-full bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg p-2 text-sm text-gray-200 focus:outline-none focus:border-[#F48969]"
+                                rows={3}
+                            />
+                        </div>
+
+                        {/* Font Size */}
+                        <div className="flex flex-col gap-2">
+                            <div className="flex justify-between items-center text-xs text-gray-400">
+                                <span>Font Size</span>
+                                <span>{selectedItem.textStyle?.fontSize || 24}px</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="12"
+                                max="120"
+                                value={selectedItem.textStyle?.fontSize || 24}
+                                onChange={(e) => onUpdateText(selectedItem.content!, { ...selectedItem.textStyle, fontSize: parseInt(e.target.value) })}
+                                className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-[#F48969]"
+                            />
+                        </div>
+
+                        {/* Color & Position */}
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="flex flex-col gap-1">
+                                <span className="text-xs text-gray-400">Color</span>
+                                <input
+                                    type="color"
+                                    value={selectedItem.textStyle?.color || '#ffffff'}
+                                    onChange={(e) => onUpdateText(selectedItem.content!, { ...selectedItem.textStyle, color: e.target.value })}
+                                    className="w-full h-8 bg-transparent cursor-pointer rounded overflow-hidden"
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <span className="text-xs text-gray-400">X ({selectedItem.textStyle?.xPosition !== undefined ? Math.round(selectedItem.textStyle.xPosition) : 50}%)</span>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    value={selectedItem.textStyle?.xPosition !== undefined ? selectedItem.textStyle.xPosition : 50}
+                                    onChange={(e) => onUpdateText(selectedItem.content!, { ...selectedItem.textStyle, xPosition: parseInt(e.target.value) })}
+                                    className="w-full h-8 bg-transparent cursor-pointer accent-[#F48969]"
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <span className="text-xs text-gray-400">Y ({selectedItem.textStyle?.yPosition !== undefined ? Math.round(selectedItem.textStyle.yPosition) : 50}%)</span>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    value={selectedItem.textStyle?.yPosition || 50}
+                                    onChange={(e) => onUpdateText(selectedItem.content!, { ...selectedItem.textStyle, yPosition: parseInt(e.target.value) })}
+                                    className="w-full h-8 bg-transparent cursor-pointer accent-[#F48969]"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Speed Control (Global for now, or per clip if supported later) */}
                 <div className="flex flex-col gap-2">
                     <div className="flex justify-between items-center text-sm text-gray-400">
@@ -84,8 +154,8 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, current
                                 key={rate}
                                 onClick={() => onUpdateSpeed(rate)}
                                 className={`flex-1 text-xs py-1.5 rounded transition-all ${currentGlobalSpeed === rate
-                                        ? 'bg-[#F48969] text-white font-medium shadow-sm'
-                                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                    ? 'bg-[#F48969] text-white font-medium shadow-sm'
+                                    : 'text-gray-400 hover:text-white hover:bg-white/5'
                                     }`}
                             >
                                 {rate}x

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Mic, Upload, FolderOpen } from 'lucide-react';
+import { Image, Mic, Upload, FolderOpen, Type } from 'lucide-react';
 
 interface SidebarItem {
     id: string;
@@ -10,6 +10,7 @@ interface SidebarItem {
 const sidebarItems: SidebarItem[] = [
     { id: 'image', label: 'توليد صورة', icon: Image },
     { id: 'voice', label: 'توليد صوت', icon: Mic },
+    { id: 'text', label: 'نصوص', icon: Type },
     { id: 'uploads', label: 'الرفوعات', icon: Upload },
     { id: 'assets', label: 'الأصول', icon: FolderOpen },
 ];

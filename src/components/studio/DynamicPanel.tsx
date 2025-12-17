@@ -4,6 +4,7 @@ import VoiceGenerationPanel from './panels/VoiceGenerationPanel';
 import SceneBuilderPanel from './panels/SceneBuilderPanel';
 import GenericGridPanel from './panels/GenericGridPanel';
 import UploadsPanel from './panels/UploadsPanel';
+import TextPanel from './panels/TextPanel';
 
 interface DynamicPanelProps {
     activeTool: string;
@@ -17,13 +18,16 @@ interface DynamicPanelProps {
     onAssetsUpdated?: (newAssets: any[]) => void;
     blockIndex?: number;
     voices?: any[]; // Pass voices array
+    onAddText?: (type: 'heading' | 'subheading' | 'body') => void;
 }
 
-const DynamicPanel: React.FC<DynamicPanelProps> = ({ activeTool, onGenerateVoice, activeBlock, onUpdateBlock, onDeleteBlock, onClearSelection, onAddGhostBlock, project, onAssetsUpdated, blockIndex, voices = [] }) => {
+const DynamicPanel: React.FC<DynamicPanelProps> = ({ activeTool, onGenerateVoice, activeBlock, onUpdateBlock, onDeleteBlock, onClearSelection, onAddGhostBlock, project, onAssetsUpdated, blockIndex, voices = [], onAddText }) => {
     const renderPanel = () => {
         switch (activeTool) {
             case 'image':
                 return <ImageGenerationPanel />;
+            case 'text':
+                return <TextPanel onAddText={onAddText} />;
             case 'voice':
                 return <VoiceGenerationPanel
                     onGenerate={onGenerateVoice || (async () => { })}

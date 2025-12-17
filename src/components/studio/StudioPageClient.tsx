@@ -97,9 +97,8 @@ export default function StudioPageClient() {
             // Already compatible: videoTrackItems is TimelineItem[]
 
             // 2. Prepare Audio Items
-            // Convert cards to TimelineItems logic (similar to Timeline.tsx)
             let currentAudioStart = 0;
-            const audioItems: TimelineItem[] = cards
+            const voiceItems: TimelineItem[] = cards
                 .filter(c => c.audioUrl)
                 .map(c => {
                     const duration = c.duration || 0;
@@ -109,16 +108,23 @@ export default function StudioPageClient() {
                         duration: duration,
                         content: "audio",
                         type: 'voice',
-                        audioUrl: c.audioUrl
+                        audioUrl: c.audioUrl,
+                        volume: c.volume ?? 1
                     };
                     currentAudioStart += duration;
                     return item;
                 });
 
+            const musicItems = videoTrackItems.filter(i => i.type === 'music');
+            const allAudioItems = [...voiceItems, ...musicItems];
+
+            // Visual items (exclude music)
+            const visualItems = videoTrackItems.filter(i => i.type !== 'music');
+
             toast.loading('Rendering video in browser... this may take a moment.', { id: toastId });
 
             // 3. Render
-            const blob = await renderTimelineToVideo(videoTrackItems, audioItems, {
+            const blob = await renderTimelineToVideo(visualItems, allAudioItems, {
                 width: 1280, // Default 720p for performance
                 height: 720,
                 fps: 30
@@ -145,6 +151,7 @@ export default function StudioPageClient() {
     };
     const [isGenerating, setIsGenerating] = useState(false);
     const [isCriticalLoading, setIsCriticalLoading] = useState(true);
+    const pendingDeletionsRef = useRef<Set<string>>(new Set());
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [activeLeftTool, setActiveLeftTool] = useState('voice');
     const [activeCardId, setActiveCardId] = useState<string | null>(null);
@@ -266,7 +273,15 @@ export default function StudioPageClient() {
     const selectedItem = useMemo(() => {
         if (activeVideoId) {
             const item = videoTrackItems.find(i => i.id === activeVideoId);
-            if (item) return { id: item.id, type: 'video' as const, volume: item.volume ?? 1, playbackRate: item.playbackRate ?? 1, name: item.content };
+            if (item) return {
+                id: item.id,
+                type: (item.type === 'text' ? 'text' : 'video') as 'text' | 'video',
+                volume: item.volume ?? 1,
+                playbackRate: item.playbackRate ?? 1,
+                name: item.content,
+                content: item.content,
+                textStyle: item.textStyle
+            };
         } else if (activeCardId) {
             const card = cards.find(c => c.id === activeCardId);
             if (card) return { id: card.id, type: 'voice' as const, volume: card.volume ?? 1, playbackRate: card.playbackRate ?? 1, name: 'Voice Block' };
@@ -333,13 +348,29 @@ export default function StudioPageClient() {
                 break;
             case 'delete':
                 if (activeCardId) {
+                    const idToDelete = activeCardId;
+
+                    // Optimistic UI Update
                     setCards(prev => {
-                        const next = prev.filter(c => c.id !== activeCardId);
+                        const next = prev.filter(c => c.id !== idToDelete);
                         recordHistory(next, videoTrackItems);
                         return next;
                     });
+
+                    // Prevent reappearance from subscription
+                    pendingDeletionsRef.current.add(idToDelete);
                     setActiveCardId(null);
-                    toast.success('تم الحذف');
+
+                    // API Call
+                    deleteBlock(idToDelete).then(() => {
+                        pendingDeletionsRef.current.delete(idToDelete);
+                        toast.success('تم الحذف');
+                    }).catch(err => {
+                        console.error("Failed to delete block", err);
+                        pendingDeletionsRef.current.delete(idToDelete);
+                        toast.error("فشل الحذف");
+                        // Ideally revert UI here, but complex with history
+                    });
                 } else if (activeVideoId) {
                     setVideoTrackItems(prev => {
                         const next = prev.filter(i => i.id !== activeVideoId);
@@ -474,13 +505,11 @@ export default function StudioPageClient() {
             setIsCriticalLoading(true);
             setLoadingProgress(10);
             setLoadingMessage("يتم تحميل المشروع...");
-            await new Promise(resolve => setTimeout(resolve, 500)); // Artificial delay for UX
 
             try {
                 // 1. Fetch Project
                 const projectData = await getProjectById(projectId);
                 setLoadingProgress(40);
-                await new Promise(resolve => setTimeout(resolve, 800));
 
                 if (!projectData) {
                     notFound();
@@ -491,7 +520,6 @@ export default function StudioPageClient() {
                 setLoadingMessage("يتم تحضير الاصوات...");
                 const voicesData = await fetchVoices().catch(e => { console.error("Voice fetch failed:", e); return []; });
                 setLoadingProgress(70);
-                await new Promise(resolve => setTimeout(resolve, 800));
 
                 // 3. Fetch Records/Assets
                 setLoadingMessage("يتم تحضير assets...");
@@ -500,7 +528,6 @@ export default function StudioPageClient() {
                     headers: { Authorization: `Bearer ${token}` }
                 }).then(res => res.ok ? res.json() : []);
                 setLoadingProgress(90);
-                await new Promise(resolve => setTimeout(resolve, 600)); // Final pause before rendering
 
                 if (!projectData) {
                     notFound();
@@ -577,24 +604,42 @@ export default function StudioPageClient() {
     }, [projectId, token]);
 
     // Persist Video Timeline to Project.blocks_json
+    // Persist Video Timeline to Project.blocks_json
     useEffect(() => {
         if (!projectId || !token || !timelineLoaded) return;
 
         const timer = setTimeout(async () => {
             try {
-                // Only save if we have items or explicitly want to clear
+                // Sanitize items before saving
+                const sanitizedItems = videoTrackItems.map(item => ({
+                    id: item.id,
+                    start: item.start,
+                    duration: item.duration,
+                    content: item.content,
+                    type: item.type,
+                    mediaStartOffset: item.mediaStartOffset,
+                    blockId: item.blockId,
+                    // Only save persistent URLs
+                    audioUrl: item.audioUrl?.startsWith('blob:') ? undefined : item.audioUrl,
+                    volume: item.volume,
+                    playbackRate: item.playbackRate,
+                    textStyle: item.textStyle
+                }));
+
                 const res = await executeGraphQL<any>({
                     query: UPDATE_PROJECT_BLOCKS,
                     variables: {
                         id: projectId,
-                        blocks_json: videoTrackItems
+                        blocks_json: sanitizedItems
                     },
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 if (res.errors) throw new Error(res.errors[0].message);
             } catch (e: any) {
-                console.error("Failed to save timeline", e);
-                toast.error(`Auto-save failed: ${e.message}`);
+                if (e.message !== 'connection error') {
+                    console.error("Failed to save timeline", e);
+                    toast.error(`Auto-save failed: ${e.message}`);
+                }
             }
         }, 2000);
 
@@ -621,6 +666,7 @@ export default function StudioPageClient() {
 
                 const validServerBlocks = Array.from(new Map(serverBlocks.map(b => [b.id, b])).values())
                     .filter(b => {
+                        if (pendingDeletionsRef.current.has(b.id)) return false; // Ignore if pending delete
                         if (b.id === 'merge' || b.block_index === 'merge' || b.block_index === 'record' || b.block_index === 'merged_blocks') return false;
                         if (!b.content || !Array.isArray(b.content.blocks)) return false;
                         if (b.s3_url && (b.s3_url.includes('_block') || b.s3_url.includes('_final'))) {
@@ -682,7 +728,14 @@ export default function StudioPageClient() {
                 const mergedCards = [...serverCards, ...localOnlyCards].sort((a, b) => {
                     const indexA = parseInt(a.block_index) || 0;
                     const indexB = parseInt(b.block_index) || 0;
-                    return indexA - indexB;
+                    if (indexA !== indexB) {
+                        return indexA - indexB;
+                    }
+                    // Secondary sort by creation time to prevent jitter
+                    const timeA = new Date(a.created_at || 0).getTime();
+                    const timeB = new Date(b.created_at || 0).getTime();
+                    if (timeA !== timeB) return timeA - timeB;
+                    return a.id.localeCompare(b.id);
                 });
 
                 console.log("Current Local Cards:", currentCards.map(c => c.id));
@@ -1299,6 +1352,42 @@ export default function StudioPageClient() {
         });
     };
 
+    const handleAddText = useCallback((type: 'heading' | 'subheading' | 'body') => {
+        let textContent = 'New Text';
+        let style = {
+            fontSize: 24,
+            fontWeight: 'normal',
+            color: '#ffffff',
+            backgroundColor: 'transparent',
+            textAlign: 'center'
+        };
+
+        if (type === 'heading') {
+            textContent = 'Heading';
+            style = { ...style, fontSize: 48, fontWeight: 'bold', color: '#ffffff' };
+        } else if (type === 'subheading') {
+            textContent = 'Subheading';
+            style = { ...style, fontSize: 32, fontWeight: 'bold', color: '#e0e0e0' };
+        } else {
+            textContent = 'Body Text';
+            style = { ...style, fontSize: 24, color: '#cccccc' };
+        }
+
+        const newItem: TimelineItem = {
+            id: uuidv4(),
+            type: 'text',
+            start: currentTime, // Add at current playhead
+            duration: 5,
+            content: textContent,
+            textStyle: style as any
+        };
+
+        setVideoTrackItems(prev => [...prev, newItem]);
+        recordHistory(cards, [...videoTrackItems, newItem]);
+        toast.success(`Text added: ${type}`);
+    }, [currentTime, videoTrackItems, cards, recordHistory]);
+
+
     const handleSplit = useCallback((itemId: string, splitTime: number, trackType: string) => {
         if (trackType === 'voice') {
             // Sort cards by block_index to ensure we split the correct visual item in sequence
@@ -1397,6 +1486,35 @@ export default function StudioPageClient() {
             return (voice.characterName.toLowerCase().includes(lowerSearchTerm) || voice.countryName.toLowerCase().includes(lowerSearchTerm));
         });
 
+    const handleTextUpdate = useCallback((id: string, newStyle: any) => {
+        setVideoTrackItems(prev => {
+            return prev.map(item =>
+                item.id === id
+                    ? { ...item, textStyle: newStyle }
+                    : item
+            );
+        });
+        setActiveVideoId(id);
+    }, []);
+
+    const handleUpdateText = useCallback((content: string, style: any) => {
+        if (!activeVideoId) return;
+
+        setVideoTrackItems(prev => {
+            return prev.map(item =>
+                item.id === activeVideoId && item.type === 'text'
+                    ? { ...item, content: content, textStyle: style }
+                    : item
+            );
+        });
+    }, [activeVideoId]);
+
+    const activeTextItems = useMemo(() => {
+        return videoTrackItems
+            .filter(item => item.type === 'text' && currentTime >= item.start && currentTime < (item.start + item.duration))
+            .map(item => ({ id: item.id, content: item.content, style: item.textStyle }));
+    }, [videoTrackItems, currentTime]);
+
     if (!user) {
         return null;
     }
@@ -1468,6 +1586,7 @@ export default function StudioPageClient() {
                                     onUpdateVolume={handleUpdateVolume}
                                     onUpdateSpeed={handleUpdateItemSpeed}
                                     onDelete={handleDeleteSelection}
+                                    onUpdateText={handleUpdateText}
                                 />
                             </div>
 
@@ -1481,6 +1600,8 @@ export default function StudioPageClient() {
                                     onPlayPause={() => timelineRef.current?.togglePlayPause()}
                                     onSeek={(t) => timelineRef.current?.seek(t)}
                                     onVolumeChange={handleUpdateVolume}
+                                    activeTextItems={activeTextItems}
+                                    onTextUpdate={handleTextUpdate}
                                 />
                             </div>
 
@@ -1498,6 +1619,7 @@ export default function StudioPageClient() {
                                     onAddGhostBlock={handleAddGhostBlock}
                                     project={project}
                                     onAssetsUpdated={handleAssetsUpdated}
+                                    onAddText={handleAddText}
                                 />
                             </div>
                         </div>
