@@ -2,6 +2,7 @@
 
 import { useState, useContext, useEffect } from "react";
 import { ArrowLeft, Mic, Code, Database, Shield, Download, DollarSign, Gift, Zap, Sparkles, Globe, Layers, Image as ImageIcon, Video, Clapperboard, Wand2, Cpu, Music, Settings, Rocket } from "lucide-react";
+import Link from 'next/link';
 import Image from 'next/image';
 import { AuthContext } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -49,7 +50,7 @@ export default function LandingPageClient() {
         </div>
 
         <div className="w-full max-w-7xl mx-auto px-5 sm:px-8 relative z-10">
-          <div className="flex flex-col lg:grid lg:grid-cols-2 gap-24 lg:gap-20 items-center w-full">
+          <div className="flex flex-col lg:grid lg:grid-cols-2 gap-16 lg:gap-20 items-center w-full">
 
             {/* Left Column: Text & CTA */}
             <div className="flex flex-col items-start text-start space-y-5 sm:space-y-8 animate-in fade-in slide-in-from-bottom-10 duration-700 w-full max-w-full">
@@ -231,6 +232,40 @@ export default function LandingPageClient() {
       <EditorShowcase />
       <FluidCta />
 
+      {/* FAQ Section */}
+      <section className="py-24 bg-background relative overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-primary/5 blur-[120px] -z-10 rounded-full pointer-events-none"></div>
+        <div className="container mx-auto px-6 max-w-4xl relative z-10">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold mb-4 text-foreground">الأسئلة الشائعة</h2>
+            <p className="text-muted-foreground">إجابات على أهم استفسارات صناع المحتوى</p>
+          </div>
+          <div className="space-y-4">
+            {[
+              { q: "ما هو MuejamStudio؟", a: "هو استوديو متكامل مدعوم بالذكاء الاصطناعي لإنشاء محتوى فيديو وصوت احترافي. يجمع بين تحويل النص إلى كلام (TTS)، استنساخ الأصوات، والمونتاج السحابي في واجهة واحدة." },
+              { q: "هل تدعمون اللهجات العربية العامية؟", a: "نعم، هذا هو تخصصنا! ندعم أكثر من 30 لهجة محلية (مصرية، سعودية، إماراتية، شامية، مغاربية) بنطق طبيعي جداً يفهم السياق والتشكيل." },
+              { q: "هل يحتاج البرنامج لمواصفات جهاز قوية؟", a: "لا، MuejamStudio يعمل بالكامل على المتصفح السحابي. يمكنك استخدامه من أي لابتوب أو حتى جهاز تابلت دون الحاجة لكرت شاشة قوي." },
+              { q: "ما هي دقة استنساخ الصوت؟", a: "تصل الدقة إلى 95% من نبرة الصوت الأصلية. تحتاج فقط لتسجيل عينة قصيرة (30 ثانية) لإنشاء نسخة رقمية مطابقة لصوتك." },
+              { q: "هل يمكنني استخدام الأصوات في يوتيوب (Monetization)؟", a: "بالتأكيد. جميع الأصوات التي تنتجها عبر خططنا المدفوعة تأتي مع حقوق ملكية تجارية كاملة تسمح لك بالربح من قنوات اليوتيوب والإعلانات." }
+            ].map((item, i) => (
+              <div key={i} className="border border-border/50 rounded-2xl bg-card overflow-hidden hover:border-primary/30 transition-colors">
+                <details className="group">
+                  <summary className="flex justify-between items-center font-bold cursor-pointer list-none p-6 text-foreground">
+                    <span className="text-lg">{item.q}</span>
+                    <span className="transition-transform group-open:rotate-180">
+                      <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </span>
+                  </summary>
+                  <div className="text-muted-foreground mt-0 px-6 pb-6 leading-relaxed border-t border-border/10 pt-4">
+                    {item.a}
+                  </div>
+                </details>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="bg-muted/30 border-t border-border pt-16 pb-8">
         <div className="container mx-auto px-6">
@@ -249,24 +284,25 @@ export default function LandingPageClient() {
             <div>
               <h4 className="font-bold mb-4 text-foreground">المنتجات</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-primary transition-colors">Text to Speech</a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">Voice Cloning</a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">Video Editor <span className="text-[10px] bg-green-500/20 text-green-500 px-1 rounded ml-1">New</span></a></li>
+                <li><Link href="/products/text-to-speech" className="hover:text-primary transition-colors">Text to Speech</Link></li>
+                <li><Link href="/products/voice-cloning" className="hover:text-primary transition-colors">Voice Cloning</Link></li>
+                <li><Link href="/projects" className="hover:text-primary transition-colors">Video Editor <span className="text-[10px] bg-green-500/20 text-green-500 px-1 rounded ml-1">New</span></Link></li>
               </ul>
             </div>
             <div>
               <h4 className="font-bold mb-4 text-foreground">مصادر</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-primary transition-colors">المدونة</a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">التوثيق</a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">مساعدة</a></li>
+                <li><Link href="/about" className="hover:text-primary transition-colors">من نحن</Link></li>
+                <li><a href="https://muejam.com/" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">المدونة</a></li>
+                <li><Link href="/docs" className="hover:text-primary transition-colors">التوثيق</Link></li>
+                <li><Link href="/contact" className="hover:text-primary transition-colors">مساعدة (تواصل معنا)</Link></li>
               </ul>
             </div>
             <div>
               <h4 className="font-bold mb-4 text-foreground">قانوني</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-primary transition-colors">الخصوصية</a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">الشروط</a></li>
+                <li><Link href="/legal#privacy" className="hover:text-primary transition-colors">الخصوصية</Link></li>
+                <li><Link href="/legal#terms" className="hover:text-primary transition-colors">الشروط</Link></li>
               </ul>
             </div>
           </div>

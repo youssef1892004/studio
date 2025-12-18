@@ -171,34 +171,34 @@ export default function HeroDemo() {
                     )}
                 </div>
 
-                {/* Footer Controls (Exact Match: Side-by-Side) */}
-                <div className="bg-[#444444] p-4 sm:p-6 flex flex-row items-center justify-between gap-3 border-t border-white/5 overflow-x-auto no-scrollbar" dir="ltr">
+                {/* Footer Controls (Compact & No Scroll) */}
+                <div className="bg-[#444444] p-3 sm:p-6 flex flex-row items-center justify-between gap-2 border-t border-white/5 overflow-hidden" dir="ltr">
 
                     {/* Generate Button (Left) */}
                     <button
                         onClick={handlePlay}
                         disabled={isLoading}
-                        className="bg-[#ff8c66] hover:bg-[#ff7a50] text-white px-5 sm:px-6 py-3.5 rounded-full font-bold text-lg shadow-lg shadow-orange-900/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2 flex-shrink-0"
+                        className="bg-[#ff8c66] hover:bg-[#ff7a50] text-white px-4 sm:px-6 py-3 sm:py-3.5 rounded-full font-bold text-sm sm:text-lg shadow-lg shadow-orange-900/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2 flex-shrink-0"
                     >
                         <span>{isLoading ? 'Processing' : 'Generate'}</span>
-                        {!isLoading && <Play className="w-5 h-5 fill-current" />}
+                        {!isLoading && <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />}
                     </button>
 
-                    {/* Selectors (Right - Side by Side) */}
-                    <div className="flex items-center gap-2 sm:gap-3 flex-nowrap">
+                    {/* Selectors (Right - Optimized for Mobile) */}
+                    <div className="flex items-center gap-2 flex-shrink min-w-0">
                         {/* Voice */}
-                        <div className="flex items-center gap-3 bg-[#555555] rounded-full px-3 py-2 border border-white/5 cursor-pointer hover:bg-[#5a5a5a] transition-colors group whitespace-nowrap flex-shrink-0">
-                            <div className="flex flex-col leading-none">
-                                <span className="text-sm font-bold text-zinc-200">ar-EG-ShakirNeural</span>
-                                <span className="text-[10px] text-zinc-400">Male • Arabic</span>
+                        <div className="flex items-center gap-2 sm:gap-3 bg-[#555555] rounded-full px-2 sm:px-3 py-2 border border-white/5 cursor-pointer hover:bg-[#5a5a5a] transition-colors group whitespace-nowrap overflow-hidden">
+                            <div className="flex flex-col leading-none truncate">
+                                <span className="text-xs sm:text-sm font-bold text-zinc-200 truncate">ar-EG-ShakirNeural</span>
+                                <span className="text-[10px] text-zinc-400 hidden sm:block">Male • Arabic</span>
                             </div>
-                            <div className="w-8 h-8 rounded-full bg-[#333] flex items-center justify-center text-[10px] text-white border border-white/10 group-hover:border-[#ff8c66] transition-colors">EG</div>
+                            <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-[#333] flex items-center justify-center text-[10px] text-white border border-white/10 group-hover:border-[#ff8c66] transition-colors flex-shrink-0">EG</div>
                         </div>
 
                         {/* Provider */}
-                        <div className="flex items-center gap-2 bg-[#555555] rounded-full px-4 py-3 border border-white/5 cursor-pointer hover:bg-[#5a5a5a] transition-colors whitespace-nowrap flex-shrink-0">
-                            <span className="text-sm font-bold text-zinc-200">Ghaymah</span>
-                            <span className="text-[10px] text-zinc-400 border-l border-zinc-600 pl-2 ml-1 tracking-wider uppercase">PROVIDER</span>
+                        <div className="flex items-center gap-2 bg-[#555555] rounded-full px-3 sm:px-4 py-2 sm:py-3 border border-white/5 cursor-pointer hover:bg-[#5a5a5a] transition-colors whitespace-nowrap">
+                            <span className="text-xs sm:text-sm font-bold text-zinc-200">Ghaymah</span>
+                            <span className="text-[10px] text-zinc-400 border-l border-zinc-600 pl-2 ml-1 tracking-wider uppercase hidden sm:inline-block">PROVIDER</span>
                         </div>
                     </div>
 
