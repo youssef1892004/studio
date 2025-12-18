@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Play, Pause, ChevronRight, Mic, Globe, Settings2, Sparkles, Volume2, Loader2, Lock } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import Modal from '@/components/ui/Modal';
 
 const DEMO_TEXTS = [
     "أهلاً بك في MuejamStudio. منصتك المتكاملة لإنتاج محتوى صوتي احترافي.",
@@ -19,6 +20,7 @@ export default function HeroDemo() {
     const [audioProgress, setAudioProgress] = useState(0);
     const [usageCount, setUsageCount] = useState(0);
     const [isLocked, setIsLocked] = useState(false);
+    const [showLockModal, setShowLockModal] = useState(false);
 
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -45,7 +47,7 @@ export default function HeroDemo() {
 
         // 2. Handle Lock logic
         if (isLocked || usageCount >= 3) {
-            // Optional: Add visual feedback/shake here
+            setShowLockModal(true);
             return;
         }
 
@@ -117,142 +119,128 @@ export default function HeroDemo() {
     }, []);
 
     return (
-        <div className="w-full max-w-4xl mx-auto relative z-20">
+        <div className="w-full relative z-20">
             <audio ref={audioRef} className="hidden" />
 
-            {/* Main Glass Card */}
-            <div className="bg-card/60 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl overflow-hidden relative group transition-all duration-300 hover:shadow-primary/10">
+            {/* Main Card - Exact Design Replica */}
+            <div className="bg-[#444444] rounded-[1.5rem] shadow-2xl overflow-hidden relative group w-full font-sans border border-white/5">
 
-                {/* Header Tabs */}
-                <div className="flex items-center gap-6 px-8 py-4 border-b border-border/50 bg-muted/20">
-                    <button className="text-foreground font-bold text-sm border-b-2 border-primary pb-4 -mb-4.5 px-2 transition-colors">
-                        TEXT TO SPEECH
-                    </button>
-                    <button className="text-muted-foreground hover:text-foreground font-medium text-sm pb-4 -mb-4.5 px-2 transition-colors">
-                        VOICE CLONING
-                    </button>
-                    <button className="text-muted-foreground hover:text-foreground font-medium text-sm pb-4 -mb-4.5 px-2 transition-colors">
-                        AUDIO DUBBING
-                    </button>
-                    {/* Usage Counter Badge */}
-                    <div className="mr-auto text-xs font-mono bg-background/50 px-2 py-1 rounded text-muted-foreground">
-                        {isLocked ? "Limit Reached" : `${3 - usageCount} Tries Left`}
+                {/* Header (Forced LTR for consistency with image layout) */}
+                <div className="flex items-center justify-between px-6 py-4 bg-[#4a4a4a] border-b border-white/5" dir="ltr">
+                    {/* Badge (Left) */}
+                    <div className="bg-[#3a2e2e] px-3 py-1.5 rounded-md text-[#ff8c66] text-xs font-mono font-bold tracking-tight shadow-inner shadow-black/20">
+                        {isLocked ? "Limit Reached" : `Tries Left ${3 - usageCount}`}
+                    </div>
+
+                    {/* Tabs (Right) */}
+                    <div className="flex items-center gap-6 text-xs sm:text-sm font-bold text-zinc-400">
+                        <button className="hover:text-white transition-colors uppercase tracking-wide hidden sm:block">Audio Dubbing</button>
+                        <button className="hover:text-white transition-colors uppercase tracking-wide hidden sm:block">Voice Cloning</button>
+                        <button className="text-[#e8e8e8] border-b-2 border-[#ff8c66] pb-1 uppercase tracking-wide">Text to Speech</button>
                     </div>
                 </div>
 
-                {/* Text Area */}
-                <div className="relative p-6 sm:p-8 min-h-[220px]">
+                {/* Content Area */}
+                <div className="relative p-8 min-h-[280px] bg-[#525252] flex flex-col group-hover:bg-[#555555] transition-colors duration-500">
                     <textarea
                         value={text}
                         onChange={(e) => setText(e.target.value)}
-                        disabled={isPlaying || isLoading || isLocked}
-                        className="w-full h-full min-h-[120px] bg-transparent border-none focus:ring-0 text-lg sm:text-xl leading-relaxed text-foreground resize-none placeholder:text-muted-foreground/50 font-medium disabled:opacity-50"
-                        placeholder="اكتب النص هنا..."
+                        disabled={isPlaying || isLoading}
+                        readOnly={isLocked}
+                        className="w-full h-full bg-transparent border-none focus:ring-0 text-xl sm:text-2xl leading-relaxed text-right text-[#f0f0f0] placeholder:text-zinc-500 resize-none font-medium custom-scrollbar selection:bg-[#ff8c66]/30"
                         dir="rtl"
+                        placeholder="اكتب النص هنا..."
                     />
-                    <div className="absolute bottom-4 left-6 text-xs text-muted-foreground font-mono">
-                        {text.length} / 200 chars
+
+                    {/* Bottom Info Line */}
+                    <div className="mt-auto pt-6 flex items-center justify-between text-zinc-400 text-xs font-mono" dir="ltr">
+                        <span>chars {text.length} / 200</span>
                     </div>
 
                     {/* Locked Overlay */}
                     {isLocked && (
-                        <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] flex flex-col items-center justify-center text-center p-6 z-20 animate-in fade-in">
-                            <div className="bg-card border border-border p-6 rounded-2xl shadow-xl max-w-sm">
-                                <div className="w-12 h-12 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <Lock className="w-6 h-6" />
-                                </div>
-                                <h3 className="font-bold text-lg mb-2">انتهت التجربة المجانية</h3>
-                                <p className="text-muted-foreground text-sm mb-6">لقد استهلكت جميع المحاولات المجانية (3 مرات). يرجى تسجيل الدخول للمتابعة بدون حدود.</p>
-                                <button
-                                    onClick={() => router.push('/login')}
-                                    className="btn btn-primary w-full"
-                                >
-                                    تسجيل الدخول
-                                </button>
-                            </div>
+                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
+                            <button
+                                onClick={() => setShowLockModal(true)}
+                                className="flex items-center gap-2 bg-[#333]/90 border border-zinc-500/50 rounded-full px-5 py-2.5 text-zinc-200 hover:scale-105 transition-transform shadow-lg"
+                            >
+                                <Lock className="w-4 h-4 text-[#ff8c66]" />
+                                <span className="font-bold text-sm">انتهت المحاولات - اضغط هنا</span>
+                            </button>
                         </div>
                     )}
                 </div>
 
-                {/* Bottom Control Bar */}
-                <div className="relative bg-background/50 border-t border-border/50 p-4 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-6">
+                {/* Footer Controls (Exact Match: Side-by-Side) */}
+                <div className="bg-[#444444] p-4 sm:p-6 flex flex-row items-center justify-between gap-3 border-t border-white/5 overflow-x-auto no-scrollbar" dir="ltr">
 
-                    {/* Waveform Background Animation */}
-                    {isPlaying && (
-                        <div className="absolute inset-0 z-0 opacity-20 pointer-events-none overflow-hidden">
-                            <div className="flex items-center justify-center gap-1 h-full w-full">
-                                {[...Array(60)].map((_, i) => (
-                                    <div
-                                        key={i}
-                                        style={{
-                                            animationDelay: `${i * 0.05}s`,
-                                            height: `${Math.random() * 60 + 20}%`
-                                        }}
-                                        className="w-1.5 bg-primary rounded-full animate-music-bar-1"
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    )}
+                    {/* Generate Button (Left) */}
+                    <button
+                        onClick={handlePlay}
+                        disabled={isLoading}
+                        className="bg-[#ff8c66] hover:bg-[#ff7a50] text-white px-5 sm:px-6 py-3.5 rounded-full font-bold text-lg shadow-lg shadow-orange-900/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2 flex-shrink-0"
+                    >
+                        <span>{isLoading ? 'Processing' : 'Generate'}</span>
+                        {!isLoading && <Play className="w-5 h-5 fill-current" />}
+                    </button>
 
-                    {/* Provider & Character Selection */}
-                    <div className="flex flex-col sm:flex-row items-center gap-3 relative z-10 w-full sm:w-auto">
-                        <div className="flex items-center gap-3 bg-card border border-border rounded-full py-2 px-4 shadow-sm hover:border-primary/50 transition-colors cursor-pointer text-muted-foreground">
-                            <span className="text-xs font-bold uppercase tracking-wider">Provider</span>
-                            <div className="w-px h-4 bg-border"></div>
-                            <span className="text-sm font-bold text-foreground">Ghaymah</span>
-                        </div>
-                        <div className="flex items-center gap-3 bg-card border border-border rounded-full py-2 px-2 pr-4 shadow-sm hover:border-primary/50 transition-colors cursor-pointer min-w-[200px]">
-                            <div className="w-8 h-8 rounded-full bg-muted overflow-hidden relative border border-border">
-                                <div className="absolute inset-0 bg-neutral-800 flex items-center justify-center text-[10px] text-white font-bold">EG</div>
+                    {/* Selectors (Right - Side by Side) */}
+                    <div className="flex items-center gap-2 sm:gap-3 flex-nowrap">
+                        {/* Voice */}
+                        <div className="flex items-center gap-3 bg-[#555555] rounded-full px-3 py-2 border border-white/5 cursor-pointer hover:bg-[#5a5a5a] transition-colors group whitespace-nowrap flex-shrink-0">
+                            <div className="flex flex-col leading-none">
+                                <span className="text-sm font-bold text-zinc-200">ar-EG-ShakirNeural</span>
+                                <span className="text-[10px] text-zinc-400">Male • Arabic</span>
                             </div>
-                            <div className="flex flex-col items-start leading-none">
-                                <span className="text-sm font-bold text-foreground">ar-EG-ShakirNeural</span>
-                                <span className="text-[10px] text-muted-foreground text-left w-full">Male • Arabic</span>
-                            </div>
-                            <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
+                            <div className="w-8 h-8 rounded-full bg-[#333] flex items-center justify-center text-[10px] text-white border border-white/10 group-hover:border-[#ff8c66] transition-colors">EG</div>
                         </div>
-                    </div>
 
-                    {/* Play Button */}
-                    <div className="relative z-10">
-                        <button
-                            onClick={handlePlay}
-                            disabled={isLoading || isLocked}
-                            className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-3 rounded-full font-bold shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:pointer-events-none min-w-[140px] justify-center"
-                        >
-                            {isLoading ? (
-                                <>
-                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                    <span>Processing</span>
-                                </>
-                            ) : isPlaying ? (
-                                <>
-                                    <Pause className="w-5 h-5 fill-current" />
-                                    <span>Stop</span>
-                                </>
-                            ) : isLocked ? (
-                                <>
-                                    <Lock className="w-4 h-4" />
-                                    <span>Locked</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Play className="w-5 h-5 fill-current" />
-                                    <span>Generate</span>
-                                </>
-                            )}
-                        </button>
+                        {/* Provider */}
+                        <div className="flex items-center gap-2 bg-[#555555] rounded-full px-4 py-3 border border-white/5 cursor-pointer hover:bg-[#5a5a5a] transition-colors whitespace-nowrap flex-shrink-0">
+                            <span className="text-sm font-bold text-zinc-200">Ghaymah</span>
+                            <span className="text-[10px] text-zinc-400 border-l border-zinc-600 pl-2 ml-1 tracking-wider uppercase">PROVIDER</span>
+                        </div>
                     </div>
 
                 </div>
 
-                {/* Progress Bar Line */}
-                <div className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-primary to-orange-400 z-30 transition-all duration-100 ease-linear" style={{ width: `${audioProgress}%` }} />
+                {/* Progress Bar */}
+                {isPlaying && <div className="absolute bottom-0 left-0 h-1.5 bg-[#ff8c66] transition-all duration-100 ease-linear z-30" style={{ width: `${audioProgress}%` }} />}
             </div>
 
-            {/* Decorative Glows */}
-            <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-orange-500/20 rounded-[2rem] blur-2xl -z-10 opacity-50 animate-pulse-slow pointer-events-none" />
+            {/* Decorative Shadow/Glow (Subtle) */}
+            <div className="absolute -inset-4 bg-black/20 blur-xl -z-10 rounded-[3rem]"></div>
+
+            {/* Modal */}
+            <Modal
+                isOpen={showLockModal}
+                onClose={() => setShowLockModal(false)}
+                title="انتهت التجربة المجانية"
+            >
+                <div className="flex flex-col items-center text-center space-y-4 pt-4">
+                    <div className="w-16 h-16 bg-[#ff8c66]/10 text-[#ff8c66] rounded-full flex items-center justify-center mb-2">
+                        <Lock className="w-8 h-8" />
+                    </div>
+                    <p className="text-zinc-500 leading-relaxed text-sm sm:text-lg">
+                        You have used all 3 free tries. <br />
+                        Sign in to continue creating unlimited content.
+                    </p>
+                    <div className="grid gap-3 w-full pt-4">
+                        <button
+                            onClick={() => router.push('/login')}
+                            className="w-full bg-[#ff8c66] hover:bg-[#ff7a50] text-white font-bold py-4 rounded-xl shadow-lg transition-all"
+                        >
+                            Sign In / Register
+                        </button>
+                        <button
+                            onClick={() => setShowLockModal(false)}
+                            className="text-sm text-zinc-500 hover:text-zinc-800 transition-colors py-2"
+                        >
+                            Close Preview
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }

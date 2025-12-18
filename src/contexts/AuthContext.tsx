@@ -19,11 +19,11 @@ interface AuthContextType {
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const getCookie = (name: string): string | null => {
-    if (typeof window === 'undefined') return null;
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
-    return null;
+  if (typeof window === 'undefined') return null;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+  return null;
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -86,11 +86,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const userData: User = data.user;
-    const userToken: string = data.accessToken; // FIX: API returns accessToken, not token
+    const userToken: string = data.accessToken;
 
     localStorage.setItem('user', JSON.stringify(userData));
-    document.cookie = `token=${userToken};path=/;max-age=86400;SameSite=Lax`; // 1 day expiry
-    
+
+    // Manual Cookie Fallback: Ensure cookie is set client-side to bypass any server-header rejection issues
+    // This allows middleware to see the token immediately upon redirect
+    document.cookie = `token=${userToken}; path=/; max-age=604800; SameSite=Lax; Secure`;
+
     setUser(userData);
     setToken(userToken);
 

@@ -117,10 +117,26 @@ export async function POST(request: NextRequest) {
       expiresIn: '1d',
     });
 
-    return jsonResponse({
+    const response = NextResponse.json({
       accessToken: token,
       user: { id: user.id, displayName: user.displayName, email: user.email, roles: allowedRoles }
-    }, 200);
+    }, { status: 200 });
+
+    // Determine secure status robustly (Cloudflare/Vercel proxies usually set x-forwarded-proto)
+    const forwardedProto = request.headers.get('x-forwarded-proto');
+    const isSecure = process.env.NODE_ENV === 'production' || forwardedProto === 'https';
+
+    response.cookies.set({
+      name: 'token',
+      value: token,
+      httpOnly: false, // Client needs to read this for AuthContext
+      secure: isSecure,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+    });
+
+    return response;
 
   } catch (error: any) {
     console.error("CRITICAL ERROR in token generation route:", error);

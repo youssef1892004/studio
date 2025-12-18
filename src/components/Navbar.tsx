@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -98,11 +99,15 @@ export default function Navbar() {
 
                         {/* Logo Section */}
                         <Link href="/" className="flex items-center gap-3 group relative z-50">
-                            <div className="relative">
-                                <div className="absolute inset-0 bg-primary/40 rounded-xl blur-lg group-hover:blur-xl transition-all duration-300 opacity-60"></div>
-                                <div className="w-10 h-10 bg-gradient-to-br from-primary to-orange-600 rounded-xl flex items-center justify-center transform transition-all duration-300 group-hover:scale-105 group-hover:rotate-3 shadow-lg ring ring-white/10 relative z-10">
-                                    <Mic className="w-5 h-5 text-white" />
-                                </div>
+                            <div className="relative w-16 h-16">
+                                <div className="absolute inset-0 bg-primary/40 rounded-3xl blur-lg group-hover:blur-xl transition-all duration-300 opacity-60"></div>
+                                <Image
+                                    src="/logos/ms-logo-orange.png"
+                                    alt="MuejamStudio Logo"
+                                    width={64}
+                                    height={64}
+                                    className="w-full h-full object-contain relative z-10 rounded-3xl transform transition-all duration-300 group-hover:scale-105"
+                                />
                             </div>
                             <span className="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70 tracking-tight">
                                 MuejamStudio
