@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useContext, useEffect } from "react";
-import { ArrowLeft, Mic, Code, Database, Shield, Download, DollarSign, Gift, Zap, Sparkles, Globe, Layers, Image as ImageIcon, Video, Clapperboard, Wand2, Cpu, Music, Settings, Rocket } from "lucide-react";
+import { ArrowLeft, Mic, Code, Database, Shield, Download, DollarSign, Gift, Zap, Sparkles, Globe, Layers, Image as ImageIcon, Video, Clapperboard, Wand2, Cpu, Music, Settings, Rocket, Megaphone, Check, X, Youtube } from "lucide-react";
 import Link from 'next/link';
 import Image from 'next/image';
 import { AuthContext } from '@/contexts/AuthContext';
@@ -18,6 +18,40 @@ export default function LandingPageClient() {
   const projectLink = user ? "/projects" : "/login";
 
   const [showPromoBar, setShowPromoBar] = useState(true);
+  const [activeUseCase, setActiveUseCase] = useState<'creators' | 'marketers' | 'developers'>('creators');
+
+  const useCases = {
+    creators: {
+      title: "لصناع المحتوى واليوتيوبرز",
+      desc: "ضاعف إنتاجك من الفيديوهات. سواء كنت تدير قناة 'بدون وجه' (Faceless) أو بودكاست، وفر ساعات من التسجيل والمونتاج.",
+      features: ["أصوات وثائقية عميقة", "تزامن تلقائي للفيديو", "تصدير 1080p"],
+      link: "/solutions/content-creators",
+      icon: <Youtube className="w-6 h-6" />,
+      color: "text-red-500",
+      bg: "bg-red-500/10",
+      border: "border-red-500/20"
+    },
+    marketers: {
+      title: "للمسوقين ووكالات الإعلان",
+      desc: "أطلق حملات إعلانية متعددة اللهجات في دقائق. خاطب كل عميل بلهجته المحلية لزيادة المبيعات.",
+      features: ["30+ لهجة محلية", "تغيير الصيغ (A/B Testing)", "تكلفة دقيقة منخفضة"],
+      link: "/solutions/marketers",
+      icon: <Megaphone className="w-6 h-6" />,
+      color: "text-blue-500",
+      bg: "bg-blue-500/10",
+      border: "border-blue-500/20"
+    },
+    developers: {
+      title: "للمطورين والشركات الناشئة",
+      desc: "ابنِ تطبيقات صوتية مذهلة باستخدام واجهة برمجة التطبيقات (API) الخاصة بنا. وثائق واضحة ودعم فني مباشر.",
+      features: ["Low Latency API", "Webhooks", "SDKs جاهزة"],
+      link: "/docs",
+      icon: <Code className="w-6 h-6" />,
+      color: "text-green-500",
+      bg: "bg-green-500/10",
+      border: "border-green-500/20"
+    }
+  };
 
   // Redirect if user is logged in
   useEffect(() => {
@@ -201,6 +235,122 @@ export default function LandingPageClient() {
         </div>
       </section>
 
+      {/* Use Cases - Interactive Tabs */}
+      <section className="py-24 bg-background relative">
+        <div className="container mx-auto px-6">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold mb-4">حلول مفصلة لكل مبدع</h2>
+            <p className="text-muted-foreground">اختر مجالك واكتشف كيف يمكننا مساعدتك</p>
+          </div>
+
+          <div className="max-w-5xl mx-auto bg-card border border-border/50 rounded-3xl p-2 sm:p-4 shadow-2xl">
+            {/* Tabs Header */}
+            <div className="flex flex-wrap justify-center gap-2 mb-8 border-b border-border/50 pb-4">
+              {(Object.keys(useCases) as Array<keyof typeof useCases>).map((key) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveUseCase(key)}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-full text-sm font-bold transition-all ${activeUseCase === key
+                      ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-105'
+                      : 'hover:bg-muted text-muted-foreground'
+                    }`}
+                >
+                  {useCases[key].icon}
+                  {key === 'creators' ? 'صناع المحتوى' : key === 'marketers' ? 'المسوقين' : 'المطورين'}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab Content */}
+            <div className="grid md:grid-cols-2 gap-12 p-4 sm:p-8 items-center animate-in fade-in slide-in-from-bottom-4 duration-500" key={activeUseCase}>
+              <div className="space-y-6">
+                <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold w-fit ${useCases[activeUseCase].bg} ${useCases[activeUseCase].color} ${useCases[activeUseCase].border} border`}>
+                  {useCases[activeUseCase].icon}
+                  <span>الحل الأمثل</span>
+                </div>
+                <h3 className="text-3xl font-bold">{useCases[activeUseCase].title}</h3>
+                <p className="text-lg text-muted-foreground leading-relaxed">
+                  {useCases[activeUseCase].desc}
+                </p>
+                <ul className="space-y-3">
+                  {useCases[activeUseCase].features.map((feat, i) => (
+                    <li key={i} className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">✓</div>
+                      <span className="text-foreground">{feat}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Link href={useCases[activeUseCase].link} className="inline-flex items-center gap-2 text-primary font-bold hover:underline underline-offset-4 mt-4 group">
+                  اقرأ المزيد
+                  <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                </Link>
+              </div>
+
+              {/* Visual Side */}
+              <div className={`aspect-video rounded-2xl ${useCases[activeUseCase].bg} border ${useCases[activeUseCase].border} flex items-center justify-center relative overflow-hidden group`}>
+                <div className="absolute inset-0 bg-gradient-to-br from-transparent to-black/20"></div>
+                <Megaphone className={`w-32 h-32 ${useCases[activeUseCase].color} opacity-20 group-hover:scale-110 transition-transform duration-700`} />
+                <div className="absolute bottom-4 left-4 right-4 bg-background/90 backdrop-blur-sm p-4 rounded-xl border border-border/50 text-sm font-mono opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0 duration-300">
+                  {`> Initiating ${activeUseCase} module...`}
+                  <br />
+                  <span className="text-green-500">{`> Success! Efficiency boosted by 300%`}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Comparison Teaser */}
+      <section className="py-24 bg-zinc-900/50 border-y border-white/5">
+        <div className="container mx-auto px-6">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div>
+              <h2 className="text-3xl md:text-5xl font-bold mb-6">لماذا ينتقل الجميع إلى <span className="text-primary">MuejamStudio</span>؟</h2>
+              <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
+                بينما تركز الأدوات العالمية على الإنجليزية، ركزنا نحن على لغتك. دقة في التشكيل، أداء طبيعي، وسعر يناسب منطقتنا.
+              </p>
+              <div className="flex gap-4">
+                <Link href="/compare" className="btn btn-primary px-8 py-4 text-lg shadow-xl shadow-primary/10">
+                  شاهد المقارنة الكاملة
+                </Link>
+                <Link href="/studio" className="btn bg-white/10 text-white hover:bg-white/20 px-8 py-4 text-lg">
+                  جرب بنفسك
+                </Link>
+              </div>
+            </div>
+
+            {/* Mini Comparison Card */}
+            <div className="bg-background rounded-3xl border border-border p-8 relative shadow-2xl">
+              <div className="absolute -top-4 -right-4 bg-green-500 text-black font-bold px-4 py-1 rounded-full text-sm transform rotate-12">وفر 70%</div>
+              <div className="space-y-6">
+                <div className="flex justify-between items-center border-b border-border pb-4">
+                  <span className="font-bold text-muted-foreground">الميزة</span>
+                  <div className="flex gap-8 text-sm">
+                    <span className="text-primary font-bold">Muejam</span>
+                    <span className="text-muted-foreground">Others</span>
+                  </div>
+                </div>
+                {[
+                  { label: "دعم اللهجات", us: true, them: false },
+                  { label: "التشكيل التلقائي", us: true, them: false },
+                  { label: "الدفع المحلي", us: true, them: false },
+                  { label: "تصدير الفيديو", us: true, them: "Limited" },
+                ].map((item, i) => (
+                  <div key={i} className="flex justify-between items-center">
+                    <span className="font-medium">{item.label}</span>
+                    <div className="flex gap-12 items-center">
+                      <span className="w-8 flex justify-center">{item.us ? <Check className="text-green-500 w-5 h-5" /> : item.us}</span>
+                      <span className="w-8 flex justify-center text-muted-foreground text-xs">{item.them === false ? <X className="text-red-500 w-4 h-4 opacity-50" /> : item.them}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Steps Section */}
       <section className="py-24 relative overflow-hidden">
         <div className="container mx-auto px-6 relative z-10">
@@ -287,12 +437,15 @@ export default function LandingPageClient() {
                 <li><Link href="/products/text-to-speech" className="hover:text-primary transition-colors">Text to Speech</Link></li>
                 <li><Link href="/products/voice-cloning" className="hover:text-primary transition-colors">Voice Cloning</Link></li>
                 <li><Link href="/projects" className="hover:text-primary transition-colors">Video Editor <span className="text-[10px] bg-green-500/20 text-green-500 px-1 rounded ml-1">New</span></Link></li>
+                <li><Link href="/solutions/content-creators" className="hover:text-primary transition-colors">لصناع المحتوى</Link></li>
+                <li><Link href="/solutions/marketers" className="hover:text-primary transition-colors">للمسوقين</Link></li>
               </ul>
             </div>
             <div>
               <h4 className="font-bold mb-4 text-foreground">مصادر</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><Link href="/about" className="hover:text-primary transition-colors">من نحن</Link></li>
+                <li><Link href="/compare" className="hover:text-primary transition-colors text-orange-400">مقارنة بالمنافسين</Link></li>
                 <li><a href="https://muejam.com/" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">المدونة</a></li>
                 <li><Link href="/docs" className="hover:text-primary transition-colors">التوثيق</Link></li>
                 <li><Link href="/contact" className="hover:text-primary transition-colors">مساعدة (تواصل معنا)</Link></li>

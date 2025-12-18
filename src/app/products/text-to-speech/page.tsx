@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { Mic, Globe, Zap, Play, CheckCircle2, ArrowLeft } from 'lucide-react';
 
 export const metadata: Metadata = {
-    title: 'تحويل النص إلى كلام عربي بالذكاء الاصطناعي | Text to Speech',
-    description: 'حول أي نص مكتوب إلى تعليق صوتي احترافي باللهجات العربية (مصر، السعودية، الإمارات) باستخدام أحدث تقنيات MuejamStudio.',
+    title: 'تحويل النص إلى كلام عربي (Arabic TTS) | أصوات طبيعية بالذكاء الاصطناعي',
+    description: 'أفضل برنامج تحويل النص إلى كلام (TTS) يدعم اللهجات العربية (المصرية، السعودية، الخليجية) مع تشكيل تلقائي للنص. اصنع تعليقاً صوتياً (Voice Over) لليوتيوب، الكتب الصوتية، والرد الآلي IVR بجودة بشرية 100%.',
+    keywords: ['تحويل النص إلى كلام', 'Arabic TTS', 'Text to Speech Arabic', 'قارئ النصوص العربية', 'أصوات ذكاء اصطناعي', 'دبلجة آلية', 'تشكيل النصوص', 'فويس اوفر مجاني', 'برنامج ناطق عربي'],
 };
 
 export default function TextToSpeechPage() {

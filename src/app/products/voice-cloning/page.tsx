@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { Fingerprint, Lock, Wand2, Mic2, ArrowLeft, Volume2 } from 'lucide-react';
 
 export const metadata: Metadata = {
-    title: 'استنساخ الأصوات بالذكاء الاصطناعي | Voice Cloning',
-    description: 'استنسخ صوتك أو أي صوت آخر بدقة متناهية باستخدام تقنية Voice Cloning من MuejamStudio. مثالي للبودكاست، الكتب الصوتية، والمحتوى الرقمي.',
+    title: 'استنساخ الأصوات (Voice Cloning) | أنشئ نسختك الرقمية بالذكاء الاصطناعي',
+    description: 'تقنية استنساخ الصوت (Voice Cloning) الأولى عربياً. انسخ نبرة صوتك أو أي شخصية بدقة 95%. مثالي لصناع المحتوى، البودكاست، والكتب الصوتية (Audiobooks).',
+    keywords: ['استنساخ الصوت', 'Voice Cloning Arabic', 'نسخ الصوت', 'تقليد الأصوات', 'ذكاء اصطناعي صوتي', 'تغيير الصوت', 'Custom Voice', 'AI Voice API'],
 };
 
 export default function VoiceCloningPage() {
