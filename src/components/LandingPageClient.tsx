@@ -1,15 +1,25 @@
 'use client';
 
 import { useState, useContext, useEffect } from "react";
+import dynamic from 'next/dynamic';
 import { ArrowLeft, Mic, Code, Database, Shield, Download, DollarSign, Gift, Zap, Sparkles, Globe, Layers, Image as ImageIcon, Video, Clapperboard, Wand2, Cpu, Music, Settings, Rocket, Megaphone, Check, X, Youtube } from "lucide-react";
 import Link from 'next/link';
 import Image from 'next/image';
 import { AuthContext } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import HeroDemo from '@/components/HeroDemo';
-import FluidCta from '@/components/FluidCta';
-import EditorShowcase from '@/components/EditorShowcase';
-import MobileOptimizationWarning from '@/components/MobileOptimizationWarning';
+
+const FluidCta = dynamic(() => import('@/components/FluidCta'), {
+  loading: () => <div className="h-96 w-full bg-muted/10 animate-pulse rounded-3xl container mx-auto" />,
+  ssr: false
+});
+
+const EditorShowcase = dynamic(() => import('@/components/EditorShowcase'), {
+  loading: () => <div className="h-[600px] w-full bg-muted/10 animate-pulse rounded-3xl container mx-auto" />,
+  ssr: false
+});
+
+const MobileOptimizationWarning = dynamic(() => import('@/components/MobileOptimizationWarning'), { ssr: false });
 
 export default function LandingPageClient() {
   const router = useRouter();
@@ -118,10 +128,19 @@ export default function LandingPageClient() {
                 </button>
 
                 {/* Social Proof - Visible on Mobile now */}
+                {/* Social Proof - Visible on Mobile now */}
                 <div className="flex flex-row items-center justify-start gap-2 sm:gap-3 text-sm text-muted-foreground bg-white/5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border border-white/5 hover:bg-white/10 transition-colors cursor-default">
                   <div className="flex -space-x-2 sm:-space-x-3">
                     {[1, 2, 3].map(i => (
-                      <div key={i} className="w-6 h-6 sm:w-8 sm:h-8 rounded-full border-2 border-background bg-zinc-700 flex items-center justify-center text-[8px] sm:text-[10px] text-white font-bold relative z-0 hover:z-10 transition-all">U{i}</div>
+                      <div key={i} className="w-6 h-6 sm:w-8 sm:h-8 rounded-full border-2 border-background overflow-hidden relative z-0 hover:z-10 transition-all hover:scale-110 shadow-sm">
+                        <Image
+                          src={`/avatars/user${i}.png`}
+                          alt={`User ${i}`}
+                          fill
+                          sizes="(max-width: 768px) 24px, 32px"
+                          className="object-cover"
+                        />
+                      </div>
                     ))}
                   </div>
                   <p className="font-medium whitespace-nowrap text-xs sm:text-sm">انضم لـ 10,000+ مبدع</p>
@@ -251,8 +270,8 @@ export default function LandingPageClient() {
                   key={key}
                   onClick={() => setActiveUseCase(key)}
                   className={`flex items-center gap-2 px-6 py-3 rounded-full text-sm font-bold transition-all ${activeUseCase === key
-                      ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-105'
-                      : 'hover:bg-muted text-muted-foreground'
+                    ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-105'
+                    : 'hover:bg-muted text-muted-foreground'
                     }`}
                 >
                   {useCases[key].icon}
@@ -416,55 +435,6 @@ export default function LandingPageClient() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-muted/30 border-t border-border pt-16 pb-8">
-        <div className="container mx-auto px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
-            <div className="col-span-2 md:col-span-1">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/20">
-                  <Mic className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-lg font-bold">MuejamStudio</span>
-              </div>
-              <p className="text-muted-foreground text-sm leading-relaxed mb-4">
-                المنصة العربية الأولى المتكاملة لتحرير الصوت، الصورة، والفيديو باستخدام أحدث تقنيات الذكاء الاصطناعي التوليدي.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-bold mb-4 text-foreground">المنتجات</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="/products/text-to-speech" className="hover:text-primary transition-colors">Text to Speech</Link></li>
-                <li><Link href="/products/voice-cloning" className="hover:text-primary transition-colors">Voice Cloning</Link></li>
-                <li><Link href="/projects" className="hover:text-primary transition-colors">Video Editor <span className="text-[10px] bg-green-500/20 text-green-500 px-1 rounded ml-1">New</span></Link></li>
-                <li><Link href="/solutions/content-creators" className="hover:text-primary transition-colors">لصناع المحتوى</Link></li>
-                <li><Link href="/solutions/marketers" className="hover:text-primary transition-colors">للمسوقين</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-bold mb-4 text-foreground">مصادر</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="/about" className="hover:text-primary transition-colors">من نحن</Link></li>
-                <li><Link href="/compare" className="hover:text-primary transition-colors text-orange-400">مقارنة بالمنافسين</Link></li>
-                <li><a href="https://muejam.com/" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">المدونة</a></li>
-                <li><Link href="/docs" className="hover:text-primary transition-colors">التوثيق</Link></li>
-                <li><Link href="/contact" className="hover:text-primary transition-colors">مساعدة (تواصل معنا)</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-bold mb-4 text-foreground">قانوني</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="/legal#privacy" className="hover:text-primary transition-colors">الخصوصية</Link></li>
-                <li><Link href="/legal#terms" className="hover:text-primary transition-colors">الشروط</Link></li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-border pt-8 text-center text-sm text-muted-foreground">
-            <p>&copy; {new Date().getFullYear()} MuejamStudio. جميع الحقوق محفوظة.</p>
-          </div>
-        </div>
-      </footer>
-
       {/* Sticky Bottom CTA */}
       <div className="fixed bottom-0 w-full p-4 bg-background/80 backdrop-blur-lg border-t border-border md:hidden z-40">
         <button onClick={() => router.push(projectLink)} className="btn btn-primary w-full shadow-lg shadow-primary/20">
@@ -474,6 +444,6 @@ export default function LandingPageClient() {
 
       <MobileOptimizationWarning />
 
-    </div>
+    </div >
   );
 }

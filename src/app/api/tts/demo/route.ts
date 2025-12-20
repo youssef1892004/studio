@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
                 block_id: "demo-block",
                 provider: "ghaymah", // Fixed Provider (lowercase)
                 voice: "ar-EG-ShakirNeural", // Fixed Voice
-                arabic: true,
+                arabic: false, // Bypass broken diacritizer for demo stability
                 speed: 1,
                 pitch: 1
             }]

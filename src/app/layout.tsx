@@ -152,12 +152,13 @@ export default function RootLayout({
         <ClientLayout>
           {children}
         </ClientLayout>
-        {/* Umami Analytics - Commented out to prevent CORP errors for now */}
-        {/* <Script
+        {/* Umami Analytics */}
+        <Script
           src="https://cloud.umami.is/script.js"
-          data-website-id="b3c8b995-c0f2-4e86-b0ce-a937cda2e208"
+          data-website-id="92cdf002-7acc-494d-807f-f9407ce196ff"
           strategy="afterInteractive"
-        /> */}
+        />
+
         {/* Schema Markup for SEO */}
         <Script
           id="schema-markup"

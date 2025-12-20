@@ -81,7 +81,7 @@ export default function Navbar() {
                         <div className="flex items-center gap-2">
                             <span className="font-bold">عرض خاص: 14 يوم تجربة مجانية شاملة لكل الأدوات!</span>
                         </div>
-                        <button onClick={() => setShowPromoBar(false)} className="hover:bg-white/20 rounded-full p-1 transition-colors">
+                        <button onClick={() => setShowPromoBar(false)} aria-label="إغلاق الإعلان" className="hover:bg-white/20 rounded-full p-1 transition-colors">
                             <X className="w-4 h-4" />
                         </button>
                     </div>
@@ -137,6 +137,7 @@ export default function Navbar() {
                                 <div className="hidden md:block relative" ref={profileMenuRef}>
                                     <button
                                         onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                                        aria-label="قائمة المستخدم"
                                         className={`flex items-center gap-3 pl-2 pr-4 py-1.5 rounded-full border transition-all duration-300 ${profileMenuOpen
                                             ? 'bg-secondary border-primary/30 ring-2 ring-primary/10'
                                             : 'bg-background border-border hover:border-primary/50'
@@ -217,6 +218,7 @@ export default function Navbar() {
                             <div className="md:hidden">
                                 <button
                                     onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                                    aria-label={mobileMenuOpen ? "إغلاق القائمة" : "فتح القائمة"}
                                     className="p-2 text-foreground bg-muted/50 rounded-xl hover:bg-muted transition-colors"
                                 >
                                     {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}

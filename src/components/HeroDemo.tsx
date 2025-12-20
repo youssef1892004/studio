@@ -5,6 +5,7 @@ import { Play, Pause, ChevronRight, Mic, Globe, Settings2, Sparkles, Volume2, Lo
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import Modal from '@/components/ui/Modal';
+import { toast } from 'react-hot-toast';
 
 const DEMO_TEXTS = [
     "أهلاً بك في MuejamStudio. منصتك المتكاملة لإنتاج محتوى صوتي احترافي.",
@@ -85,9 +86,11 @@ export default function HeroDemo() {
                 });
             }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("TTS Demo Error:", error);
-            alert("عذراً، حدث خطأ أثناء توليد الصوت. يرجى المحاولة مرة أخرى.");
+            toast.error(error.message || "عذراً، حدث خطأ أثناء توليد الصوت. يرجى المحاولة مرة أخرى.", {
+                style: { direction: 'rtl' }
+            });
         } finally {
             setIsLoading(false);
         }

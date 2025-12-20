@@ -53,6 +53,7 @@ export default function MobileOptimizationWarning() {
                                 </div>
                                 <button
                                     onClick={dismiss}
+                                    aria-label="إغلاق التنبيه"
                                     className="text-muted-foreground hover:text-foreground transition-colors p-1"
                                 >
                                     <X className="w-5 h-5" />
