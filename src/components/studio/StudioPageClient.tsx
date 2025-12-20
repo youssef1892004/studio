@@ -231,10 +231,22 @@ export default function StudioPageClient() {
     const [loadingProgress, setLoadingProgress] = useState(0);
     const [activeMedia, setActiveMedia] = useState<{ id?: string; url: string; type: string; start: number; volume?: number; mediaStartOffset?: number } | null>(null);
 
+
+
     // Playback State
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const timelineRef = useRef<TimelineHandle>(null);
+
+    const activeVisualLayers = useMemo(() => {
+        return videoTrackItems
+            .filter(item =>
+                (item.type === 'video' || item.type === 'image' || item.type === 'scene') &&
+                currentTime >= item.start && currentTime < (item.start + item.duration) &&
+                (item.visible ?? true)
+            )
+            .sort((a, b) => (a.layerIndex || 0) - (b.layerIndex || 0));
+    }, [videoTrackItems, currentTime]);
 
     const { user, subscription, isLoading: isAuthLoading, refreshSubscription, token } = useAuth();
     const router = useRouter();
@@ -1650,13 +1662,34 @@ export default function StudioPageClient() {
                                             ));
                                         }
                                     }}
+                                    onUpdateOpacity={(newOpacity) => {
+                                        if (activeVideoId) {
+                                            setVideoTrackItems(prev => prev.map(item =>
+                                                item.id === activeVideoId
+                                                    ? { ...item, opacity: newOpacity }
+                                                    : item
+                                            ));
+                                        }
+                                    }}
+                                    onUpdateVisibility={(visible) => {
+                                        if (activeVideoId) {
+                                            setVideoTrackItems(prev => prev.map(item =>
+                                                item.id === activeVideoId
+                                                    ? { ...item, visible: visible }
+                                                    : item
+                                            ));
+                                        }
+                                    }}
                                 />
                             </div>
 
                             {/* Center: Preview Player */}
                             <div className="flex-1 flex flex-col relative bg-black/20 overflow-hidden">
                                 <PreviewPlayer
-                                    activeMedia={activeMedia}
+                                    layers={activeVisualLayers}
+                                    activeId={activeVideoId}
+                                    activeMedia={activeMedia} // Keep for legacy or specific audio logic if any
+
                                     isPlaying={isPlaying}
                                     currentTime={currentTime}
                                     playbackRate={playbackRate}

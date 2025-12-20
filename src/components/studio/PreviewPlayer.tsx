@@ -2,7 +2,13 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Maximize, Volume2 } from 'lucide-react';
 
 interface PreviewPlayerProps {
+    // Multi-layer support
+    layers?: any[];
+    activeId?: string | null;
+
+    // Legacy/Single Item support
     activeMedia?: { id?: string; url: string; type: string; start: number; volume?: number; mediaStartOffset?: number } | null;
+
     isPlaying?: boolean;
     currentTime?: number;
     onPlayPause?: () => void;
@@ -16,8 +22,82 @@ interface PreviewPlayerProps {
     onTransformUpdate?: (transform: { scale: number; x: number; y: number; rotation: number }) => void;
 }
 
+const MediaLayer: React.FC<{
+    item: any;
+    currentTime: number;
+    isPlaying: boolean;
+    playbackRate: number;
+    onMouseDown: (e: React.MouseEvent) => void;
+    isActive: boolean;
+}> = ({ item, currentTime, isPlaying, playbackRate, onMouseDown, isActive }) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    // Sync Logic for Video
+    useEffect(() => {
+        if (item.type === 'video' || item.type === 'scene') {
+            const vid = videoRef.current;
+            if (!vid) return;
+
+            const offset = item.mediaStartOffset || 0;
+            const targetTime = Math.max(0, currentTime - item.start + offset);
+
+            if (Math.abs(vid.currentTime - targetTime) > 0.25) {
+                vid.currentTime = targetTime;
+            }
+
+            if (isPlaying && vid.paused) vid.play().catch(() => { });
+            else if (!isPlaying && !vid.paused) vid.pause();
+
+            if (Math.abs(vid.playbackRate - playbackRate) > 0.01) {
+                vid.playbackRate = playbackRate;
+            }
+
+            vid.volume = item.volume ?? 1;
+        }
+    }, [item, currentTime, isPlaying, playbackRate]);
+
+    const style: React.CSSProperties = {
+        width: '100%',
+        height: '100%',
+        objectFit: 'contain',
+        pointerEvents: 'none',
+        userSelect: 'none'
+    };
+
+    const src = item.audioUrl || item.url || (item.source);
+    const proxySrc = src ? `/api/asset-proxy?url=${encodeURIComponent(src)}` : '';
+
+    if (item.type === 'video' || item.type === 'scene') {
+        return (
+            <video
+                ref={videoRef}
+                src={proxySrc}
+                style={style}
+                muted={false}
+                playsInline
+                preload="auto"
+            />
+        );
+    }
+
+    if (item.type === 'image') {
+        return (
+            <img
+                src={proxySrc}
+                alt="Layer"
+                style={style}
+                draggable={false}
+            />
+        );
+    }
+
+    return null;
+};
+
 const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
     activeMedia,
+    layers = [],
+    activeId,
     isPlaying = false,
     currentTime = 0,
     onPlayPause,
@@ -30,11 +110,26 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
     activeTransform = { scale: 1, x: 0, y: 0, rotation: 0 },
     onTransformUpdate
 }) => {
-    const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [draggingId, setDraggingId] = useState<string | null>(null);
-    const [isPanning, setIsPanning] = useState(false);
-    const [startPan, setStartPan] = useState({ x: 0, y: 0 });
+
+    // Backward compatibility: If no layers passed but activeMedia exists, create a temp layer
+    const displayLayers = layers.length > 0 ? layers : (activeMedia ? [{
+        ...activeMedia,
+        id: activeMedia.id || 'temp',
+        transform: activeTransform,
+        opacity: 1,
+        visible: true
+    }] : []);
+
+    const [dragState, setDragState] = useState<{
+        type: 'pan' | 'resize' | null;
+        startX: number;
+        startY: number;
+        startValX: number;
+        startValY: number;
+        startDist?: number;
+    }>({ type: null, startX: 0, startY: 0, startValX: 0, startValY: 0 });
 
     const handleTextMouseDown = (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
@@ -42,129 +137,113 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
         setDraggingId(id);
     };
 
-    const handleMediaMouseDown = (e: React.MouseEvent) => {
-        if (e.button !== 0) return; // Only left click
+    const handleLayerMouseDown = (e: React.MouseEvent, layer: any) => {
+        // Only drag if active
+        if (activeId && layer.id !== activeId) return;
+
+        if (e.button !== 0 || !onTransformUpdate) return;
         e.preventDefault();
-        setIsPanning(true);
-        setStartPan({ x: e.clientX, y: e.clientY });
+        e.stopPropagation();
+
+        const tf = layer.transform || { x: 0, y: 0, scale: 1, rotation: 0 };
+        // const op = layer.opacity ?? 1;
+
+        setDragState({
+            type: 'pan',
+            startX: e.clientX,
+            startY: e.clientY,
+            startValX: tf.x,
+            startValY: tf.y
+        });
+    };
+
+    const handleResizeStart = (e: React.MouseEvent, layer: any) => {
+        if (e.button !== 0 || !onTransformUpdate || !containerRef.current) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        const tf = layer.transform || { x: 0, y: 0, scale: 1, rotation: 0 };
+        const rect = containerRef.current.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const dist = Math.sqrt(Math.pow(e.clientX - centerX, 2) + Math.pow(e.clientY - centerY, 2));
+
+        setDragState({
+            type: 'resize',
+            startX: e.clientX,
+            startY: e.clientY,
+            startValX: tf.scale,
+            startValY: 0,
+            startDist: dist
+        });
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
         if (!containerRef.current) return;
+        const rect = containerRef.current.getBoundingClientRect();
 
-        // Text Dragging
         if (draggingId && onTextUpdate) {
-            const rect = containerRef.current.getBoundingClientRect();
             const x = ((e.clientX - rect.left) / rect.width) * 100;
             const y = ((e.clientY - rect.top) / rect.height) * 100;
-
             const item = activeTextItems.find(i => i.id === draggingId);
             if (item) {
                 onTextUpdate(draggingId, { ...item.style, xPosition: x, yPosition: y });
             }
+            return;
         }
 
-        // Media Panning
-        if (isPanning && onTransformUpdate) {
-            const rect = containerRef.current.getBoundingClientRect();
-            const dx = e.clientX - startPan.x;
-            const dy = e.clientY - startPan.y;
+        if (!dragState.type || !onTransformUpdate) return;
 
-            // Convert to percentage of container dimensions
+        if (dragState.type === 'pan') {
+            const dx = e.clientX - dragState.startX;
+            const dy = e.clientY - dragState.startY;
             const dxPercent = (dx / rect.width) * 100;
             const dyPercent = (dy / rect.height) * 100;
 
+            // Update Active Transform (passed to parent)
+            onTransformUpdate({
+                ...activeTransform, // Use activeTransform from props as base since we are editing Active Item
+                x: dragState.startValX + dxPercent,
+                y: dragState.startValY + dyPercent
+            });
+        }
+
+        if (dragState.type === 'resize' && dragState.startDist) {
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const currentDist = Math.sqrt(Math.pow(e.clientX - centerX, 2) + Math.pow(e.clientY - centerY, 2));
+            const scaleFactor = currentDist / dragState.startDist;
+            const newScale = Math.max(0.1, Math.min(10, dragState.startValX * scaleFactor));
+
             onTransformUpdate({
                 ...activeTransform,
-                x: activeTransform.x + dxPercent,
-                y: activeTransform.y + dyPercent
+                scale: newScale
             });
-
-            setStartPan({ x: e.clientX, y: e.clientY });
         }
     };
 
     const handleMouseUp = () => {
         setDraggingId(null);
-        setIsPanning(false);
+        setDragState({ type: null, startX: 0, startY: 0, startValX: 0, startValY: 0 });
     };
 
     const handleWheel = (e: React.WheelEvent) => {
         if (!onTransformUpdate) return;
         e.stopPropagation();
-
-        // Zoom logic
         const delta = -e.deltaY * 0.001;
         const newScale = Math.max(0.1, Math.min(5, activeTransform.scale + delta));
-
-        onTransformUpdate({
-            ...activeTransform,
-            scale: newScale
-        });
+        onTransformUpdate({ ...activeTransform, scale: newScale });
     };
 
     const toggleFullscreen = () => {
-        if (!document.fullscreenElement) {
-            containerRef.current?.requestFullscreen();
-        } else {
-            document.exitFullscreen();
-        }
+        if (!document.fullscreenElement) containerRef.current?.requestFullscreen();
+        else document.exitFullscreen();
     };
-
-    // Sync video player
-    useEffect(() => {
-        if (activeMedia?.type === 'video' && videoRef.current) {
-            const vid = videoRef.current;
-            // Calculate local time within the clip (timeline time - clip start + clip internal offset)
-            const offset = activeMedia.mediaStartOffset || 0;
-            const targetTime = Math.max(0, currentTime - activeMedia.start + offset);
-
-            // Sync play state
-            if (isPlaying && vid.paused) {
-                vid.play().catch(e => {
-                    // Autoplay policy might block unmuted
-                    console.warn("Autoplay blocked", e);
-                });
-            } else if (!isPlaying && !vid.paused) {
-                vid.pause();
-            }
-
-            // Sync time if drift > 0.2s (allow some rubber banding)
-            // Or if we just seeked (large jump)
-            if (Math.abs(vid.currentTime - targetTime) > 0.2) {
-                vid.currentTime = targetTime;
-            }
-
-            // Sync Volume
-            if (activeMedia.volume !== undefined) {
-                vid.volume = activeMedia.volume;
-            } else {
-                vid.volume = 1;
-            }
-
-            // Sync Speed
-            if (activeMedia?.type === 'video' && Math.abs(vid.playbackRate - playbackRate) > 0.01) {
-                vid.playbackRate = playbackRate;
-            }
-        }
-    }, [activeMedia, isPlaying, currentTime, playbackRate]);
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    };
-
-    const mediaStyle: React.CSSProperties = {
-        transform: `translate(${activeTransform.x}%, ${activeTransform.y}%) scale(${activeTransform.scale}) rotate(${activeTransform.rotation}deg)`,
-        transformOrigin: 'center',
-        cursor: isPanning ? 'grabbing' : 'grab',
-        position: 'absolute',
-        width: '100%',
-        height: '100%',
-        objectFit: 'contain' // We start with contain, allowing scale to zoom out/in from that base
-        // Actually, for free transform, usually we might want object-cover if scale=1 means fill?
-        // But let's stick to contain as base (fit) and let user zoom in to fill.
     };
 
     return (
@@ -174,127 +253,126 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
         >
-            {/* Main Preview Area */}
             <div
                 ref={containerRef}
                 className="w-full max-w-4xl bg-black rounded-lg shadow-2xl overflow-hidden relative flex items-center justify-center border border-studio-border dark:border-studio-border group select-none"
                 style={{ aspectRatio: aspectRatio, maxHeight: '80vh' }}
                 onWheel={handleWheel}
             >
-                {/* Media Preview - Wrapper for clipping */}
-                <div className="absolute inset-0 overflow-hidden flex items-center justify-center">
-                    {activeMedia ? (
-                        activeMedia.type === 'video' ? (
-                            <video
-                                ref={videoRef}
-                                src={`/api/asset-proxy?url=${encodeURIComponent(activeMedia.url)}`}
-                                className="transition-transform duration-75 ease-out"
-                                style={mediaStyle}
-                                onMouseDown={handleMediaMouseDown}
-                                muted={false}
-                                playsInline
-                                preload="auto"
-                                onDoubleClick={(e) => {
-                                    e.stopPropagation();
-                                    if (onTransformUpdate) {
-                                        const isZoomed = activeTransform.scale > 1.1;
-                                        onTransformUpdate({
-                                            ...activeTransform,
-                                            scale: isZoomed ? 1 : 1.5,
-                                            x: isZoomed ? 0 : activeTransform.x,
-                                            y: isZoomed ? 0 : activeTransform.y
-                                        });
-                                    }
-                                }}
-                            />
-                        ) : (
-                            <img
-                                src={`/api/asset-proxy?url=${encodeURIComponent(activeMedia.url)}`}
-                                alt="Preview"
-                                className="transition-transform duration-75 ease-out"
-                                style={mediaStyle}
-                                onMouseDown={handleMediaMouseDown}
-                                draggable={false}
-                                onDoubleClick={(e) => {
-                                    e.stopPropagation();
-                                    if (onTransformUpdate) {
-                                        const isZoomed = activeTransform.scale > 1.1;
-                                        onTransformUpdate({
-                                            ...activeTransform,
-                                            scale: isZoomed ? 1 : 1.5,
-                                            x: isZoomed ? 0 : activeTransform.x,
-                                            y: isZoomed ? 0 : activeTransform.y
-                                        });
-                                    }
-                                }}
-                            />
-                        )
+                <div className="absolute inset-0 overflow-hidden">
+                    {displayLayers.length > 0 ? (
+                        displayLayers.map((layer, index) => {
+                            const isActive = activeId && layer.id === activeId;
+                            // Use activeTransform PROP if this is the active layer, otherwise use stored transform
+                            const tf = isActive ? activeTransform : (layer.transform || { scale: 1, x: 0, y: 0, rotation: 0 });
+
+                            const containerStyle: React.CSSProperties = {
+                                transform: `translate(${tf.x}%, ${tf.y}%) scale(${tf.scale}) rotate(${tf.rotation}deg)`,
+                                transformOrigin: 'center',
+                                position: 'absolute',
+                                width: '100%',
+                                height: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                opacity: layer.opacity ?? 1,
+                                visibility: (layer.visible === false) ? 'hidden' : 'visible',
+                                zIndex: layer.layerIndex || (index + 10),
+                                cursor: isActive ? (dragState.type === 'pan' ? 'grabbing' : 'grab') : 'default'
+                            };
+
+                            return (
+                                <div
+                                    key={layer.id || index}
+                                    style={containerStyle}
+                                    onMouseDown={(e) => isActive && handleLayerMouseDown(e, layer)}
+                                >
+                                    <MediaLayer
+                                        item={layer}
+                                        currentTime={currentTime}
+                                        isPlaying={isPlaying}
+                                        playbackRate={playbackRate}
+                                        onMouseDown={(e) => isActive && handleLayerMouseDown(e, layer)}
+                                        isActive={!!isActive}
+                                    />
+
+                                    {/* Handles for Active Layer */}
+                                    {isActive && (
+                                        <div className="absolute inset-0 pointer-events-none">
+                                            <div className="absolute inset-0 border-2 border-[#F48969]/70"></div>
+                                            {['nw', 'ne', 'sw', 'se'].map((pos) => (
+                                                <div
+                                                    key={pos}
+                                                    className={`absolute w-4 h-4 bg-white border-2 border-[#F48969] rounded-full hover:scale-125 transition-transform pointer-events-auto shadow-sm z-20`}
+                                                    style={{
+                                                        top: pos.includes('n') ? -8 : 'auto',
+                                                        bottom: pos.includes('s') ? -8 : 'auto',
+                                                        left: pos.includes('w') ? -8 : 'auto',
+                                                        right: pos.includes('e') ? -8 : 'auto',
+                                                        cursor: `${pos}-resize`,
+                                                        transform: `scale(${1 / Math.max(0.1, tf.scale)})`
+                                                    }}
+                                                    onMouseDown={(e) => handleResizeStart(e, layer)}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })
                     ) : (
-                        /* Placeholder Content */
-                        <div className="text-center pointer-events-none">
-                            <div className="w-16 h-16 bg-studio-accent/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Play className="w-8 h-8 text-studio-accent fill-current ml-1" />
+                        <div className="flex items-center justify-center h-full pointer-events-none">
+                            <div className="text-center opacity-50">
+                                <Play className="w-12 h-12 mx-auto mb-2 text-studio-accent" />
+                                <p>No media selected</p>
                             </div>
-                            <p className="text-studio-text-light dark:text-studio-text opacity-50">No preview available</p>
                         </div>
                     )}
                 </div>
 
-                {/* Text Layer - Independent of Media Zoom? Or Linked? Usually independent overlay */}
+                {/* Text Layer */}
                 {activeTextItems?.map((text, idx) => (
                     <div
                         key={idx}
                         onMouseDown={(e) => handleTextMouseDown(e, text.id)}
                         style={{
                             position: 'absolute',
-                            top: `${text.style?.yPosition !== undefined ? text.style.yPosition : 50}%`,
-                            left: `${text.style?.xPosition !== undefined ? text.style.xPosition : 50}%`,
+                            top: `${text.style?.yPosition ?? 50}%`,
+                            left: `${text.style?.xPosition ?? 50}%`,
                             transform: 'translate(-50%, -50%)',
                             color: text.style?.color || 'white',
-                            fontSize: `${(text.style?.fontSize || 24) * 1.5}px`, // Simple scaling
+                            fontSize: `${(text.style?.fontSize || 24) * 1.5}px`,
                             fontWeight: text.style?.fontWeight || 'normal',
-                            textAlign: text.style?.textAlign || 'center',
-                            fontFamily: text.style?.fontFamily || 'sans-serif',
-                            zIndex: 30,
+                            zIndex: 100 + idx,
                             cursor: 'move',
-                            pointerEvents: 'auto',
-                            textShadow: '0 2px 4px rgba(0,0,0,0.5)',
-                            whiteSpace: 'pre-wrap',
                             border: draggingId === text.id ? '1px dashed #F48969' : 'none',
-                            padding: '4px'
+                            padding: '4px',
+                            userSelect: 'none'
                         }}
                     >
                         {text.content}
                     </div>
                 ))}
 
-                {/* Overlay Controls (Bottom) */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-auto z-10">
+                {/* Controls Overlay */}
+                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-auto z-[9999]">
                     <div className="flex items-center justify-between text-white">
                         <div className="flex items-center gap-4">
-                            <button className="hover:text-studio-accent transition-colors" onClick={() => onSeek?.(Math.max(0, currentTime - 5))}><SkipBack className="w-5 h-5" /></button>
-                            <button className="hover:text-studio-accent transition-colors" onClick={onPlayPause}>
-                                {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current" />}
+                            <button onClick={() => onSeek?.(Math.max(0, currentTime - 5))}><SkipBack className="w-5 h-5" /></button>
+                            <button onClick={onPlayPause}>
+                                {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
                             </button>
-                            <button className="hover:text-studio-accent transition-colors" onClick={() => onSeek?.(currentTime + 5)}><SkipForward className="w-5 h-5" /></button>
-                            <span className="text-xs font-mono opacity-80">{formatTime(currentTime)} / 00:00</span>
+                            <button onClick={() => onSeek?.(currentTime + 5)}><SkipForward className="w-5 h-5" /></button>
+                            <span className="text-xs font-mono">{formatTime(currentTime)}</span>
                         </div>
-
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                                <Volume2 className="w-4 h-4" />
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="1"
-                                    step="0.05"
-                                    value={activeMedia?.volume ?? 1}
-                                    onChange={(e) => onVolumeChange?.(parseFloat(e.target.value))}
-                                    className="w-20 h-1 accent-studio-accent bg-white/30 rounded-lg cursor-pointer"
-                                    onClick={(e) => e.stopPropagation()}
-                                />
-                            </div>
-                            <button className="hover:text-studio-accent transition-colors" onClick={toggleFullscreen}><Maximize className="w-4 h-4" /></button>
+                        <div className="flex items-center gap-2">
+                            <Volume2 className="w-4 h-4" />
+                            <input type="range" min="0" max="1" step="0.1"
+                                value={activeMedia?.volume ?? 1}
+                                onChange={e => onVolumeChange?.(parseFloat(e.target.value))}
+                                className="w-20 h-1 accent-[#F48969]"
+                            />
+                            <button onClick={toggleFullscreen}><Maximize className="w-4 h-4" /></button>
                         </div>
                     </div>
                 </div>

@@ -1,16 +1,18 @@
 import React from 'react';
-import { Trash2, Volume2, Gauge, Maximize2, RotateCcw } from 'lucide-react';
+import { Trash2, Volume2, Gauge, Maximize2, RotateCcw, Eye, EyeOff } from 'lucide-react';
 
 interface PropertiesPanelProps {
     selectedItem: {
         id: string;
         type: 'video' | 'voice' | 'image' | 'text'; // Simplified type
         volume?: number;
-        playbackRate?: number; // Though currently rate is global in Timeline, per-clip speed might be future. But layout request implies per-clip controls? 
+        playbackRate?: number;
         name?: string;
         content?: string;
         textStyle?: any;
         transform?: { scale: number; x: number; y: number; rotation: number };
+        opacity?: number;
+        visible?: boolean;
     } | null;
     currentGlobalSpeed: number;
     onUpdateVolume: (val: number) => void;
@@ -18,9 +20,11 @@ interface PropertiesPanelProps {
     onDelete: () => void;
     onUpdateText?: (content: string, style: any) => void;
     onUpdateTransform?: (transform: { scale: number; x: number; y: number; rotation: number }) => void;
+    onUpdateOpacity?: (val: number) => void;
+    onUpdateVisibility?: (visible: boolean) => void;
 }
 
-const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, currentGlobalSpeed, onUpdateVolume, onUpdateSpeed, onDelete, onUpdateText, onUpdateTransform }) => {
+const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, currentGlobalSpeed, onUpdateVolume, onUpdateSpeed, onDelete, onUpdateText, onUpdateTransform, onUpdateOpacity, onUpdateVisibility }) => {
 
     if (!selectedItem) {
         return (
@@ -161,6 +165,40 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, current
                                 className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-[#F48969]"
                             />
                         </div>
+
+                        {/* Opacity Control */}
+                        {onUpdateOpacity && (
+                            <div className="flex flex-col gap-1">
+                                <span className="text-xs text-gray-500 flex justify-between">
+                                    <span>Opacity</span>
+                                    <span>{Math.round((selectedItem.opacity ?? 1) * 100)}%</span>
+                                </span>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.01"
+                                    value={selectedItem.opacity ?? 1}
+                                    onChange={(e) => onUpdateOpacity(parseFloat(e.target.value))}
+                                    className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-[#F48969]"
+                                />
+                            </div>
+                        )}
+
+                        {/* Visibility Control */}
+                        {onUpdateVisibility && (
+                            <div className="flex flex-col gap-1 mt-2">
+                                <div className="flex justify-between items-center text-xs text-gray-500">
+                                    <span>Visibility</span>
+                                    <button
+                                        onClick={() => onUpdateVisibility(!(selectedItem.visible ?? true))}
+                                        className={`p-1 rounded ${selectedItem.visible !== false ? 'text-studio-accent bg-studio-accent/10' : 'text-gray-500 hover:text-white'}`}
+                                    >
+                                        {selectedItem.visible !== false ? <Eye size={16} /> : <EyeOff size={16} />}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 

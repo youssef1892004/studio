@@ -14,7 +14,7 @@ const WaveformSegment = dynamic(() => import('./WaveformSegment').then(mod => mo
 
 // --- Types & Mock Data ---
 
-type TrackType = 'image' | 'scene' | 'voice' | 'effect' | 'text' | 'music';
+type TrackType = 'image' | 'video' | 'scene' | 'voice' | 'effect' | 'text' | 'music';
 
 interface Track {
     id: string;
@@ -56,6 +56,10 @@ export interface TimelineItem {
         y: number;
         rotation: number;
     };
+    // Multi-Layer Support
+    layerIndex?: number; // 0 is background, higher is foreground
+    opacity?: number; // 0.0 - 1.0
+    visible?: boolean;
 }
 
 // --- Helper Components ---
@@ -302,32 +306,48 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
     }, [maxContentTime]);
 
     // Tracks configuration
-    const tracks: Track[] = useMemo(() => [
-        {
-            id: 't-text',
-            type: 'text',
-            name: 'Text / Titles',
-            items: videoTrackItems.filter(i => i.type === 'text')
-        },
-        {
-            id: 't-video',
-            type: 'image',
-            name: 'Video / Images',
-            items: videoTrackItems.filter(i => i.type !== 'text' && i.type !== 'music')
-        },
-        {
-            id: 't-voice',
-            type: 'voice',
-            name: 'Voiceover',
-            items: displayVoiceItems // Use the display (reordered) items
-        },
-        {
-            id: 't-music',
-            type: 'music',
-            name: 'Music / SFX',
-            items: videoTrackItems.filter(i => i.type === 'music')
+    // Tracks configuration
+    const tracks: Track[] = useMemo(() => {
+        const visualItems = videoTrackItems.filter(i => i.type === 'image' || i.type === 'scene' || i.type === 'video');
+
+        let maxLayer = 0;
+        visualItems.forEach(i => maxLayer = Math.max(maxLayer, i.layerIndex || 0));
+
+        // Ensure at least 2 layers or max+1
+        const layerCount = Math.max(maxLayer + 1, 2);
+
+        const videoTracks: Track[] = [];
+        for (let i = layerCount; i >= 0; i--) {
+            videoTracks.push({
+                id: `t-video-${i}`,
+                type: 'video',
+                name: `Video ${i + 1}`,
+                items: visualItems.filter(item => (item.layerIndex || 0) === i)
+            });
         }
-    ], [displayVoiceItems, videoTrackItems]);
+
+        return [
+            {
+                id: 't-text',
+                type: 'text',
+                name: 'Text / Titles',
+                items: videoTrackItems.filter(i => i.type === 'text')
+            },
+            ...videoTracks,
+            {
+                id: 't-voice',
+                type: 'voice',
+                name: 'Voiceover',
+                items: displayVoiceItems // Use the display (reordered) items
+            },
+            {
+                id: 't-music',
+                type: 'music',
+                name: 'Music / SFX',
+                items: videoTrackItems.filter(i => i.type === 'music')
+            }
+        ];
+    }, [displayVoiceItems, videoTrackItems]);
 
     // --- Drag and Drop Handlers ---
     // --- Drag and Drop Handlers ---
@@ -366,8 +386,9 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
         }
     };
 
-    const handleDrop = async (e: React.DragEvent, trackType?: string) => {
+    const handleDrop = async (e: React.DragEvent, trackType?: string, trackId?: string) => {
         e.preventDefault();
+        e.stopPropagation();
 
         const dataStr = e.dataTransfer.getData('application/json');
 
@@ -522,13 +543,22 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                     }
                 }
 
+                const targetLayer = (trackId && trackId.startsWith('t-video-')) ? parseInt(trackId.replace('t-video-', '')) : 0;
+
+                // Update item with new layerIndex if valid
+                if (trackType === 'video' || trackType === 'image') {
+                    // Check if item is changing layer
+                    // If so, we need to check collisions only on the TARGET layer
+                }
+
                 const newItem: TimelineItem = {
                     id: uuidv4(),
                     start: dropTime,
                     duration: 5, // Placeholder
                     content: data.name,
                     type: data.type?.startsWith('audio') ? 'music' : (data.type?.startsWith('video') ? 'scene' : 'image'),
-                    audioUrl: data.url
+                    audioUrl: data.url,
+                    layerIndex: (trackType === 'video' || trackType === 'image') ? targetLayer : 0
                 };
 
                 // 1. Add item immediately
@@ -566,17 +596,22 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                 // Collision Detection & Snapping
                 const movingItem = videoTrackItems.find(i => i.id === data.id);
                 if (movingItem) {
+                    const targetLayer = (trackId && trackId.startsWith('t-video-'))
+                        ? parseInt(trackId.replace('t-video-', ''))
+                        : (movingItem.layerIndex || 0);
+
                     const duration = movingItem.duration;
 
-                    // Filter others based on track type
+                    // Filter others based on track type AND LAYER
                     const isTextItem = movingItem.type === 'text';
                     const isMusicItem = movingItem.type === 'music';
+                    const isVisual = !isTextItem && !isMusicItem;
 
                     const others = videoTrackItems.filter(i =>
                         i.id !== movingItem.id &&
                         (isTextItem ? i.type === 'text' :
                             isMusicItem ? i.type === 'music' :
-                                (i.type !== 'text' && i.type !== 'music'))
+                                (i.type !== 'text' && i.type !== 'music' && (i.layerIndex || 0) === targetLayer))
                     );
 
                     // Sort others by start time for consistent checking
@@ -597,14 +632,18 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                             }
                         }
                     }
+                    onVideoTrackUpdate(videoTrackItems.map(item => {
+                        if (item.id === data.id) {
+                            const canHaveLayer = item.type === 'image' || item.type === 'scene' || item.type === 'video';
+                            return {
+                                ...item,
+                                start: dropTime,
+                                layerIndex: canHaveLayer ? targetLayer : item.layerIndex
+                            };
+                        }
+                        return item;
+                    }));
                 }
-
-                onVideoTrackUpdate(videoTrackItems.map(item => {
-                    if (item.id === data.id) {
-                        return { ...item, start: dropTime };
-                    }
-                    return item;
-                }));
             }
         } catch (err) { console.error(err); }
 
@@ -1199,7 +1238,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                                     key={track.id}
                                     className="h-20 border-b border-[#8E8D8D]/20 relative bg-[#2F2F2F] group"
                                     onDragOver={(e) => e.preventDefault()}
-                                    onDrop={(e) => handleDrop(e, track.type)}
+                                    onDrop={(e) => handleDrop(e, track.type, track.id)}
                                 >
                                     {/* Grid Lines */}
                                     <div className="absolute inset-0 pointer-events-none opacity-5"
@@ -1224,7 +1263,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                                                     e.stopPropagation();
                                                     if (activeTool === 'razor' && onSplit) {
                                                         const isSelected = (track.type === 'voice' && activeBlockId === item.blockId) ||
-                                                            ((track.type === 'image' || track.type === 'text' || track.type === 'music') && activeVideoId === item.id);
+                                                            ((track.type === 'video' || track.type === 'image' || track.type === 'text' || track.type === 'music') && activeVideoId === item.id);
 
                                                         if (isSelected) {
                                                             if (!timelineScrollRef.current) return;
@@ -1235,11 +1274,11 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                                                             onSplit(item.blockId || item.id, clickTime, track.type);
                                                         }
                                                     } else {
-                                                        if (track.type === 'image' || track.type === 'text' || track.type === 'music') onVideoClick?.(item.id);
+                                                        if (track.type === 'video' || track.type === 'image' || track.type === 'text' || track.type === 'music') onVideoClick?.(item.id);
                                                         else if (track.type === 'voice') onBlockClick?.(item.blockId!);
                                                     }
                                                 }}
-                                                className={`absolute top-1 bottom-1 rounded-md overflow-hidden cursor-move group select-none transition-all ${(track.type === 'voice' && activeBlockId === item.blockId) || ((track.type === 'image' || track.type === 'text' || track.type === 'music') && activeVideoId === item.id)
+                                                className={`absolute top-1 bottom-1 rounded-md overflow-hidden cursor-move group select-none transition-all ${(track.type === 'voice' && activeBlockId === item.blockId) || ((track.type === 'video' || track.type === 'image' || track.type === 'text' || track.type === 'music') && activeVideoId === item.id)
                                                     ? 'ring-2 ring-white z-20 shadow-xl'
                                                     : 'hover:ring-1 hover:ring-white/50 z-10'
                                                     } ${draggingItemId === (item.blockId || item.id) ? 'opacity-50' : ''} ${activeTool === 'razor' ? 'cursor-crosshair' : ''}`}
@@ -1301,7 +1340,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                                                                 </span>
                                                             </div>
                                                         )
-                                                    ) : track.type === 'image' ? (
+                                                    ) : (track.type === 'image' || track.type === 'video') ? (
                                                         <div className="w-full h-full flex items-center justify-center bg-black/20 overflow-hidden relative">
                                                             {item.audioUrl ? (
                                                                 <>
