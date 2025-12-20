@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
 import Button from '@/components/ui/Button';
+import { usePerformance } from '@/contexts/PerformanceContext';
 
 // Import WaveformSegment dynamically
 const WaveformSegment = dynamic(() => import('./WaveformSegment').then(mod => mod.default), { ssr: false });
@@ -48,6 +49,12 @@ export interface TimelineItem {
         backgroundOpacity?: number;
         yPosition?: number; // % from top
         xPosition?: number; // % from left
+    };
+    transform?: {
+        scale: number;
+        x: number;
+        y: number;
+        rotation: number;
     };
 }
 
@@ -179,6 +186,7 @@ export interface TimelineHandle {
 const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voices, onCardsUpdate, isBlocksProcessing, onBlockClick, onAddBlock, onGenerateAll, videoTrackItems = [], onVideoTrackUpdate, activeBlockId, onActiveMediaChange, onTimeUpdate, onIsPlayingChange, activeVideoId, onVideoClick, onPlaybackRateChange, activeTool, onSplit, onToolChange, onDelete, onUndo, onRedo, canUndo, canRedo }, ref) => {
 
     const [isPlaying, setIsPlaying] = useState(false);
+    const { settings } = usePerformance();
     const [currentTime, setCurrentTime] = useState(0);
     const [zoomLevel, setZoomLevel] = useState(50); // Pixels per second
     const [totalDuration, setTotalDuration] = useState(30); // Default 30s
@@ -233,9 +241,9 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                     id: card.id,
                     start: currentStart,
                     duration: duration,
-                    content: (card.content?.blocks && Array.isArray(card.content.blocks))
-                        ? card.content.blocks.map(b => b.data.text).join(' ').substring(0, 30) + '...'
-                        : 'No content',
+                    content: (card.content && typeof card.content === 'object' && 'blocks' in card.content && Array.isArray((card.content as any).blocks))
+                        ? ((card.content as any).blocks.map((b: any) => b.data?.text || '').join(' ').substring(0, 30) + '...')
+                        : (typeof card.content === 'string' ? card.content : 'No content'),
                     type: 'voice',
                     blockId: card.id,
                     audioUrl: card.audioUrl,
@@ -1273,6 +1281,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                                                                 segmentId={item.blockId}
                                                                 onClick={() => onBlockClick?.(item.blockId!)}
                                                                 onDurationLoaded={(dur) => handleDurationLoad(item.blockId!, dur)}
+                                                                quality={settings.waveformQuality}
                                                             />
                                                         ) : (
                                                             // Placeholder for ungenerated voice block

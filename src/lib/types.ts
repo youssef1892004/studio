@@ -79,3 +79,52 @@ export interface Subscription {
     max_chars: number;
   };
 }
+
+export interface AspectRatioPreset {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  ratio: number; // width / height
+  description: string;
+  icon?: string;
+}
+
+export const ASPECT_RATIO_PRESETS: AspectRatioPreset[] = [
+  {
+    id: 'youtube',
+    name: 'YouTube / Widescreen',
+    width: 1920,
+    height: 1080,
+    ratio: 16 / 9,
+    description: '16:9 Landscape',
+    icon: 'youtube'
+  },
+  {
+    id: 'tiktok',
+    name: 'TikTok / Reels',
+    width: 1080,
+    height: 1920,
+    ratio: 9 / 16,
+    description: '9:16 Vertical',
+    icon: 'smartphone'
+  },
+  {
+    id: 'instagram',
+    name: 'Instagram Post',
+    width: 1080,
+    height: 1080,
+    ratio: 1,
+    description: '1:1 Square',
+    icon: 'instagram'
+  },
+  {
+    id: 'twitter',
+    name: 'Twitter / LinkedIn',
+    width: 1200,
+    height: 675,
+    ratio: 16 / 9,
+    description: '16:9 Landscape',
+    icon: 'twitter'
+  }
+];

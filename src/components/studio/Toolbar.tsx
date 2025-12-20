@@ -14,7 +14,11 @@ interface ToolbarProps {
     activeTool?: 'select' | 'razor';
     onToolChange?: (tool: 'select' | 'razor') => void;
     onBack?: () => void;
+    activePresetId?: string;
+    onPresetChange?: (presetId: string) => void;
 }
+
+import { ASPECT_RATIO_PRESETS } from '@/lib/types';
 
 const Toolbar: React.FC<ToolbarProps> = ({
     onExport,
@@ -28,6 +32,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
     activeTool = 'select',
     onToolChange,
     onBack,
+    activePresetId = 'youtube',
+    onPresetChange,
 }) => {
     const showComingSoon = (feature: string) => {
         toast((t) => (
@@ -161,6 +167,21 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
             {/* Right - Export Buttons */}
             <div className="flex items-center gap-2">
+                {/* Aspect Ratio Selector */}
+                <select
+                    value={activePresetId}
+                    onChange={(e) => onPresetChange?.(e.target.value)}
+                    className="h-9 px-3 text-sm bg-studio-panel-light dark:bg-studio-panel border border-studio-border-light dark:border-studio-border rounded-md text-studio-text-light dark:text-studio-text focus:outline-none focus:ring-1 focus:ring-studio-accent cursor-pointer"
+                    title="Change Canvas Size"
+                >
+                    {ASPECT_RATIO_PRESETS.map(preset => (
+                        <option key={preset.id} value={preset.id}>
+                            {preset.name}
+                        </option>
+                    ))}
+                </select>
+                <div className="w-px h-6 bg-studio-border-light dark:bg-studio-border mx-2"></div>
+
                 <button
                     onClick={onExport}
                     className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white text-sm font-bold rounded-full transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105"

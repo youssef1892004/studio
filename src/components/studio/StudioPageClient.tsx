@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import { fetchVoices } from '@/lib/tts';
-import { Voice, StudioBlock, Project } from '@/lib/types';
+import { Voice, StudioBlock, Project, ASPECT_RATIO_PRESETS } from '@/lib/types';
 import { LoaderCircle, List } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getProjectById, updateProject, subscribeToBlocks, deleteBlock, deleteBlockByIndex, executeGraphQL, UPDATE_PROJECT_BLOCKS } from '@/lib/graphql';
@@ -29,6 +29,8 @@ import { useStudioHistory } from '@/hooks/useStudioHistory';
 
 import { getApiUrl } from '@/lib/tts';
 import { notFound } from 'next/navigation';
+import { PerformanceProvider } from '@/contexts/PerformanceContext';
+import ExportModal, { ExportSettings } from './ExportModal';
 
 const PRO_VOICES_IDS = ['0', '1', '2', '3'];
 const MAINTENANCE_VOICES = ['0', '1', '2', '3'];
@@ -42,7 +44,8 @@ export default function StudioPageClient() {
     const [isExporting, setIsExporting] = useState(false);
     const [videoTrackItems, setVideoTrackItems] = useState<TimelineItem[]>([]);
     const [showExportModal, setShowExportModal] = useState(false);
-    const [exportSettings, setExportSettings] = useState({ resolution: '720p', fps: 30 });
+    const [activePresetId, setActivePresetId] = useState('youtube');
+    // const [exportSettings, setExportSettings] = useState({ resolution: '720p', fps: 30 }); // Moved to Modal logic
 
     // Undo/Redo History
     const {
@@ -91,7 +94,7 @@ export default function StudioPageClient() {
         setShowExportModal(true);
     };
 
-    const confirmExport = async () => {
+    const confirmExport = async (settings: ExportSettings) => {
         setShowExportModal(false);
         setIsExporting(true);
         const toastId = toast.loading('Initializing video export engine (WASM)...');
@@ -128,34 +131,57 @@ export default function StudioPageClient() {
             // Visual items (exclude music)
             const visualItems = videoTrackItems.filter(i => i.type !== 'music');
 
-            toast.loading(`Rendering video (${exportSettings.resolution} @ ${exportSettings.fps}fps)...`, { id: toastId });
+            toast.loading(`Rendering video (${settings.resolution} @ ${settings.fps}fps)...`, { id: toastId });
 
-            // Resolve Settings
-            let width = 1280, height = 720;
-            if (exportSettings.resolution === '1080p') { width = 1920; height = 1080; }
-            if (exportSettings.resolution === '480p') { width = 854; height = 480; }
+            // Resolve Settings & Preset
+            const currentPreset = ASPECT_RATIO_PRESETS.find(p => p.id === activePresetId) || ASPECT_RATIO_PRESETS[0];
+            const ratio = currentPreset.ratio;
+
+            let baseSize = 720;
+            if (settings.resolution === '1080p') baseSize = 1080;
+            if (settings.resolution === '480p') baseSize = 480;
+
+            // Calculate width/height ensuring they are multiples of 2
+            let width, height;
+            if (ratio >= 1) {
+                // Landscape or Square: Height is base, Width is derived
+                height = baseSize;
+                width = Math.round(height * ratio);
+            } else {
+                // Vertical: Width is base, Height is derived
+                width = baseSize;
+                height = Math.round(width / ratio);
+            }
+
+            // Ensure even numbers
+            if (width % 2 !== 0) width++;
+            if (height % 2 !== 0) height++;
 
             // 3. Render
+            const startTime = Date.now();
             const blob = await renderTimelineToVideo(visualItems, allAudioItems, {
                 width,
                 height,
-                fps: exportSettings.fps,
+                fps: settings.fps,
+                preset: settings.preset,
                 onProgress: (p) => {
-                    toast.loading(`Rendering video (${exportSettings.resolution}) ... ${p}%`, { id: toastId });
+                    toast.loading(`Rendering video (${settings.resolution}) ... ${p}%`, { id: toastId });
                 }
             });
+            const endTime = Date.now();
+            const durationInSeconds = ((endTime - startTime) / 1000).toFixed(1);
 
             // 4. Download
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${projectTitle || 'video'}_${exportSettings.resolution}.mp4`;
+            a.download = `${projectTitle || 'video'}_${settings.resolution}.mp4`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
-            toast.success('Video exported successfully!', { id: toastId });
+            toast.success(`Video exported successfully! (Took ${durationInSeconds}s)`, { id: toastId });
 
         } catch (error: any) {
             console.error("Export Error:", error);
@@ -1540,7 +1566,13 @@ export default function StudioPageClient() {
 
 
     return (
-        <>
+        <PerformanceProvider>
+            <ExportModal
+                isOpen={showExportModal}
+                onClose={() => setShowExportModal(false)}
+                onExport={confirmExport}
+                isExporting={isExporting}
+            />
             {isCriticalLoading && (
                 <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-studio-bg-light dark:bg-studio-bg transition-colors duration-300">
                     <div className="w-full max-w-md px-6 flex flex-col items-center gap-6">
@@ -1589,12 +1621,14 @@ export default function StudioPageClient() {
                             activeTool={activeTool}
                             onToolChange={setActiveTool}
                             onBack={() => router.push('/projects')}
+                            activePresetId={activePresetId}
+                            onPresetChange={setActivePresetId}
                         />
 
-                        {/* Middle Area: Split View (Left Panel + Center Player + Right Properties) */}
-                        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+                        {/* Middle Area: Split View (Properties + Center + Dynamic) */}
+                        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
 
-                            {/* Right: Properties Panel (Now First in Source -> Right in RTL) */}
+                            {/* Right: Properties Panel (First in DOM -> Right in RTL) */}
                             <div className="w-full lg:w-[300px] flex-shrink-0 bg-[#1E1E1E] border-l border-studio-border z-10 overflow-y-auto">
                                 <PropertiesPanel
                                     selectedItem={selectedItem}
@@ -1603,6 +1637,15 @@ export default function StudioPageClient() {
                                     onUpdateSpeed={handleUpdateItemSpeed}
                                     onDelete={handleDeleteSelection}
                                     onUpdateText={handleUpdateText}
+                                    onUpdateTransform={(newTransform) => {
+                                        if (activeMedia?.id) {
+                                            setVideoTrackItems(prev => prev.map(item =>
+                                                item.id === activeMedia.id
+                                                    ? { ...item, transform: newTransform }
+                                                    : item
+                                            ));
+                                        }
+                                    }}
                                 />
                             </div>
 
@@ -1615,13 +1658,26 @@ export default function StudioPageClient() {
                                     playbackRate={playbackRate}
                                     onPlayPause={() => timelineRef.current?.togglePlayPause()}
                                     onSeek={(t) => timelineRef.current?.seek(t)}
+                                    // Media Volume
                                     onVolumeChange={handleUpdateVolume}
                                     activeTextItems={activeTextItems}
                                     onTextUpdate={handleTextUpdate}
+                                    aspectRatio={ASPECT_RATIO_PRESETS.find(p => p.id === activePresetId)?.ratio || 16 / 9}
+                                    // Visual Transform
+                                    activeTransform={videoTrackItems.find(i => i.id === activeMedia?.id)?.transform || { scale: 1, x: 0, y: 0, rotation: 0 }}
+                                    onTransformUpdate={(newTransform) => {
+                                        if (activeMedia?.id) {
+                                            setVideoTrackItems(prev => prev.map(item =>
+                                                item.id === activeMedia.id
+                                                    ? { ...item, transform: newTransform }
+                                                    : item
+                                            ));
+                                        }
+                                    }}
                                 />
                             </div>
 
-                            {/* Left: Dynamic Panel (Now Last in Source -> Left in RTL) */}
+                            {/* Left: Dynamic Panel (Last in DOM -> Left in RTL) */}
                             <div ref={dynamicPanelRef} className={`w-full lg:w-[340px] flex-shrink-0 bg-studio-bg-light dark:bg-studio-bg border-r border-studio-border-light dark:border-studio-border z-10 overflow-y-auto ${!activeLeftTool ? 'hidden' : ''}`}>
                                 <DynamicPanel
                                     voices={voices}
@@ -1640,8 +1696,8 @@ export default function StudioPageClient() {
                             </div>
                         </div>
 
-                        {/* Timeline Area */}
-                        <div className="h-[180px] md:h-[250px] flex-shrink-0 border-t border-studio-border-light dark:border-studio-border bg-studio-panel-light dark:bg-studio-panel z-10">
+                        {/* Timeline Area (Fixed at bottom of main content) */}
+                        <div className="h-[280px] flex-shrink-0 border-t border-studio-border-light dark:border-studio-border bg-studio-panel-light dark:bg-studio-panel z-20">
                             <Timeline
                                 cards={cards}
                                 voices={voices}
@@ -1673,83 +1729,6 @@ export default function StudioPageClient() {
                     </div>
                 </div>
             )}
-
-            {showExportModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                    <div className="bg-[#1E1E1E] p-6 rounded-xl border border-[#333] shadow-2xl w-[400px] flex flex-col gap-6 animate-in fade-in zoom-in duration-200">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-xl font-bold text-white">Export Settings</h2>
-                            <button onClick={() => setShowExportModal(false)} className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-white/10">
-                                <span className="sr-only">Close</span>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-                            </button>
-                        </div>
-
-                        <div className="flex flex-col gap-4">
-                            <div className="flex flex-col gap-2">
-                                <label className="text-sm font-medium text-gray-400 border-b border-white/5 pb-1 mb-1">Resolution (Quality)</label>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {['480p', '720p', '1080p'].map((res) => (
-                                        <button
-                                            key={res}
-                                            onClick={() => setExportSettings(s => ({ ...s, resolution: res }))}
-                                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${exportSettings.resolution === res
-                                                ? 'bg-[#F48969] text-white shadow-lg ring-1 ring-[#F48969]'
-                                                : 'bg-[#2A2A2A] text-gray-300 hover:bg-[#333] hover:text-white'
-                                                }`}
-                                        >
-                                            {res}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col gap-2">
-                                <label className="text-sm font-medium text-gray-400 border-b border-white/5 pb-1 mb-1">Frame Rate</label>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {[24, 30, 60].map((fps) => (
-                                        <button
-                                            key={fps}
-                                            onClick={() => setExportSettings(s => ({ ...s, fps: fps }))}
-                                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${exportSettings.fps === fps
-                                                ? 'bg-[#F48969] text-white shadow-lg ring-1 ring-[#F48969]'
-                                                : 'bg-[#2A2A2A] text-gray-300 hover:bg-[#333] hover:text-white'
-                                                }`}
-                                        >
-                                            {fps} FPS
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-3 mt-2">
-                            <button
-                                onClick={() => setShowExportModal(false)}
-                                className="flex-1 px-4 py-2.5 rounded-lg bg-[#2A2A2A] text-gray-300 hover:bg-[#333] font-medium transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={confirmExport}
-                                className="flex-1 px-4 py-2.5 rounded-lg bg-[#F48969] hover:bg-[#E07858] text-white font-bold shadow-lg shadow-[#F48969]/20 transition-all active:scale-95"
-                            >
-                                Start Export
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <StudioContextMenu
-                visible={contextMenu.visible}
-                x={contextMenu.x}
-                y={contextMenu.y}
-                type={contextMenu.type}
-                onClose={() => setContextMenu(prev => ({ ...prev, visible: false }))}
-                onAction={handleContextAction}
-                currentVolume={currentMenuVolume}
-            />
-        </>
+        </PerformanceProvider>
     );
-}
+};

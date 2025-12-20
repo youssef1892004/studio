@@ -17,6 +17,7 @@ interface WaveformSegmentProps {
   segmentId?: string;
   onClick?: () => void;
   onDurationLoaded?: (duration: number) => void;
+  quality?: 'low' | 'high';
 }
 
 const WaveformSegment: React.FC<WaveformSegmentProps> = ({
@@ -31,7 +32,8 @@ const WaveformSegment: React.FC<WaveformSegmentProps> = ({
   onDelete,
   segmentId,
   onClick,
-  onDurationLoaded
+  onDurationLoaded,
+  quality = 'high'
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -93,10 +95,17 @@ const WaveformSegment: React.FC<WaveformSegmentProps> = ({
 
         // 2. Try Rust Wasm Engine First
         try {
+          // Skip WASM for low quality mode to save overhead/memory if native is faster for low sample count
+          // Actually WASM is usually faster for large data, but for low quality we might just want quick decimation.
+          // Let's keep using WASM if available but maybe pass a 'quality' param later. 
+          // For now, let's stick to the existing logic but respect 'samples'.
+          // The WASM function `generateWaveform` accepts samples count according to line 99.
+          const targetSamples = quality === 'low' ? 50 : 300;
+
           console.log("🦀 استخدام WebAssembly Waveform Engine...");
           // Dynamic import to avoid SSR issues if any
           const { generateWaveform } = await import('@/lib/wasm-loader');
-          const peaks = await generateWaveform(new Uint8Array(arrayBuffer), 300);
+          const peaks = await generateWaveform(new Uint8Array(arrayBuffer), targetSamples);
 
           if (peaks && peaks.length > 0) {
             console.log("✅ تم توليد الموجة بواسطة Wasm:", peaks.length);
@@ -130,7 +139,7 @@ const WaveformSegment: React.FC<WaveformSegmentProps> = ({
 
         // 🎨 توليد الموجة
         const rawData = audioBuffer.getChannelData(0);
-        const samples = 300;
+        const samples = quality === 'low' ? 50 : 300;
         const blockSize = Math.floor(rawData.length / samples);
         const filteredData: number[] = [];
 

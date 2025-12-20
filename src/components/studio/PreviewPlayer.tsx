@@ -11,12 +11,30 @@ interface PreviewPlayerProps {
     playbackRate?: number;
     activeTextItems?: { id: string; content: string; style: any }[];
     onTextUpdate?: (id: string, newStyle: any) => void;
+    aspectRatio?: number;
+    activeTransform?: { scale: number; x: number; y: number; rotation: number };
+    onTransformUpdate?: (transform: { scale: number; x: number; y: number; rotation: number }) => void;
 }
 
-const PreviewPlayer: React.FC<PreviewPlayerProps> = ({ activeMedia, isPlaying = false, currentTime = 0, onPlayPause, onSeek, onVolumeChange, playbackRate = 1, activeTextItems = [], onTextUpdate }) => {
+const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
+    activeMedia,
+    isPlaying = false,
+    currentTime = 0,
+    onPlayPause,
+    onSeek,
+    onVolumeChange,
+    playbackRate = 1,
+    activeTextItems = [],
+    onTextUpdate,
+    aspectRatio = 16 / 9,
+    activeTransform = { scale: 1, x: 0, y: 0, rotation: 0 },
+    onTransformUpdate
+}) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [draggingId, setDraggingId] = useState<string | null>(null);
+    const [isPanning, setIsPanning] = useState(false);
+    const [startPan, setStartPan] = useState({ x: 0, y: 0 });
 
     const handleTextMouseDown = (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
@@ -24,23 +42,66 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({ activeMedia, isPlaying = 
         setDraggingId(id);
     };
 
+    const handleMediaMouseDown = (e: React.MouseEvent) => {
+        if (e.button !== 0) return; // Only left click
+        e.preventDefault();
+        setIsPanning(true);
+        setStartPan({ x: e.clientX, y: e.clientY });
+    };
+
     const handleMouseMove = (e: React.MouseEvent) => {
-        if (!draggingId || !containerRef.current || !onTextUpdate) return;
+        if (!containerRef.current) return;
 
-        const rect = containerRef.current.getBoundingClientRect();
-        const x = ((e.clientX - rect.left) / rect.width) * 100;
-        const y = ((e.clientY - rect.top) / rect.height) * 100;
+        // Text Dragging
+        if (draggingId && onTextUpdate) {
+            const rect = containerRef.current.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
 
-        const item = activeTextItems.find(i => i.id === draggingId);
-        if (item) {
-            onTextUpdate(draggingId, { ...item.style, xPosition: x, yPosition: y });
+            const item = activeTextItems.find(i => i.id === draggingId);
+            if (item) {
+                onTextUpdate(draggingId, { ...item.style, xPosition: x, yPosition: y });
+            }
+        }
+
+        // Media Panning
+        if (isPanning && onTransformUpdate) {
+            const rect = containerRef.current.getBoundingClientRect();
+            const dx = e.clientX - startPan.x;
+            const dy = e.clientY - startPan.y;
+
+            // Convert to percentage of container dimensions
+            const dxPercent = (dx / rect.width) * 100;
+            const dyPercent = (dy / rect.height) * 100;
+
+            onTransformUpdate({
+                ...activeTransform,
+                x: activeTransform.x + dxPercent,
+                y: activeTransform.y + dyPercent
+            });
+
+            setStartPan({ x: e.clientX, y: e.clientY });
         }
     };
 
     const handleMouseUp = () => {
         setDraggingId(null);
+        setIsPanning(false);
     };
 
+    const handleWheel = (e: React.WheelEvent) => {
+        if (!onTransformUpdate) return;
+        e.stopPropagation();
+
+        // Zoom logic
+        const delta = -e.deltaY * 0.001;
+        const newScale = Math.max(0.1, Math.min(5, activeTransform.scale + delta));
+
+        onTransformUpdate({
+            ...activeTransform,
+            scale: newScale
+        });
+    };
 
     const toggleFullscreen = () => {
         if (!document.fullscreenElement) {
@@ -94,44 +155,68 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({ activeMedia, isPlaying = 
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
+    const mediaStyle: React.CSSProperties = {
+        transform: `translate(${activeTransform.x}%, ${activeTransform.y}%) scale(${activeTransform.scale}) rotate(${activeTransform.rotation}deg)`,
+        transformOrigin: 'center',
+        cursor: isPanning ? 'grabbing' : 'grab',
+        position: 'absolute',
+        width: '100%',
+        height: '100%',
+        objectFit: 'contain' // We start with contain, allowing scale to zoom out/in from that base
+        // Actually, for free transform, usually we might want object-cover if scale=1 means fill?
+        // But let's stick to contain as base (fit) and let user zoom in to fill.
+    };
+
     return (
         <div
-            className="flex-1 bg-black/20 flex flex-col items-center justify-center relative p-4 min-h-[300px]"
+            className="flex-1 w-full bg-black/20 flex flex-col items-center justify-center relative p-4 min-h-[300px]"
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
         >
             {/* Main Preview Area */}
-            <div ref={containerRef} className="w-full h-full max-w-4xl bg-studio-panel dark:bg-studio-panel rounded-lg shadow-2xl overflow-hidden relative aspect-video flex items-center justify-center border border-studio-border dark:border-studio-border group">
-                {/* Media Preview */}
-                {activeMedia ? (
-                    activeMedia.type === 'video' ? (
-                        <video
-                            ref={videoRef}
-                            src={`/api/asset-proxy?url=${encodeURIComponent(activeMedia.url)}`}
-                            className="w-full h-full object-contain bg-black"
-                            muted={false} // Enable audio mixing
-                            playsInline
-                            preload="auto"
-                        />
+            <div
+                ref={containerRef}
+                className="w-full max-w-4xl bg-black rounded-lg shadow-2xl overflow-hidden relative flex items-center justify-center border border-studio-border dark:border-studio-border group select-none"
+                style={{ aspectRatio: aspectRatio, maxHeight: '80vh' }}
+                onWheel={handleWheel}
+            >
+                {/* Media Preview - Wrapper for clipping */}
+                <div className="absolute inset-0 overflow-hidden flex items-center justify-center">
+                    {activeMedia ? (
+                        activeMedia.type === 'video' ? (
+                            <video
+                                ref={videoRef}
+                                src={`/api/asset-proxy?url=${encodeURIComponent(activeMedia.url)}`}
+                                className="transition-transform duration-75 ease-out"
+                                style={mediaStyle}
+                                onMouseDown={handleMediaMouseDown}
+                                muted={false}
+                                playsInline
+                                preload="auto"
+                            />
+                        ) : (
+                            <img
+                                src={`/api/asset-proxy?url=${encodeURIComponent(activeMedia.url)}`}
+                                alt="Preview"
+                                className="transition-transform duration-75 ease-out"
+                                style={mediaStyle}
+                                onMouseDown={handleMediaMouseDown}
+                                draggable={false}
+                            />
+                        )
                     ) : (
-                        <img
-                            src={`/api/asset-proxy?url=${encodeURIComponent(activeMedia.url)}`}
-                            alt="Preview"
-                            className="w-full h-full object-contain bg-black"
-                        />
-                    )
-                ) : (
-                    /* Placeholder Content */
-                    <div className="text-center">
-                        <div className="w-16 h-16 bg-studio-accent/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Play className="w-8 h-8 text-studio-accent fill-current ml-1" />
+                        /* Placeholder Content */
+                        <div className="text-center pointer-events-none">
+                            <div className="w-16 h-16 bg-studio-accent/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Play className="w-8 h-8 text-studio-accent fill-current ml-1" />
+                            </div>
+                            <p className="text-studio-text-light dark:text-studio-text opacity-50">No preview available</p>
                         </div>
-                        <p className="text-studio-text-light dark:text-studio-text opacity-50">No preview available</p>
-                    </div>
-                )}
+                    )}
+                </div>
 
-                {/* Text Layer */}
+                {/* Text Layer - Independent of Media Zoom? Or Linked? Usually independent overlay */}
                 {activeTextItems?.map((text, idx) => (
                     <div
                         key={idx}
@@ -142,13 +227,13 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({ activeMedia, isPlaying = 
                             left: `${text.style?.xPosition !== undefined ? text.style.xPosition : 50}%`,
                             transform: 'translate(-50%, -50%)',
                             color: text.style?.color || 'white',
-                            fontSize: `${(text.style?.fontSize || 24) * 1.5}px`,
+                            fontSize: `${(text.style?.fontSize || 24) * 1.5}px`, // Simple scaling
                             fontWeight: text.style?.fontWeight || 'normal',
                             textAlign: text.style?.textAlign || 'center',
                             fontFamily: text.style?.fontFamily || 'sans-serif',
                             zIndex: 30,
                             cursor: 'move',
-                            pointerEvents: 'auto', // Enable interaction
+                            pointerEvents: 'auto',
                             textShadow: '0 2px 4px rgba(0,0,0,0.5)',
                             whiteSpace: 'pre-wrap',
                             border: draggingId === text.id ? '1px dashed #F48969' : 'none',

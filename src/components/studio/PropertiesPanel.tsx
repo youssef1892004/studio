@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, Volume2, Gauge } from 'lucide-react';
+import { Trash2, Volume2, Gauge, Maximize2, RotateCcw } from 'lucide-react';
 
 interface PropertiesPanelProps {
     selectedItem: {
@@ -7,31 +7,20 @@ interface PropertiesPanelProps {
         type: 'video' | 'voice' | 'image' | 'text'; // Simplified type
         volume?: number;
         playbackRate?: number; // Though currently rate is global in Timeline, per-clip speed might be future. But layout request implies per-clip controls? 
-        // Wait, current Timeline has GLOBAL playback rate. But user request implies properties for selected item.
-        // If speed is global, it shouldn't be in properties of a clip? 
-        // Or user wants per-clip speed? The prompt said "Speed Buttons (0.5x, 1x, 2x)".
-        // If it's per-clip speed, I'd need to add `playbackRate` to TimelineItem.
-        // BUT, for now let's assume global speed OR duplicate the toggle from toolbar to here?
-        // The prompt said "Speed Buttons (0.5x, 1x, 2x)" in the properties panel.
-        // Let's stick to what's possible now: Volume is per clip. Speed is currently global. 
-        // I will put global speed here for now if no item selected? Or just put it here anyway.
-        // Actually, if I look at the screenshot, "Speed" is next to volume.
-        // I will implement it as global speed control for now, but placed in this panel.
         name?: string;
         content?: string;
         textStyle?: any;
+        transform?: { scale: number; x: number; y: number; rotation: number };
     } | null;
     currentGlobalSpeed: number;
     onUpdateVolume: (val: number) => void;
     onUpdateSpeed: (val: number) => void;
     onDelete: () => void;
     onUpdateText?: (content: string, style: any) => void;
+    onUpdateTransform?: (transform: { scale: number; x: number; y: number; rotation: number }) => void;
 }
 
-const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, currentGlobalSpeed, onUpdateVolume, onUpdateSpeed, onDelete, onUpdateText }) => {
-
-    // If no item selected, what to show? Maybe "Project Settings" or empty state.
-    // For now, let's show "Project Properties" if nothing selected, or just empty.
+const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, currentGlobalSpeed, onUpdateVolume, onUpdateSpeed, onDelete, onUpdateText, onUpdateTransform }) => {
 
     if (!selectedItem) {
         return (
@@ -140,7 +129,42 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, current
                     </div>
                 )}
 
-                {/* Speed Control (Global for now, or per clip if supported later) */}
+                {/* Visual Transform Controls */}
+                {(selectedItem.type === 'video' || selectedItem.type === 'image') && onUpdateTransform && (
+                    <div className="flex flex-col gap-4">
+                        <div className="flex justify-between items-center text-sm text-gray-400">
+                            <div className="flex items-center gap-2">
+                                <Maximize2 size={14} />
+                                <span>التحجيم (Scale & Position)</span>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => onUpdateTransform({ scale: 1, x: 0, y: 0, rotation: 0 })}
+                                    className="p-1 hover:bg-white/10 rounded text-xs"
+                                    title="Reset"
+                                >
+                                    <RotateCcw size={14} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Scale Slider */}
+                        <div className="flex flex-col gap-1">
+                            <span className="text-xs text-gray-500">Scale ({Math.round((selectedItem.transform?.scale || 1) * 100)}%)</span>
+                            <input
+                                type="range"
+                                min="0.1"
+                                max="5"
+                                step="0.1"
+                                value={selectedItem.transform?.scale || 1}
+                                onChange={(e) => onUpdateTransform({ ...(selectedItem.transform || { x: 0, y: 0, rotation: 0 }), scale: parseFloat(e.target.value) })}
+                                className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-[#F48969]"
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Speed Control */}
                 <div className="flex flex-col gap-2">
                     <div className="flex justify-between items-center text-sm text-gray-400">
                         <div className="flex items-center gap-2">

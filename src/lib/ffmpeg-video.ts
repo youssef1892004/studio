@@ -10,6 +10,7 @@ interface RenderOptions {
     height?: number;
     fps?: number;
     onProgress?: (progress: number) => void;
+    preset?: 'fast' | 'balanced' | 'professional';
 }
 
 export async function renderTimelineToVideo(
@@ -20,7 +21,22 @@ export async function renderTimelineToVideo(
     if (!ffmpeg) {
         ffmpeg = new FFmpeg();
     }
-    const { width = 1280, height = 720, fps = 30, onProgress } = opt;
+    const { width = 1280, height = 720, fps = 30, onProgress, preset = 'balanced' } = opt;
+
+    // Map preset to FFmpeg settings
+    // fast: ultrafast, crf 28 (smaller file, fast encode, lower quality)
+    // balanced: medium, crf 23 (standard)
+    // professional: slow, crf 18 (high quality, slow encode)
+    let ffmpegPreset = 'medium';
+    let crf = '23';
+
+    if (preset === 'fast') {
+        ffmpegPreset = 'ultrafast';
+        crf = '28';
+    } else if (preset === 'professional') {
+        ffmpegPreset = 'medium'; // 'slow' might be too heavy for WASM, sticking to medium but lower CRF for quality
+        crf = '18';
+    }
 
     if (!ffmpeg.loaded) {
         const baseURL = '/ffmpeg';
@@ -103,35 +119,106 @@ export async function renderTimelineToVideo(
             await ffmpeg.writeFile(inputName, await fetchFile(blob));
             console.timeEnd(`fetch_${i}`);
 
-            // Standardize Video Segment
-            const filter = `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
-            const commonOut = ['-vf', filter, '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-f', 'mpegts'];
+            // Transform Logic
+            const transform = item.transform || { scale: 1, x: 0, y: 0, rotation: 0 };
+            const scale = transform.scale || 1;
+            const x = transform.x || 0;
+            const y = transform.y || 0;
+
+            // Updated Filter Chain: Scale -> Overlay on Black Canvas
+            // 1. Scale input to fit * scaleFactor
+            const scaleW = `iw*min(${width}/iw,${height}/ih)*${scale}`;
+            const scaleH = `ih*min(${width}/iw,${height}/ih)*${scale}`;
+            const scaleFilter = `[0:v]scale=w='${scaleW}':h='${scaleH}'[fg]`;
+
+            // 2. Overlay [fg] onto [bg] (black color source)
+            // x/y are percentages of canvas size.
+            // Overlay x = (W-w)/2 + (x%/100 * W)
+            const overlayX = `(W-w)/2+(${x}/100*${width})`;
+            const overlayY = `(H-h)/2+(${y}/100*${height})`;
+            const overlayFilter = `[1:v][fg]overlay=x='${overlayX}':y='${overlayY}':shortest=1,setsar=1`;
+
+            const complexFilter = `${scaleFilter};${overlayFilter}`;
+
+            // Output flags (without filter)
+            const baseEncodingFlags = ['-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-f', 'mpegts'];
 
             // We must strictly trim/limit duration to item.duration
+            const CHUNK_DURATION = 10;
+            const needsChunking = isVideo && item.duration > CHUNK_DURATION;
+
+            // Helper to build command
+            const runFFmpeg = async (seek: string | null, duration: string, outName: string) => {
+                const args = [];
+                // Input 0 (Visual)
+                if (seek) args.push('-ss', seek);
+                if (!isVideo) args.push('-loop', '1'); // Loop image
+                args.push('-i', inputName);
+
+                // Input 1 (Background Color)
+                args.push('-f', 'lavfi', '-i', `color=c=black:s=${width}x${height}:r=${fps}`);
+
+                // Filter
+                args.push('-filter_complex', complexFilter);
+
+                // Duration & Output
+                args.push('-t', duration);
+                if (!isVideo) args.push('-tune', 'stillimage');
+                args.push(...baseEncodingFlags, outName);
+
+                await ffmpeg!.exec(args);
+                return outName;
+            };
+
             if (isVideo) {
-                const offset = (item.mediaStartOffset || 0).toFixed(3);
-                const duration = item.duration.toFixed(3);
+                if (needsChunking) {
+                    let processed = 0;
+                    let chunkIdx = 0;
+                    while (processed < item.duration) {
+                        const currentChunkDur = Math.min(CHUNK_DURATION, item.duration - processed);
+                        const subSegName = `seg_visual_${i}_${chunkIdx}.ts`;
+                        const currentOffset = (item.mediaStartOffset || 0) + processed;
 
-                // Convert video to TS with Seek
-                await ffmpeg.exec(['-ss', offset, '-i', inputName, '-t', duration, ...commonOut, segName]);
+                        await runFFmpeg(currentOffset.toFixed(3), currentChunkDur.toFixed(3), subSegName);
+                        videoSegments.push(subSegName);
 
-                // Extract Audio from Video Item
-                if (item.audioUrl) { // Check if video item has an associated audio track
-                    const audName = `v_aud_${i}.wav`;
-                    try {
-                        // Extract audio with Seek
-                        await ffmpeg.exec(['-ss', offset, '-i', inputName, '-t', duration, '-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2', audName]);
-                        audioSources.push({ filename: audName, start: item.start, volume: item.volume });
-                    } catch (e) { /* Ignore if no audio */ }
+                        processed += currentChunkDur;
+                        chunkIdx++;
+                    }
+
+                    // Audio extraction (unchanged)
+                    if (item.audioUrl) {
+                        const audName = `v_aud_${i}.wav`;
+                        try {
+                            const offset = (item.mediaStartOffset || 0).toFixed(3);
+                            const duration = item.duration.toFixed(3);
+                            await ffmpeg.exec(['-ss', offset, '-i', inputName, '-t', duration, '-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2', audName]);
+                            audioSources.push({ filename: audName, start: item.start, volume: item.volume });
+                        } catch (e) { /* Ignore */ }
+                    }
+
+                } else {
+                    // Standard processing for short clips
+                    const offset = (item.mediaStartOffset || 0).toFixed(3);
+                    const duration = item.duration.toFixed(3);
+
+                    await runFFmpeg(offset, duration, segName);
+                    videoSegments.push(segName);
+
+                    // Extract Audio
+                    if (item.audioUrl) {
+                        const audName = `v_aud_${i}.wav`;
+                        try {
+                            await ffmpeg.exec(['-ss', offset, '-i', inputName, '-t', duration, '-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2', audName]);
+                            audioSources.push({ filename: audName, start: item.start, volume: item.volume });
+                        } catch (e) { /* Ignore */ }
+                    }
                 }
-
             } else {
-                // Convert image to TS video
-                // Optimization: use -tune stillimage to speed up encoding of static images
-                await ffmpeg.exec(['-loop', '1', '-t', item.duration.toFixed(3), '-i', inputName, ...commonOut, '-tune', 'stillimage', segName]);
+                // Image
+                await runFFmpeg(null, item.duration.toFixed(3), segName);
+                videoSegments.push(segName);
             }
-
-            videoSegments.push(segName);
 
             // cleanup input immediately
             try { await ffmpeg.deleteFile(inputName); } catch (e) { }
