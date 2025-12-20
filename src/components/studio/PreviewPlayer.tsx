@@ -194,6 +194,18 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                                 muted={false}
                                 playsInline
                                 preload="auto"
+                                onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onTransformUpdate) {
+                                        const isZoomed = activeTransform.scale > 1.1;
+                                        onTransformUpdate({
+                                            ...activeTransform,
+                                            scale: isZoomed ? 1 : 1.5,
+                                            x: isZoomed ? 0 : activeTransform.x,
+                                            y: isZoomed ? 0 : activeTransform.y
+                                        });
+                                    }
+                                }}
                             />
                         ) : (
                             <img
@@ -203,6 +215,18 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                                 style={mediaStyle}
                                 onMouseDown={handleMediaMouseDown}
                                 draggable={false}
+                                onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onTransformUpdate) {
+                                        const isZoomed = activeTransform.scale > 1.1;
+                                        onTransformUpdate({
+                                            ...activeTransform,
+                                            scale: isZoomed ? 1 : 1.5,
+                                            x: isZoomed ? 0 : activeTransform.x,
+                                            y: isZoomed ? 0 : activeTransform.y
+                                        });
+                                    }
+                                }}
                             />
                         )
                     ) : (

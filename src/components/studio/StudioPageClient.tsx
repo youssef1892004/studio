@@ -314,21 +314,22 @@ export default function StudioPageClient() {
     const selectedItem = useMemo(() => {
         if (activeVideoId) {
             const item = videoTrackItems.find(i => i.id === activeVideoId);
-            if (item) return {
-                id: item.id,
-                type: (item.type === 'text' ? 'text' : 'video') as 'text' | 'video',
-                volume: item.volume ?? 1,
-                playbackRate: item.playbackRate ?? 1,
-                name: item.content,
-                content: item.content,
-                textStyle: item.textStyle
+            // Ensure we return the item with its transform property
+            return item || null;
+        }
+        if (activeCardId) {
+            const c = cards.find(ca => ca.id === activeCardId);
+            if (c) return {
+                id: c.id,
+                type: 'voice' as const,
+                volume: c.volume,
+                playbackRate: c.speed,
+                content: c.content?.blocks?.[0]?.data?.text
             };
-        } else if (activeCardId) {
-            const card = cards.find(c => c.id === activeCardId);
-            if (card) return { id: card.id, type: 'voice' as const, volume: card.volume ?? 1, playbackRate: card.playbackRate ?? 1, name: 'Voice Block' };
         }
         return null;
     }, [activeVideoId, activeCardId, videoTrackItems, cards]);
+
 
     const handleUpdateItemSpeed = (rate: number) => {
         if (activeVideoId) {
@@ -1556,6 +1557,8 @@ export default function StudioPageClient() {
             .map(item => ({ id: item.id, content: item.content, style: item.textStyle }));
     }, [videoTrackItems, currentTime]);
 
+
+
     if (!user) {
         return null;
     }
@@ -1631,16 +1634,17 @@ export default function StudioPageClient() {
                             {/* Right: Properties Panel (First in DOM -> Right in RTL) */}
                             <div className="w-full lg:w-[300px] flex-shrink-0 bg-[#1E1E1E] border-l border-studio-border z-10 overflow-y-auto">
                                 <PropertiesPanel
-                                    selectedItem={selectedItem}
+                                    selectedItem={selectedItem as any}
                                     currentGlobalSpeed={selectedItem?.playbackRate ?? playbackRate}
                                     onUpdateVolume={handleUpdateVolume}
                                     onUpdateSpeed={handleUpdateItemSpeed}
                                     onDelete={handleDeleteSelection}
                                     onUpdateText={handleUpdateText}
                                     onUpdateTransform={(newTransform) => {
-                                        if (activeMedia?.id) {
+                                        // Update transform for the selected item (activeVideoId)
+                                        if (activeVideoId) {
                                             setVideoTrackItems(prev => prev.map(item =>
-                                                item.id === activeMedia.id
+                                                item.id === activeVideoId
                                                     ? { ...item, transform: newTransform }
                                                     : item
                                             ));
@@ -1663,12 +1667,18 @@ export default function StudioPageClient() {
                                     activeTextItems={activeTextItems}
                                     onTextUpdate={handleTextUpdate}
                                     aspectRatio={ASPECT_RATIO_PRESETS.find(p => p.id === activePresetId)?.ratio || 16 / 9}
-                                    // Visual Transform
-                                    activeTransform={videoTrackItems.find(i => i.id === activeMedia?.id)?.transform || { scale: 1, x: 0, y: 0, rotation: 0 }}
+                                    // Visual Transform - PREFER SELECTED ITEM
+                                    activeTransform={
+                                        ((activeVideoId ? videoTrackItems.find(i => i.id === activeVideoId)?.transform : null) ||
+                                            (activeMedia?.id ? videoTrackItems.find(i => i.id === activeMedia.id)?.transform : null) ||
+                                            { scale: 1, x: 0, y: 0, rotation: 0 })
+                                    }
                                     onTransformUpdate={(newTransform) => {
-                                        if (activeMedia?.id) {
+                                        // Update the SELECTED item (activeVideoId) if available, otherwise activeMedia
+                                        const targetId = activeVideoId || activeMedia?.id;
+                                        if (targetId) {
                                             setVideoTrackItems(prev => prev.map(item =>
-                                                item.id === activeMedia.id
+                                                item.id === targetId
                                                     ? { ...item, transform: newTransform }
                                                     : item
                                             ));
