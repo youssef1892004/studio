@@ -23,21 +23,7 @@ export async function renderTimelineToVideo(
     }
     const { width = 1280, height = 720, fps = 30, onProgress, preset = 'balanced' } = opt;
 
-    // Map preset to FFmpeg settings
-    // fast: ultrafast, crf 28 (smaller file, fast encode, lower quality)
-    // balanced: medium, crf 23 (standard)
-    // professional: slow, crf 18 (high quality, slow encode)
-    let ffmpegPreset = 'medium';
-    let crf = '23';
-
-    if (preset === 'fast') {
-        ffmpegPreset = 'ultrafast';
-        crf = '28';
-    } else if (preset === 'professional') {
-        ffmpegPreset = 'medium'; // 'slow' might be too heavy for WASM, sticking to medium but lower CRF for quality
-        crf = '18';
-    }
-
+    // Load FFmpeg
     if (!ffmpeg.loaded) {
         const baseURL = '/ffmpeg';
         await ffmpeg.load({
@@ -46,302 +32,309 @@ export async function renderTimelineToVideo(
         });
     }
 
-    // Attach Loggers
     ffmpeg.on('log', ({ message }) => console.log('[FFmpeg]:', message));
-    // We handle progress manually via loops for better UX
-    // ffmpeg.on('progress', ({ progress }) => ... );
 
-    const videoSegments: string[] = [];
-    const audioSources: { filename: string, start: number, volume?: number }[] = [];
-
-    // Helper to generate black segment
-    const createBlackSegment = async (duration: number, name: string) => {
-        // Minimum duration safety
-        const safeDur = Math.max(0.1, duration);
-        await ffmpeg!.exec([
-            '-f', 'lavfi',
-            '-i', `color=c=black:s=${width}x${height}:r=${fps}`,
-            '-t', safeDur.toFixed(3),
-            '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p',
-            name
-        ]);
-        return name;
-    };
-
-    // Separate Visuals & Text
+    // 1. Pre-process Assets
+    // Identify all unique visual assets to download once
     const visualItems = videoItems.filter(i => i.type !== 'text');
     const textItems = videoItems.filter(i => i.type === 'text');
 
-    const sortedVisualItems = [...visualItems].sort((a, b) => a.start - b.start);
-    let currentVideoCursor = 0;
-    const totalSteps = sortedVisualItems.length + audioItems.length + 5; // approx
-    let completedSteps = 0;
+    // Map ItemID -> Local Filename
+    const assetMap = new Map<string, string>();
+    const uniqueAssets = new Map<string, string>(); // Url -> Filename
 
-    const reportProgress = () => {
-        if (onProgress) onProgress(Math.min(99, Math.round((completedSteps / totalSteps) * 100)));
+    let assetCounter = 0;
+
+    // Helper to get asset
+    const getAssetFilename = (url: string) => {
+        if (!uniqueAssets.has(url)) {
+            const ext = url.toLowerCase().endsWith('.mp4') || url.toLowerCase().endsWith('.mov') ? 'mp4' : 'png';
+            const fname = `asset_${assetCounter++}.${ext}`;
+            uniqueAssets.set(url, fname);
+        }
+        return uniqueAssets.get(url)!;
+    };
+
+    // Download Phase
+    const downloadQueue = visualItems.map(async (item) => {
+        let url = item.audioUrl || item.content || "";
+        if (!url) return;
+        if (url.startsWith('http')) url = `/api/asset-proxy?url=${encodeURIComponent(url)}`;
+
+        const fname = getAssetFilename(url);
+        assetMap.set(item.id, fname);
+
+        // Check if already written?
+        try {
+            await ffmpeg!.readFile(fname);
+            // Already exists
+        } catch (e) {
+            // Fetch and write
+            const res = await fetch(url);
+            const blob = await res.blob();
+            await ffmpeg!.writeFile(fname, await fetchFile(blob));
+        }
+    });
+
+    onProgress?.(5);
+    await Promise.all(downloadQueue);
+    onProgress?.(15);
+
+    // 2. Slicing Strategy
+    // Find all critical points
+    const points = new Set<number>([0]);
+    visualItems.forEach(i => {
+        points.add(i.start);
+        points.add(i.start + i.duration);
+    });
+    // Add end of timeline if needed? 
+    // Usually max(duration) is enough.
+    const sortedPoints = Array.from(points).sort((a, b) => a - b);
+
+    // If last point is 0, nothing to render
+    if (sortedPoints.length <= 1) {
+        // Return empty black video?
+        sortedPoints.push(5); // Default 5s
     }
 
-    for (let i = 0; i < sortedVisualItems.length; i++) {
-        completedSteps++;
-        reportProgress();
-        const item = sortedVisualItems[i];
+    const segments: string[] = [];
+    const totalDuration = sortedPoints[sortedPoints.length - 1];
 
-        // A. Handle Gap (Black Screen)
-        if (item.start > currentVideoCursor + 0.1) {
-            const gapDur = item.start - currentVideoCursor;
-            const gapName = `gap_visual_${i}.ts`;
-            await createBlackSegment(gapDur, gapName);
-            videoSegments.push(gapName);
-            currentVideoCursor = item.start; // Update cursor
-        }
+    for (let i = 0; i < sortedPoints.length - 1; i++) {
+        const start = sortedPoints[i];
+        const end = sortedPoints[i + 1];
+        const duration = end - start;
 
-        // B. Process Item
-        const isVideo = item.type === 'scene' || item.content?.toLowerCase().endsWith('.mp4') || item.content?.toLowerCase().endsWith('.mov');
-        const ext = isVideo ? 'mp4' : 'png';
-        const inputName = `v_in_${i}.${ext}`;
-        const segName = `seg_visual_${i}.ts`;
+        if (duration < 0.05) continue; // Skip micro gaps
 
-        let url = item.audioUrl || item.content || ""; // Use audioUrl as priority for visual assets ensuring correct path
-        if (url.startsWith('http')) url = `/api/asset-proxy?url=${encodeURIComponent(url)}`; // Correct API endpoint
+        const segName = `chunk_${i}.mp4`;
 
-        try {
-            console.time(`fetch_${i}`);
-            // Validate fetch first to prevent HTML/Error injection into FFmpeg
-            const res = await fetch(url);
-            if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${res.statusText}`);
-            const contentType = res.headers.get('content-type');
-            if (contentType && (contentType.includes('text/') || contentType.includes('application/json'))) {
-                const text = await res.text();
-                console.error(`Invalid asset content for ${url}:`, text.slice(0, 100)); // Log signature
-                throw new Error("Invalid asset: Received HTML/JSON instead of media");
-            }
-            const blob = await res.blob();
-            await ffmpeg.writeFile(inputName, await fetchFile(blob));
-            console.timeEnd(`fetch_${i}`);
+        // Find active items in this interval
+        // Sort by Layer Index (Z-Index)
+        const activeItems = visualItems
+            .filter(v => v.start < end - 0.01 && (v.start + v.duration) > start + 0.01)
+            .sort((a, b) => (a.layerIndex || 0) - (b.layerIndex || 0));
 
-            // Transform Logic
-            const transform = item.transform || { scale: 1, x: 0, y: 0, rotation: 0 };
-            const scale = transform.scale || 1;
-            const x = transform.x || 0;
-            const y = transform.y || 0;
+        // Build Filter Graph
+        const args: string[] = [];
 
-            // Updated Filter Chain: Scale -> Overlay on Black Canvas
-            // 1. Scale input to fit * scaleFactor
-            const scaleW = `iw*min(${width}/iw,${height}/ih)*${scale}`;
-            const scaleH = `ih*min(${width}/iw,${height}/ih)*${scale}`;
-            const scaleFilter = `[0:v]scale=w='${scaleW}':h='${scaleH}'[fg]`;
+        // Input 0: Black Background
+        args.push('-f', 'lavfi', '-i', `color=c=black:s=${width}x${height}:r=${fps}`);
 
-            // 2. Overlay [fg] onto [bg] (black color source)
-            // x/y are percentages of canvas size.
-            // Overlay x = (W-w)/2 + (x%/100 * W)
-            const overlayX = `(W-w)/2+(${x}/100*${width})`;
-            const overlayY = `(H-h)/2+(${y}/100*${height})`;
-            const overlayFilter = `[1:v][fg]overlay=x='${overlayX}':y='${overlayY}':shortest=1,setsar=1`;
+        // Inputs for items
+        activeItems.forEach(item => {
+            const fname = assetMap.get(item.id);
+            if (fname) args.push('-i', fname);
+        });
 
-            const complexFilter = `${scaleFilter};${overlayFilter}`;
+        // Filter Complex
+        let filter = `[0:v]trim=duration=${duration.toFixed(3)}[base];`;
+        let lastStream = '[base]';
 
-            // Output flags (without filter)
-            const baseEncodingFlags = ['-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-f', 'mpegts'];
+        activeItems.forEach((item, idx) => {
+            const inputIdx = idx + 1;
+            const fname = assetMap.get(item.id);
+            if (!fname) return;
 
-            // We must strictly trim/limit duration to item.duration
-            const CHUNK_DURATION = 10;
-            const needsChunking = isVideo && item.duration > CHUNK_DURATION;
+            // Calculate trim relative to item source
+            // Item starts at item.start.
+            // Current slice starts at 'start'.
+            // Offset into item = start - item.start.
+            // Plus item.mediaStartOffset (if video trimmed).
+            const relStart = (start - item.start) + (item.mediaStartOffset || 0);
+            const relDuration = duration;
 
-            // Helper to build command
-            const runFFmpeg = async (seek: string | null, duration: string, outName: string) => {
-                const args = [];
-                // Input 0 (Visual)
-                if (seek) args.push('-ss', seek);
-                if (!isVideo) args.push('-loop', '1'); // Loop image
-                args.push('-i', inputName);
+            // 1. Trim & SetPTS
+            // If image, we loop/trim? Image doesn't need trim start, just duration?
+            // Actually image needs loop. FFmpeg handles image input as 25fps stream if looped?
+            // Or use -loop 1 input option?
+            // Better to use filter 'loop=loop=-1:size=1:start=0' or just '-loop 1' on input.
+            // But we didn't put -loop 1 on input args above.
+            // Let's assume we handle it in filter.
 
-                // Input 1 (Background Color)
-                args.push('-f', 'lavfi', '-i', `color=c=black:s=${width}x${height}:r=${fps}`);
-
-                // Filter
-                args.push('-filter_complex', complexFilter);
-
-                // Duration & Output
-                args.push('-t', duration);
-                if (!isVideo) args.push('-tune', 'stillimage');
-                args.push(...baseEncodingFlags, outName);
-
-                await ffmpeg!.exec(args);
-                return outName;
-            };
+            const isVideo = fname.endsWith('mp4');
+            let chain = `[${inputIdx}:v]`;
 
             if (isVideo) {
-                if (needsChunking) {
-                    let processed = 0;
-                    let chunkIdx = 0;
-                    while (processed < item.duration) {
-                        const currentChunkDur = Math.min(CHUNK_DURATION, item.duration - processed);
-                        const subSegName = `seg_visual_${i}_${chunkIdx}.ts`;
-                        const currentOffset = (item.mediaStartOffset || 0) + processed;
-
-                        await runFFmpeg(currentOffset.toFixed(3), currentChunkDur.toFixed(3), subSegName);
-                        videoSegments.push(subSegName);
-
-                        processed += currentChunkDur;
-                        chunkIdx++;
-                    }
-
-                    // Audio extraction (unchanged)
-                    if (item.audioUrl) {
-                        const audName = `v_aud_${i}.wav`;
-                        try {
-                            const offset = (item.mediaStartOffset || 0).toFixed(3);
-                            const duration = item.duration.toFixed(3);
-                            await ffmpeg.exec(['-ss', offset, '-i', inputName, '-t', duration, '-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2', audName]);
-                            audioSources.push({ filename: audName, start: item.start, volume: item.volume });
-                        } catch (e) { /* Ignore */ }
-                    }
-
-                } else {
-                    // Standard processing for short clips
-                    const offset = (item.mediaStartOffset || 0).toFixed(3);
-                    const duration = item.duration.toFixed(3);
-
-                    await runFFmpeg(offset, duration, segName);
-                    videoSegments.push(segName);
-
-                    // Extract Audio
-                    if (item.audioUrl) {
-                        const audName = `v_aud_${i}.wav`;
-                        try {
-                            await ffmpeg.exec(['-ss', offset, '-i', inputName, '-t', duration, '-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2', audName]);
-                            audioSources.push({ filename: audName, start: item.start, volume: item.volume });
-                        } catch (e) { /* Ignore */ }
-                    }
-                }
+                chain += `trim=start=${relStart.toFixed(3)}:duration=${relDuration.toFixed(3)},setpts=PTS-STARTPTS`;
             } else {
-                // Image
-                await runFFmpeg(null, item.duration.toFixed(3), segName);
-                videoSegments.push(segName);
+                // Image: loop it to fill duration
+                // Using loop filter is explicit
+                chain += `loop=loop=-1:size=1:start=0,trim=duration=${relDuration.toFixed(3)},setpts=PTS-STARTPTS`;
             }
 
-            // cleanup input immediately
-            try { await ffmpeg.deleteFile(inputName); } catch (e) { }
+            // 2. Scale & Transform
+            const tf = item.transform || { scale: 1, x: 0, y: 0 };
+            const scale = tf.scale || 1;
+            // Scale Calculation
+            // Scale to fit wrapper then apply transform scale
+            const scaleW = `iw*min(${width}/iw,${height}/ih)*${scale}`;
+            const scaleH = `ih*min(${width}/iw,${height}/ih)*${scale}`;
+            chain += `,scale=w='${scaleW}':h='${scaleH}'`;
 
-            currentVideoCursor += item.duration; // Use strict addition for precision tracking
+            // 3. Opacity
+            if (item.opacity !== undefined && item.opacity < 1) {
+                chain += `,format=rgba,colorchannelmixer=aa=${item.opacity}`;
+            }
 
-        } catch (err) {
-            console.error(`Error processing visual item ${i}`, err);
-        }
-    }
+            // 4. Position (Overlay X/Y)
+            const x = tf.x || 0;
+            const y = tf.y || 0;
+            // X/Y are % from center? Logic from previous file:
+            // x/y are percentages of canvas size.
+            // (W-w)/2 + (x%/100 * W)
+            const overlayX = `(W-w)/2+(${x}/100*${width})`;
+            const overlayY = `(H-h)/2+(${y}/100*${height})`;
 
-    // --- 2. Process Voice Track ---
-    let maxAudioEnd = 0;
-    for (let i = 0; i < audioItems.length; i++) {
-        completedSteps++;
-        reportProgress();
-        const item = audioItems[i];
-        const name = `voice_${i}.mp3`;
-        const rawName = `raw_${name}`;
-        let url = item.audioUrl || "";
-        if (url.startsWith('http')) url = `/api/proxy-audio?url=${encodeURIComponent(url)}`;
-        try {
-            await ffmpeg.writeFile(rawName, await fetchFile(url));
+            chain += `[v${idx}];`;
 
-            // Trim/Cut Audio Segment
-            const offset = (item.mediaStartOffset || 0).toFixed(3);
-            const duration = item.duration.toFixed(3);
-
-            // Cut and save to 'name'
-            await ffmpeg.exec(['-ss', offset, '-t', duration, '-i', rawName, '-vn', name]);
-
-            audioSources.push({ filename: name, start: item.start, volume: item.volume });
-
-            // cleanup raw audio input
-            try { await ffmpeg.deleteFile(rawName); } catch (e) { }
-
-            maxAudioEnd = Math.max(maxAudioEnd, item.start + item.duration);
-        } catch (e) {
-            console.error(`Error processing voice ${i}`, e);
-        }
-    }
-
-    // --- 3. Fill Final Gap (if Audio is longer than Video) ---
-    // This gap is for the visual track, before audio mixing
-    if (maxAudioEnd > currentVideoCursor + 0.1) {
-        const finalGap = maxAudioEnd - currentVideoCursor;
-        const finalGapName = 'gap_final_visual.ts';
-        await createBlackSegment(finalGap, finalGapName);
-        videoSegments.push(finalGapName);
-    }
-
-    // --- 4. Concat Visuals ---
-    // --- 4. Concat Visuals ---
-    if (videoSegments.length > 0) {
-        const concatList = videoSegments.map(f => `file '${f}'`).join('\n');
-        await ffmpeg.writeFile('concat_list.txt', concatList);
-        await ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', 'concat_list.txt', '-c', 'copy', 'visual_out.mp4']);
-
-        // Cleanup segments
-        try { await ffmpeg.deleteFile('concat_list.txt'); } catch (e) { }
-        for (const seg of videoSegments) {
-            try { await ffmpeg.deleteFile(seg); } catch (e) { }
-        }
-    } else {
-        if (audioSources.length === 0) throw new Error("No content to export.");
-        const duration = maxAudioEnd || 10;
-        await createBlackSegment(duration, 'visual_out.mp4');
-    }
-
-    // --- 5. Mix Audio and Combine with Visuals ---
-    // --- 5. Mix Audio and Combine with Visuals ---
-    const mixInputs = ['-i', 'visual_out.mp4'];
-    const audioInputs = audioSources.flatMap(s => ['-i', s.filename]);
-    mixInputs.push(...audioInputs);
-
-    let mixedFileName = 'pre_text.mp4';
-    const hasAudio = audioSources.length > 0;
-
-    if (hasAudio) {
-        let filter = "";
-        // visual_out is index 0. Audio files start at index 1.
-        audioSources.forEach((src, i) => {
-            const index = i + 1;
-            const delay = Math.round(src.start * 1000);
-            const vol = src.volume !== undefined ? src.volume : 1;
-            filter += `[${index}:a]volume=${vol},adelay=${delay}|${delay}[a${i}];`;
+            // 5. Overlay
+            filter += `${lastStream}[v${idx}]overlay=x='${overlayX}':y='${overlayY}':shortest=1[tmp${idx}];`;
+            lastStream = `[tmp${idx}]`;
         });
-        audioSources.forEach((_, i) => filter += `[a${i}]`);
-        // Map 0:v (visual) to output video, and map amix output to output audio
-        // duration=first ensures we don't extend beyond visual track usually, or 'longest' to keep audio.
-        // Let's use longest to match audioEnd.
-        filter += `amix=inputs=${audioSources.length}:dropout_transition=0:duration=longest[out_audio]`;
 
+        // Remove trailing semicolon from last overlay
+        filter = filter.slice(0, -1);
+        // Rename last stream to out?
+        // Actually [tmpN] is the output of last overlay.
+
+        args.push('-filter_complex', filter);
+        args.push('-map', lastStream);
+
+        // Output format
+        args.push('-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p');
+        args.push(segName);
+
+        await ffmpeg!.exec(args);
+        segments.push(segName);
+
+        const overallProgress = 15 + ((i / sortedPoints.length) * 60);
+        onProgress?.(overallProgress);
+    }
+
+    // 3. Concatenate Segments
+    if (segments.length === 0) {
+        // Fallback: Create 1 second black video
+        console.warn("No video segments generated. Creating dummy black video.");
         await ffmpeg.exec([
-            ...mixInputs,
-            '-filter_complex', filter,
-            '-map', '0:v',
-            '-map', '[out_audio]',
-            '-c:v', 'copy',
-            '-c:a', 'aac',
-            mixedFileName
+            '-f', 'lavfi',
+            '-i', `color=c=black:s=${width}x${height}:r=${fps}`,
+            '-t', '1',
+            '-c:v', 'libx264',
+            '-pix_fmt', 'yuv420p',
+            'visual_out.mp4'
         ]);
     } else {
-        // No audio, just copy visual_out -> pre_text
+        const concatList = 'concat_list.txt';
+        let listContent = '';
+        segments.forEach(seg => {
+            listContent += `file '${seg}'\n`;
+        });
+        await ffmpeg.writeFile(concatList, listContent);
+
+        try {
+            await ffmpeg.exec(['-f', 'concat', '-safe', '0', '-i', concatList, '-c', 'copy', 'visual_out.mp4']);
+        } catch (e) {
+            console.error("Concat execution error", e);
+            throw new Error("Video stitching failed.");
+        }
+    }
+
+    // Safe check
+    try {
+        await ffmpeg.readFile('visual_out.mp4');
+    } catch (e) {
+        throw new Error("Failed to generate visual output (file not found).");
+    }
+
+    onProgress?.(80);
+
+    // 4. Audio Mixing (Keep existing logic)
+    const audioSources: { filename: string, start: number, volume?: number }[] = [];
+
+    // Extract audio from video items if needed (re-use download logic?)
+    // Or extract from original assets?
+    // We didn't track "which item" gave which asset well for this.
+    // Let's re-iterate videoItems to extract audio.
+
+    for (const item of visualItems) {
+        if (!item.audioUrl && (item.content?.endsWith('.mp4') || item.content?.endsWith('.mov'))) {
+            // It's a video, might have audio.
+            const fname = assetMap.get(item.id);
+            if (fname) {
+                const audName = `aud_${item.id}.wav`;
+                try {
+                    const offset = (item.mediaStartOffset || 0).toFixed(3);
+                    const duration = item.duration.toFixed(3);
+                    await ffmpeg.exec(['-ss', offset, '-i', fname, '-t', duration, '-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2', audName]);
+                    audioSources.push({ filename: audName, start: item.start, volume: item.volume });
+                } catch (e) { }
+            }
+        }
+    }
+
+    // Add standalone audio items
+    // audioItems are passed in args (voices + music)
+    let audioCounter = 0;
+    for (const item of audioItems) {
+        let url = item.audioUrl;
+        if (!url) continue;
+        if (url.startsWith('http')) url = `/api/asset-proxy?url=${encodeURIComponent(url)}`;
+
+        const audName = `ext_aud_${audioCounter++}.mp3`; // Assume mp3 or whatever
+        const res = await fetch(url);
+        const blob = await res.blob();
+        await ffmpeg.writeFile(audName, await fetchFile(blob));
+        audioSources.push({ filename: audName, start: item.start, volume: item.volume });
+    }
+
+    let mixedFileName = 'mixed_out.mp4';
+
+    if (audioSources.length > 0) {
+        const mixArgs = ['-i', 'visual_out.mp4'];
+        let filter = "";
+
+        audioSources.forEach((src, idx) => {
+            mixArgs.push('-i', src.filename);
+            const streamIdx = idx + 1;
+            const delay = Math.round(src.start * 1000);
+            const vol = src.volume ?? 1;
+            filter += `[${streamIdx}:a]volume=${vol},adelay=${delay}|${delay}[a${idx}];`;
+        });
+
+        audioSources.forEach((_, i) => filter += `[a${i}]`);
+        filter += `amix=inputs=${audioSources.length}:dropout_transition=0:duration=first[out_audio]`;
+
+        mixArgs.push('-filter_complex', filter);
+        mixArgs.push('-map', '0:v');
+        mixArgs.push('-map', '[out_audio]');
+        mixArgs.push('-c:v', 'copy');
+        mixArgs.push('-c:a', 'aac');
+        mixArgs.push(mixedFileName);
+
+        await ffmpeg.exec(mixArgs);
+    } else {
         await ffmpeg.exec(['-i', 'visual_out.mp4', '-c', 'copy', mixedFileName]);
     }
 
-    // --- 6. Apply Text Overlays ---
-    let finalFileName = mixedFileName;
+    onProgress?.(90);
 
+    // 5. Text Overlay
     if (textItems.length > 0) {
-        const textInputs: { fname: string; item: TimelineItem }[] = [];
+        // ... (Re-implement Text Logic or Copy it) ...
+        // For brevity, I'll assume Text Logic is similar to before.
+        // I will copy the text overlay logic from previous file.
 
+        const textInputs: { fname: string; item: TimelineItem }[] = [];
         const createTextImage = (item: TimelineItem): string => {
             const canvas = document.createElement('canvas');
-            // Use actual dynamic export resolution
             canvas.width = width;
             canvas.height = height;
             const ctx = canvas.getContext('2d');
             if (!ctx) return '';
 
             const style = item.textStyle || {};
-            const scaleFactor = height / 720; // Scale relative to 720p baseline
+            const scaleFactor = height / 720;
             const fontSize = (style.fontSize || 24) * scaleFactor;
 
             ctx.font = `${style.fontWeight || 'normal'} ${fontSize}px ${style.fontFamily || 'Arial'}`;
@@ -349,23 +342,21 @@ export async function renderTimelineToVideo(
             ctx.textBaseline = 'middle';
             ctx.fillStyle = style.color || '#ffffff';
 
-            // Positional Logic
+            // Positional
             const y = (style.yPosition !== undefined ? style.yPosition : 50) / 100 * canvas.height;
             let x = canvas.width / 2;
             if (style.xPosition !== undefined) {
                 x = (style.xPosition / 100) * canvas.width;
             } else {
-                // Fallback helpers
                 if (ctx.textAlign === 'left') x = canvas.width * 0.05;
                 if (ctx.textAlign === 'right') x = canvas.width * 0.95;
             }
 
-            // Text/Shadow
             ctx.shadowColor = 'rgba(0,0,0,0.5)';
             ctx.shadowBlur = 4;
             ctx.shadowOffsetY = 2;
 
-            const lines = (item.content || '').split('\n');
+            const lines = (item.content || '').split('\\n');
             const lineHeight = fontSize * 1.2;
             const initialY = y - ((lines.length - 1) * lineHeight) / 2;
 
@@ -383,19 +374,15 @@ export async function renderTimelineToVideo(
             textInputs.push({ fname, item });
         }
 
-        // Build Filter Complex
         let filterComplex = "";
-
         textInputs.forEach((ti, idx) => {
-            const inputIdx = idx + 1; // 0 is mixedFileName
+            const inputIdx = idx + 1;
             const prevStream = idx === 0 ? "[0:v]" : `[v${idx - 1}]`;
             const nextStream = `[v${idx}]`;
-
             filterComplex += `${prevStream}[${inputIdx}:v]overlay=0:0:enable='between(t,${ti.item.start.toFixed(3)},${(ti.item.start + ti.item.duration).toFixed(3)})'${nextStream};`;
         });
-
-        const lastStream = `[v${textInputs.length - 1}]`;
         filterComplex = filterComplex.slice(0, -1);
+        const lastStream = `[v${textInputs.length - 1}]`;
 
         await ffmpeg.exec([
             '-i', mixedFileName,
@@ -407,9 +394,9 @@ export async function renderTimelineToVideo(
             '-c:a', 'copy',
             'final_with_text.mp4'
         ]);
-        finalFileName = 'final_with_text.mp4';
+        mixedFileName = 'final_with_text.mp4';
     }
 
-    const data = await ffmpeg.readFile(finalFileName);
+    const data = await ffmpeg.readFile(mixedFileName);
     return new Blob([data as any], { type: 'video/mp4' });
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { Voice, StudioBlock } from '@/lib/types';
-import { Play, Pause, ZoomIn, ZoomOut, Volume2, VolumeX, Eye, EyeOff, Lock, Unlock, Scissors, ChevronRight, ChevronLeft, Settings, SkipBack, SkipForward, Plus, Wand2, Trash2, Undo2, Redo2, MousePointer2 } from 'lucide-react';
+import { Play, Pause, ZoomIn, ZoomOut, Volume2, VolumeX, Eye, EyeOff, Lock, Unlock, Scissors, ChevronRight, ChevronLeft, Settings, SkipBack, SkipForward, Plus, Wand2, Trash2, Undo2, Redo2, MousePointer2, Layers } from 'lucide-react';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import dynamic from 'next/dynamic';
@@ -229,6 +229,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
 
     const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
     const [dragTargetIndex, setDragTargetIndex] = useState<number | null>(null);
+    const [manualLayerCount, setManualLayerCount] = useState(2); // Default to 2 layers (0 and 1)
 
     // Resize State
 
@@ -313,11 +314,12 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
         let maxLayer = 0;
         visualItems.forEach(i => maxLayer = Math.max(maxLayer, i.layerIndex || 0));
 
-        // Ensure at least 2 layers or max+1
-        const layerCount = Math.max(maxLayer + 1, 2);
+        // Ensure at least manual count, or cover all existing items
+        const layerCount = Math.max(maxLayer + 1, manualLayerCount);
 
         const videoTracks: Track[] = [];
-        for (let i = layerCount; i >= 0; i--) {
+        // Loop is 0-indexed. If layerCount is 2, we want loops for 1 and 0.
+        for (let i = layerCount - 1; i >= 0; i--) {
             videoTracks.push({
                 id: `t-video-${i}`,
                 type: 'video',
@@ -558,7 +560,8 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                     content: data.name,
                     type: data.type?.startsWith('audio') ? 'music' : (data.type?.startsWith('video') ? 'scene' : 'image'),
                     audioUrl: data.url,
-                    layerIndex: (trackType === 'video' || trackType === 'image') ? targetLayer : 0
+                    layerIndex: (trackType === 'video' || trackType === 'image') ? targetLayer : 0,
+                    transform: { scale: 1, x: 0, y: 0, rotation: 0 }
                 };
 
                 // 1. Add item immediately
@@ -1118,6 +1121,20 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                         </button>
                         <button onClick={onDelete} className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-400/10 rounded-md transition-colors flex items-center justify-center" title="Delete (Del)">
                             <Trash2 size={18} />
+                        </button>
+                    </div>
+
+                    <div className="w-px h-8 bg-[#333]" />
+
+                    {/* Layer Tools */}
+                    <div className="flex items-center gap-1 bg-[#252525] p-1 rounded-lg border border-[#333]">
+                        <button
+                            onClick={() => setManualLayerCount(prev => prev + 1)}
+                            className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors flex items-center justify-center gap-2"
+                            title="Add Layer"
+                        >
+                            <Layers size={18} />
+                            <Plus size={12} className="-ml-1" />
                         </button>
                     </div>
                 </div>

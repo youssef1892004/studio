@@ -841,53 +841,83 @@ export default function StudioPageClient() {
         return () => clearTimeout(handler);
     }, [projectTitle, projectDescription, projectId, token]);
 
-    // Main save function for blocks
-    const saveBlocks = useCallback(async (blocksToSave: StudioBlock[]) => {
-        console.log("Saving blocks...", blocksToSave);
+    // --- Persistence Logic ---
+
+    // 1. Voice Blocks Persistence (cards -> blocks table)
+    const saveVoiceBlocks = useCallback(async (blocksToSave: StudioBlock[]) => {
+        // console.log("Saving voice blocks...", blocksToSave.length);
         try {
             await fetch(`/api/project/save-editor-blocks`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     projectId: projectId,
-                    blocksJson: blocksToSave, // Send the raw data
+                    blocksJson: blocksToSave,
                 }),
             });
         } catch (err) {
-            console.error("Blocks save failed:", err);
+            console.error("Voice blocks save failed:", err);
         }
     }, [projectId]);
 
-    // Ref to store the last saved state string to prevent redundant saves (loop breaking)
-    const lastSavedState = useRef<string>("");
+    // 2. Timeline Persistence (videoTrackItems -> projects.blocks_json)
+    const saveTimeline = useCallback(async (itemsToSave: TimelineItem[]) => {
+        // console.log("Saving timeline...", itemsToSave.length);
+        try {
+            await fetch(`/api/project/save-timeline`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    projectId: projectId,
+                    blocksJson: itemsToSave,
+                }),
+            });
+        } catch (err) {
+            console.error("Timeline save failed:", err);
+        }
+    }, [projectId]);
 
-    // Effect to trigger save when cards change
+    const lastSavedCardsState = useRef<string>("");
+    const lastSavedTimelineState = useRef<string>("");
+
+    // Effect: Autosave Voice Blocks
+    useEffect(() => {
+        if (isInitialLoad.current) return;
+
+        const handler = setTimeout(() => {
+            if (cards.length > 0) {
+                const currentCardsString = JSON.stringify(cards.map(c => ({
+                    ...c,
+                    isGenerating: false,
+                    voiceSelected: c.voiceSelected
+                })));
+
+                if (currentCardsString !== lastSavedCardsState.current) {
+                    saveVoiceBlocks(cards);
+                    lastSavedCardsState.current = currentCardsString;
+                }
+            }
+        }, 1500);
+        return () => clearTimeout(handler);
+    }, [cards, saveVoiceBlocks]);
+
+    // Effect: Autosave Timeline
     useEffect(() => {
         if (isInitialLoad.current) {
             isInitialLoad.current = false;
             return;
-        };
+        }
 
         const handler = setTimeout(() => {
-            if (cards.length > 0) {
-                // Create a stable string representation of the cards
-                // We map to remove unstable fields (like isGenerating if it's transient) if needed, 
-                // but checking the whole object is usually safer for sync.
-                const currentCardsString = JSON.stringify(cards.map(c => ({
-                    ...c,
-                    // Ignore fields that might change locally but shouldn't trigger a DB save looping
-                    isGenerating: false, // Don't save generating state changes repeatedly
-                    voiceSelected: c.voiceSelected // Keep this
-                })));
+            const currentItemsString = JSON.stringify(videoTrackItems);
 
-                if (currentCardsString !== lastSavedState.current) {
-                    saveBlocks(cards);
-                    lastSavedState.current = currentCardsString;
-                }
+            if (currentItemsString !== lastSavedTimelineState.current) {
+                saveTimeline(videoTrackItems);
+                lastSavedTimelineState.current = currentItemsString;
             }
-        }, 1000); // Wait 1 second after last change to save
+        }, 1000);
         return () => clearTimeout(handler);
-    }, [cards, saveBlocks]);
+    }, [videoTrackItems, saveTimeline]);
 
     const addCard = useCallback((currentVoices = voices) => {
         const newCardId = uuidv4();
@@ -992,7 +1022,7 @@ export default function StudioPageClient() {
             setActiveCardId(targetBlockId);
 
             // Force save immediately
-            await saveBlocks(updatedCards);
+            await saveVoiceBlocks(updatedCards);
         } else {
             // Update existing card state to generating
             updateCard(targetBlockId, {
@@ -1702,9 +1732,9 @@ export default function StudioPageClient() {
                                     aspectRatio={ASPECT_RATIO_PRESETS.find(p => p.id === activePresetId)?.ratio || 16 / 9}
                                     // Visual Transform - PREFER SELECTED ITEM
                                     activeTransform={
-                                        ((activeVideoId ? videoTrackItems.find(i => i.id === activeVideoId)?.transform : null) ||
-                                            (activeMedia?.id ? videoTrackItems.find(i => i.id === activeMedia.id)?.transform : null) ||
-                                            { scale: 1, x: 0, y: 0, rotation: 0 })
+                                        activeVideoId
+                                            ? (videoTrackItems.find(i => i.id === activeVideoId)?.transform || { scale: 1, x: 0, y: 0, rotation: 0 })
+                                            : (activeMedia?.id ? videoTrackItems.find(i => i.id === activeMedia.id)?.transform : { scale: 1, x: 0, y: 0, rotation: 0 })
                                     }
                                     onTransformUpdate={(newTransform) => {
                                         // Update the SELECTED item (activeVideoId) if available, otherwise activeMedia
