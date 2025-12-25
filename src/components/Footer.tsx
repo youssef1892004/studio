@@ -33,7 +33,7 @@ export default function Footer() {
                         <h4 className="font-bold mb-4 text-foreground">مصادر</h4>
                         <ul className="space-y-2 text-sm text-muted-foreground">
                             <li><Link href="/about" className="hover:text-primary transition-colors">من نحن</Link></li>
-                            <li><Link href="/compare" className="hover:text-primary transition-colors text-orange-400">مقارنة بالمنافسين</Link></li>
+                            <li><Link href="/compare" className="hover:text-primary transition-colors text-primary">مقارنة بالمنافسين</Link></li>
                             <li><a href="https://muejam.com/" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">المدونة</a></li>
                             <li><Link href="/docs" className="hover:text-primary transition-colors">التوثيق</Link></li>
                             <li><Link href="/contact" className="hover:text-primary transition-colors">مساعدة (تواصل معنا)</Link></li>

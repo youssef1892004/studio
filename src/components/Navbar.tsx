@@ -76,7 +76,7 @@ export default function Navbar() {
         <div className={`w-full z-50 transition-all duration-300 ${positionClass}`}>
             {/* Promo Bar - Only on Landing Page */}
             {isLandingPage && !user && showPromoBar && (
-                <div className="bg-gradient-to-r from-primary via-orange-500 to-rose-500 text-white text-xs md:text-sm py-2 px-4 relative overflow-hidden">
+                <div className="bg-gradient-to-r from-primary via-blue-500 to-cyan-500 text-white text-xs md:text-sm py-2 px-4 relative overflow-hidden">
                     <div className="container mx-auto flex items-center justify-between relative z-10">
                         <div className="flex items-center gap-2">
                             <span className="font-bold">عرض خاص: 14 يوم تجربة مجانية شاملة لكل الأدوات!</span>

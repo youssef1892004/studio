@@ -50,24 +50,24 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Legacy studio colors (kept for backward compatibility during migration)
+        // Legacy studio colors (Updated to Blue Theme)
         studio: {
           bg: {
-            DEFAULT: '#3A3A3A',
-            light: '#CDCDCC',
+            DEFAULT: '#051923', // Deep Blue
+            light: '#F8FAFC',
           },
           panel: {
-            DEFAULT: '#706F6F',
-            light: '#C9C9C9',
+            DEFAULT: '#003554', // Dark Blue Card
+            light: '#E2E8F0',
           },
           border: {
-            DEFAULT: '#8E8D8D',
-            light: '#B2B1B1',
+            DEFAULT: '#1E40AF',
+            light: '#94A3B8',
           },
-          accent: '#F48969',
+          accent: '#00A6FB', // New Primary Blue
           text: {
-            DEFAULT: '#E5E5E5',
-            light: '#374151',
+            DEFAULT: '#E0F2FE',
+            light: '#0F172A',
           },
         },
       },

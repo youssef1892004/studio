@@ -1,10 +1,10 @@
 'use client';
 import { useState, useEffect, MouseEvent } from 'react';
 import { useAuth } from "@/contexts/AuthContext";
-import { getProjectsByUserId, insertProject, deleteProject, updateProject } from "@/lib/graphql";
+import { getProjectsByUserId, insertProject, deleteProject, updateProject, getUserUsage } from "@/lib/graphql";
 import {
     FilePlus, LoaderCircle, Trash2, Edit, Zap, Users, Image as ImageIcon, Video, Mic,
-    Folder, Clock, Gift, Sparkles, X, Search, MoreVertical, LayoutGrid, List, Plus
+    Folder, Clock, Gift, Sparkles, X, Search, MoreVertical, LayoutGrid, List, Plus, TrendingUp, DollarSign
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -55,6 +55,7 @@ export default function ProjectsClient() {
     const [isDeleting, setIsDeleting] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [usageStats, setUsageStats] = useState<{ charsUsed: number, projectsCount: number }>({ charsUsed: 0, projectsCount: 0 });
 
     const authContext = useAuth();
     const router = useRouter();
@@ -68,6 +69,11 @@ export default function ProjectsClient() {
                     toast.error("فشل تحميل المشاريع. حاول إعادة تحميل الصفحة.");
                 })
                 .finally(() => setIsLoading(false));
+
+            getUserUsage(authContext.user.id, authContext.token)
+                .then(setUsageStats)
+                .catch(err => console.error("Failed to fetch usage stats", err));
+        } else if (!authContext.isLoading) {
         } else if (!authContext.isLoading) {
             setIsLoading(false);
         }
@@ -188,6 +194,7 @@ export default function ProjectsClient() {
                     </div>
                     <SidebarItem icon={Mic} label="تحويل النص لكلام" />
                     <SidebarItem icon={Video} label="محرر الفيديو" />
+                    <SidebarItem icon={Users} label="استنساخ الصوت" badge="قريباً" />
                     <SidebarItem icon={ImageIcon} label="توليد الصور" badge="قريباً" />
                 </nav>
 
@@ -197,6 +204,8 @@ export default function ProjectsClient() {
                         <p className="text-xs text-muted-foreground mb-3">احصل على المزيد من الأصوات والميزات.</p>
                         <button className="text-xs font-bold text-primary hover:underline">ترقية الخطة &larr;</button>
                     </div>
+
+                    <UsageWidget stats={usageStats} />
                 </div>
             </aside>
 
@@ -223,11 +232,38 @@ export default function ProjectsClient() {
                                     <Video className="w-5 h-5" />
                                     <span>إنشاء فيديو</span>
                                 </button>
-                                <button className="px-6 py-3 bg-white/20 backdrop-blur-md text-white font-bold rounded-xl border border-white/30 hover:bg-white/30 transition-colors flex items-center gap-2">
+                                <button className="px-6 py-3 bg-white/20 backdrop-blur-md text-white/70 font-bold rounded-xl border border-white/30 cursor-not-allowed flex items-center gap-2">
                                     <Mic className="w-5 h-5" />
-                                    <span>استنساخ صوت</span>
+                                    <span>استنساخ صوت (قريباً)</span>
                                 </button>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Templates Section - NEW */}
+                    <div className="mb-10">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-xl font-bold flex items-center gap-2">
+                                <LayoutGrid className="w-5 h-5 text-purple-500" />
+                                <span>ابدأ بقالب جاهز</span>
+                            </h2>
+                            <button className="text-sm text-primary hover:underline">عرض الكل</button>
+                        </div>
+                        <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
+                            {[
+                                { title: "فيديو تيك توك", color: "from-pink-500 to-rose-500", icon: Video },
+                                { title: "إعلان يوتيوب", color: "from-red-500 to-orange-500", icon: Video },
+                                { title: "بودكاست", color: "from-violet-500 to-purple-500", icon: Mic },
+                                { title: "قصة انستجرام", color: "from-purple-500 to-pink-500", icon: ImageIcon },
+                            ].map((template, idx) => (
+                                <button key={idx} onClick={openCreateModal} className="min-w-[160px] h-24 rounded-2xl relative overflow-hidden group hover:scale-105 transition-all duration-300 shadow-sm hover:shadow-lg">
+                                    <div className={`absolute inset-0 bg-gradient-to-br ${template.color} opacity-90`}></div>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-10">
+                                        <template.icon className="w-6 h-6 mb-2 opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all" />
+                                        <span className="font-bold text-sm shadow-black/20 drop-shadow-md">{template.title}</span>
+                                    </div>
+                                </button>
+                            ))}
                         </div>
                     </div>
 
@@ -255,8 +291,9 @@ export default function ProjectsClient() {
                             <QuickToolCard
                                 icon={Users}
                                 title="استنساخ الصوت"
-                                desc="بصمة صوتية خاصة"
+                                desc="قريباً"
                                 color="bg-purple-500"
+                                isComingSoon
                                 onClick={() => { }}
                             />
                             <QuickToolCard
@@ -320,8 +357,8 @@ export default function ProjectsClient() {
                                             key={project.id}
                                             project={project}
                                             viewMode={viewMode}
-                                            onEdit={(e) => handleEditClick(project, e)}
-                                            onDelete={(e) => handleDeleteClick(project, e)}
+                                            onEdit={(e: any) => handleEditClick(project, e)}
+                                            onDelete={(e: any) => handleDeleteClick(project, e)}
                                             index={index}
                                         />
                                     ))}
@@ -565,5 +602,34 @@ function ProjectCard({ project, viewMode, onEdit, onDelete, index }: any) {
                 </div>
             </Link>
         </motion.div>
+    )
+}
+
+function UsageWidget({ stats }: { stats: { charsUsed: number, projectsCount: number } }) {
+    // 1000 chars approx 1 min. Free plan = 30k chars (30 mins).
+    const maxChars = 30000;
+    const percentage = Math.min(100, Math.max(0, (stats.charsUsed / maxChars) * 100));
+    const usedMinutes = Math.ceil(stats.charsUsed / 1000);
+    const totalMinutes = 30;
+
+    return (
+        <div className="mt-4 bg-muted/30 rounded-xl p-4 border border-border/50">
+            <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-muted-foreground flex items-center gap-1">
+                    <TrendingUp className="w-3 h-3" />
+                    الاستهلاك الشهري
+                </span>
+                <span className="text-xs font-bold text-primary">{usedMinutes} / {totalMinutes} دقيقة</span>
+            </div>
+            <div className="h-2 w-full bg-muted/50 rounded-full overflow-hidden mb-2">
+                <div
+                    className="h-full bg-gradient-to-r from-primary to-blue-400 rounded-full transition-all duration-1000"
+                    style={{ width: `${percentage}%` }}
+                ></div>
+            </div>
+            <p className="text-[10px] text-muted-foreground text-center">
+                يتم تجديد الرصيد في بداية الشهر
+            </p>
+        </div>
     )
 }

@@ -26,81 +26,83 @@
 }
 
 :root {
-  /* Light Mode - Based on User Palette */
-  /* Background: Using the lightest grey #CDCDCC */
-  --background: 60 2% 80%;
-  /* Text: Dark Grey #3A3A3A */
-  --foreground: 0 0% 23%;
+  /* Light Mode - Blue Palette Adaptation */
 
-  /* Cards: Slightly lighter/different grey #C9C9C9 */
-  --card: 0 0% 79%;
-  --card-foreground: 0 0% 23%;
+  /* Background: White with very subtle blue tint for freshness */
+  --background: 210 40% 98%;
+  /* Text: Deep Blue #003554 */
+  --foreground: 202 100% 16%;
 
-  --popover: 0 0% 79%;
-  --popover-foreground: 0 0% 23%;
+  /* Cards: White */
+  --card: 0 0% 100%;
+  --card-foreground: 202 100% 16%;
 
-  /* Primary: Coral #F48969 */
-  --primary: 14 86% 68%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 202 100% 16%;
+
+  /* Primary: #00A6FB (Vibrant Blue) */
+  --primary: 200 100% 49%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 0 1% 44%;
-  /* #706F6F */
-  --secondary-foreground: 60 2% 80%;
+  /* Secondary: #E0F2FE (Light Sky Blue) */
+  --secondary: 200 80% 94%;
+  --secondary-foreground: 202 100% 16%;
 
-  --muted: 0 1% 70%;
-  /* #B2B1B1 */
-  --muted-foreground: 0 0% 40%;
+  /* Muted: #F1F5F9 (Slate 100) */
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
 
-  --accent: 14 86% 68%;
-  --accent-foreground: 0 0% 23%;
+  /* Accent: #0582CA (Mid Blue) */
+  --accent: 202 93% 41%;
+  --accent-foreground: 0 0% 100%;
 
   --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 60 2% 80%;
+  --destructive-foreground: 0 0% 98%;
 
-  --border: 0 0% 55%;
-  /* #8E8D8D */
-  --input: 0 0% 55%;
-  --ring: 14 86% 68%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 200 100% 49%;
 
   --radius: 0.75rem;
 }
 
 .dark {
-  /* Dark Mode - Based on User Palette (Primary Vibe) */
-  /* Background: #3A3A3A */
-  --background: 0 0% 23%;
-  /* Text: #CDCDCC */
-  --foreground: 60 2% 80%;
+  /* Dark Mode - Deep Blue Theme */
 
-  /* Card: #706F6F */
-  --card: 0 1% 44%;
-  --card-foreground: 60 2% 95%;
-  /* Ligher text for better contrast on dark cards */
+  /* Background: #051923 (Deepest Blue) */
+  --background: 200 75% 8%;
+  /* Text: #E0F2FE (Light Blue/White) */
+  --foreground: 200 80% 98%;
 
-  --popover: 0 0% 23%;
-  --popover-foreground: 60 2% 80%;
+  /* Card: #003554 (Dark Blue) */
+  --card: 202 100% 16%;
+  --card-foreground: 200 80% 98%;
 
-  /* Primary: Coral #F48969 */
-  --primary: 14 86% 68%;
+  --popover: 202 100% 16%;
+  --popover-foreground: 200 80% 98%;
+
+  /* Primary: #00A6FB (Vibrant Blue) */
+  --primary: 200 100% 49%;
   --primary-foreground: 0 0% 100%;
-  /* White text on coral */
 
-  --secondary: 0 1% 44%;
-  --secondary-foreground: 60 2% 80%;
+  /* Secondary: #006494 (Mid-Dark Blue) */
+  --secondary: 200 100% 29%;
+  --secondary-foreground: 0 0% 100%;
 
-  --muted: 0 1% 44%;
-  --muted-foreground: 0 0% 70%;
+  /* Muted: #006494 with opacity or darker slate */
+  --muted: 200 50% 20%;
+  --muted-foreground: 215 20% 65%;
 
-  --accent: 14 86% 68%;
+  /* Accent: #0582CA */
+  --accent: 202 93% 41%;
   --accent-foreground: 0 0% 100%;
 
   --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 60 2% 80%;
+  --destructive-foreground: 0 0% 98%;
 
-  --border: 0 0% 55%;
-  /* #8E8D8D */
-  --input: 0 0% 55%;
-  --ring: 14 86% 68%;
+  --border: 200 50% 20%;
+  --input: 200 50% 20%;
+  --ring: 200 100% 49%;
 }
 
 /* === تأكد أن الـ body يستخدم هذه الألوان === */

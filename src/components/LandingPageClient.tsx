@@ -98,14 +98,14 @@ export default function LandingPageClient() {
 
             {/* Left Column: Text & CTA */}
             <div className="flex flex-col items-start text-start space-y-5 sm:space-y-8 animate-in fade-in slide-in-from-bottom-10 duration-700 w-full max-w-full">
-              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-primary/20 rounded-full px-3 py-1.5 sm:px-4 text-[10px] sm:text-sm font-medium text-primary mb-1 shadow-sm shadow-primary/10 backdrop-blur-sm ring-1 ring-primary/20 self-start">
+              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-primary/20 rounded-full px-3 py-1.5 sm:px-4 text-[10px] sm:text-sm font-medium text-primary mb-1 shadow-sm shadow-primary/10 backdrop-blur-sm ring-1 ring-primary/20 self-start">
                 <Rocket className="w-3 h-3 sm:w-4 sm:h-4 animate-pulse" />
                 <span>الإصدار الجديد 2.0 متاح الآن!</span>
               </div>
 
               <h1 className="text-2xl xs:text-3xl sm:text-5xl lg:text-7xl font-extrabold tracking-tight text-white drop-shadow-sm flex flex-col gap-2 sm:gap-4 items-start leading-tight w-full max-w-full break-words">
                 <span>اصنع فيديوهاتك بـ</span>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-orange-400 relative px-1 leading-relaxed pb-1 self-start inline-block">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-400 relative px-1 leading-relaxed pb-1 self-start inline-block">
                   ذكاء وقوة لا مثيل لها
                   {/* Underline decoration */}
                   <svg className="absolute w-full h-2 sm:h-3 -bottom-1 right-0 text-primary opacity-50" viewBox="0 0 200 9" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2.00025 6.99997C25.7509 2.49997 73.2509 1.49997 121.75 3.99997C153.383 5.63066 183.5 7.99997 198 7.99997" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>
@@ -185,7 +185,7 @@ export default function LandingPageClient() {
 
             {/* Card 2: Advanced Audio */}
             <div className="bg-card border border-border/50 p-8 rounded-2xl hover:bg-muted/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl group relative overflow-hidden">
-              <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center text-white mb-6 shadow-lg shadow-orange-500/20 ring-1 ring-white/10">
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-xl flex items-center justify-center text-white mb-6 shadow-lg shadow-blue-500/20 ring-1 ring-white/10">
                 <Music className="w-7 h-7" />
               </div>
               <h3 className="text-xl font-bold mb-3 text-foreground">هندسة صوتية ذكية</h3>
@@ -193,8 +193,8 @@ export default function LandingPageClient() {
                 لا مزيد من تداخل الأصوات. نظام ذكي يفصل صوت التعليق عن الموسيقى الخلفية مع عرض الموجات الصوتية (Waveforms) للمزامنة الدقيقة.
               </p>
               <div className="flex flex-wrap gap-2">
-                <span className="text-xs bg-orange-500/10 text-orange-500 px-2 py-1 rounded-md font-medium">Music Track</span>
-                <span className="text-xs bg-orange-500/10 text-orange-500 px-2 py-1 rounded-md font-medium">Auto-Duration</span>
+                <span className="text-xs bg-blue-500/10 text-blue-500 px-2 py-1 rounded-md font-medium">Music Track</span>
+                <span className="text-xs bg-blue-500/10 text-blue-500 px-2 py-1 rounded-md font-medium">Auto-Duration</span>
               </div>
             </div>
 
@@ -203,7 +203,7 @@ export default function LandingPageClient() {
               <div className="absolute top-4 left-4 bg-green-500/10 text-green-500 text-[10px] font-bold px-2 py-1 rounded-full border border-green-500/20 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Live
               </div>
-              <div className="w-14 h-14 bg-gradient-to-br from-rose-500 to-pink-500 rounded-xl flex items-center justify-center text-white mb-6 shadow-lg shadow-rose-500/20 ring-1 ring-white/10">
+              <div className="w-14 h-14 bg-gradient-to-br from-violet-600 to-purple-500 rounded-xl flex items-center justify-center text-white mb-6 shadow-lg shadow-violet-500/20 ring-1 ring-white/10">
                 <Download className="w-7 h-7" />
               </div>
               <h3 className="text-xl font-bold mb-3 text-foreground">تصدير بجودة سينمائية</h3>
@@ -211,8 +211,8 @@ export default function LandingPageClient() {
                 صدر فيديوهاتك بجودة تصل إلى 1080p و 60 إطار في الثانية (FPS). تحكم كامل في حجم الملف والجودة قبل التصدير.
               </p>
               <div className="flex flex-wrap gap-2">
-                <span className="text-xs bg-rose-500/10 text-rose-500 px-2 py-1 rounded-md font-medium">1080p FHD</span>
-                <span className="text-xs bg-rose-500/10 text-rose-500 px-2 py-1 rounded-md font-medium">60 FPS</span>
+                <span className="text-xs bg-violet-500/10 text-violet-500 px-2 py-1 rounded-md font-medium">1080p FHD</span>
+                <span className="text-xs bg-violet-500/10 text-violet-500 px-2 py-1 rounded-md font-medium">60 FPS</span>
               </div>
             </div>
 

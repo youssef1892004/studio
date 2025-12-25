@@ -106,7 +106,7 @@ const TimeRuler = ({ duration, zoomLevel, currentTime, onSeek }: { duration: num
             {ticks}
             {/* Playhead Head */}
             <div
-                className="absolute top-0 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-[#F48969] z-20 transform -translate-x-1/2 pointer-events-none"
+                className="absolute top-0 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-primary z-20 transform -translate-x-1/2 pointer-events-none"
                 style={{ left: `${currentTime * zoomLevel}px` }}
             />
         </div>
@@ -121,13 +121,13 @@ const TrackHeader = ({ track, onToggleMute, onToggleHide, onToggleLock }: { trac
                 <span className="text-xs text-gray-500 capitalize">{track.type}</span>
             </div>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={onToggleHide} className={`p-1 rounded hover:bg-white/10 ${track.isHidden ? 'text-[#F48969]' : 'text-gray-400'}`}>
+                <button onClick={onToggleHide} className={`p-1 rounded hover:bg-white/10 ${track.isHidden ? 'text-primary' : 'text-gray-400'}`}>
                     {track.isHidden ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
-                <button onClick={onToggleMute} className={`p-1 rounded hover:bg-white/10 ${track.isMuted ? 'text-[#F48969]' : 'text-gray-400'}`}>
+                <button onClick={onToggleMute} className={`p-1 rounded hover:bg-white/10 ${track.isMuted ? 'text-primary' : 'text-gray-400'}`}>
                     {track.isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
                 </button>
-                <button onClick={onToggleLock} className={`p-1 rounded hover:bg-white/10 ${track.isLocked ? 'text-[#F48969]' : 'text-gray-400'}`}>
+                <button onClick={onToggleLock} className={`p-1 rounded hover:bg-white/10 ${track.isLocked ? 'text-primary' : 'text-gray-400'}`}>
                     {track.isLocked ? <Lock size={14} /> : <Unlock size={14} />}
                 </button>
             </div>

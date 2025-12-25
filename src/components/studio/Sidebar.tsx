@@ -46,11 +46,11 @@ const StudioSidebar: React.FC<StudioSidebarProps> = ({
                             style: {
                                 background: '#1E1E1E',
                                 color: '#fff',
-                                border: '1px solid #F48969',
+                                border: '1px solid var(--primary)',
                                 padding: '16px',
                             },
                             iconTheme: {
-                                primary: '#F48969',
+                                primary: 'var(--primary)',
                                 secondary: '#FFFAEE',
                             },
                         });
@@ -68,8 +68,8 @@ const StudioSidebar: React.FC<StudioSidebarProps> = ({
               transition-all duration-300 ease-out
               hover:scale-105 active:scale-95
               ${isActive
-                                ? 'bg-studio-accent text-white shadow-[0_4px_20px_rgba(244,137,105,0.5)] scale-105 ring-2 ring-studio-accent/20'
-                                : 'text-gray-500 dark:text-gray-400 hover:bg-studio-panel-light dark:hover:bg-studio-panel hover:text-studio-accent hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]'
+                                ? 'bg-primary text-white shadow-[0_4px_20px_rgba(0,166,251,0.5)] scale-105 ring-2 ring-primary/20'
+                                : 'text-gray-500 dark:text-gray-400 hover:bg-secondary dark:hover:bg-secondary hover:text-primary hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]'
                             }
             `}
                         title={item.label}

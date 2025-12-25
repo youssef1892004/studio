@@ -142,6 +142,51 @@ export const getProjectsByUserId = async (userId: string, token: string): Promis
   return response.data?.Voice_Studio_projects || [];
 };
 
+export const getUserUsage = async (userId: string, token: string): Promise<{ charsUsed: number, projectsCount: number }> => {
+  const query = `
+    query GetUserUsage($userId: uuid!, $startDate: timestamptz!) {
+      Voice_Studio_projects_aggregate(where: {user_id: {_eq: $userId}}) {
+        aggregate {
+          count
+        }
+      }
+      usage_logs_aggregate: Voice_Studio_usage_logs_aggregate(where: {user_id: {_eq: $userId}, created_at: {_gte: $startDate}}) {
+        aggregate {
+          sum {
+            chars_used
+          }
+        }
+      }
+    }
+  `;
+
+  // Calculate start of current month
+  const date = new Date();
+  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).toISOString();
+
+  const response = await executeGraphQL<{
+    Voice_Studio_projects_aggregate: { aggregate: { count: number } },
+    usage_logs_aggregate: { aggregate: { sum: { chars_used: number } } }
+  }>({
+    query,
+    variables: { userId, startDate: firstDay },
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
+
+  if (response.errors) {
+    console.error("Failed to fetch usage:", JSON.stringify(response.errors, null, 2));
+    // Return default values if table/permissions not ready yet
+    return { charsUsed: 0, projectsCount: 0 };
+  }
+
+  return {
+    charsUsed: response.data?.usage_logs_aggregate?.aggregate?.sum?.chars_used || 0,
+    projectsCount: response.data?.Voice_Studio_projects_aggregate?.aggregate?.count || 0
+  };
+};
+
 export const INSERT_ASSET = `
   mutation InsertAsset($image_url: jsonb, $video_url: jsonb, $voice_url: jsonb, $project_id: uuid) {
     insert_Voice_Studio_Asset(objects: {image_url: $image_url, video_url: $video_url, voice_url: $voice_url, project_id: $project_id}) {

@@ -299,11 +299,11 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                                     {/* Handles for Active Layer */}
                                     {isActive && (
                                         <div className="absolute inset-0 pointer-events-none">
-                                            <div className="absolute inset-0 border-2 border-[#F48969]/70"></div>
+                                            <div className="absolute inset-0 border-2 border-primary/70"></div>
                                             {['nw', 'ne', 'sw', 'se'].map((pos) => (
                                                 <div
                                                     key={pos}
-                                                    className={`absolute w-4 h-4 bg-white border-2 border-[#F48969] rounded-full hover:scale-125 transition-transform pointer-events-auto shadow-sm z-20`}
+                                                    className={`absolute w-4 h-4 bg-white border-2 border-primary rounded-full hover:scale-125 transition-transform pointer-events-auto shadow-sm z-20`}
                                                     style={{
                                                         top: pos.includes('n') ? -8 : 'auto',
                                                         bottom: pos.includes('s') ? -8 : 'auto',
@@ -345,7 +345,7 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                             fontWeight: text.style?.fontWeight || 'normal',
                             zIndex: 100 + idx,
                             cursor: 'move',
-                            border: draggingId === text.id ? '1px dashed #F48969' : 'none',
+                            border: draggingId === text.id ? '1px dashed var(--primary)' : 'none',
                             padding: '4px',
                             userSelect: 'none'
                         }}
@@ -370,7 +370,7 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                             <input type="range" min="0" max="1" step="0.1"
                                 value={activeMedia?.volume ?? 1}
                                 onChange={e => onVolumeChange?.(parseFloat(e.target.value))}
-                                className="w-20 h-1 accent-[#F48969]"
+                                className="w-20 h-1 accent-primary"
                             />
                             <button onClick={toggleFullscreen}><Maximize className="w-4 h-4" /></button>
                         </div>

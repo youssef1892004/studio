@@ -428,7 +428,7 @@ const WaveformSegment: React.FC<WaveformSegmentProps> = ({
       {!isLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-[2px]">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-4 border-[#F48969]/30 border-t-[#F48969] rounded-full animate-spin"></div>
+            <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
             {/* Optional: Text removed for cleaner look or styled to match */}
             {/* <span className="text-xs text-white/80 font-medium tracking-wide">جارٍ التحميل...</span> */}
           </div>

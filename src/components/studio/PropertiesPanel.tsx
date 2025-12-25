@@ -39,7 +39,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, current
             {/* Header */}
             <div className="h-12 border-b border-[#333] flex items-center px-4 justify-between">
                 <h3 className="text-white font-medium text-sm">تعديل (Properties)</h3>
-                <span className="text-xs text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded capitalize">{selectedItem.type}</span>
+                <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded capitalize">{selectedItem.type}</span>
             </div>
 
             <div className="p-4 flex flex-col gap-6">
@@ -61,7 +61,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, current
                             step="0.05"
                             value={selectedItem.volume ?? 1}
                             onChange={(e) => onUpdateVolume(parseFloat(e.target.value))}
-                            className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-[#F48969]"
+                            className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary"
                         />
                     </div>
                 )}
@@ -75,7 +75,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, current
                             <textarea
                                 value={selectedItem.content || ''}
                                 onChange={(e) => onUpdateText(e.target.value, selectedItem.textStyle)}
-                                className="w-full bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg p-2 text-sm text-gray-200 focus:outline-none focus:border-[#F48969]"
+                                className="w-full bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg p-2 text-sm text-gray-200 focus:outline-none focus:border-primary"
                                 rows={3}
                             />
                         </div>
@@ -92,7 +92,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, current
                                 max="120"
                                 value={selectedItem.textStyle?.fontSize || 24}
                                 onChange={(e) => onUpdateText(selectedItem.content!, { ...selectedItem.textStyle, fontSize: parseInt(e.target.value) })}
-                                className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-[#F48969]"
+                                className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary"
                             />
                         </div>
 
@@ -115,7 +115,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, current
                                     max="100"
                                     value={selectedItem.textStyle?.xPosition !== undefined ? selectedItem.textStyle.xPosition : 50}
                                     onChange={(e) => onUpdateText(selectedItem.content!, { ...selectedItem.textStyle, xPosition: parseInt(e.target.value) })}
-                                    className="w-full h-8 bg-transparent cursor-pointer accent-[#F48969]"
+                                    className="w-full h-8 bg-transparent cursor-pointer accent-primary"
                                 />
                             </div>
                             <div className="flex flex-col gap-1">
@@ -126,7 +126,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, current
                                     max="100"
                                     value={selectedItem.textStyle?.yPosition || 50}
                                     onChange={(e) => onUpdateText(selectedItem.content!, { ...selectedItem.textStyle, yPosition: parseInt(e.target.value) })}
-                                    className="w-full h-8 bg-transparent cursor-pointer accent-[#F48969]"
+                                    className="w-full h-8 bg-transparent cursor-pointer accent-primary"
                                 />
                             </div>
                         </div>
@@ -162,7 +162,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, current
                                 step="0.1"
                                 value={selectedItem.transform?.scale || 1}
                                 onChange={(e) => onUpdateTransform({ ...(selectedItem.transform || { x: 0, y: 0, rotation: 0 }), scale: parseFloat(e.target.value) })}
-                                className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-[#F48969]"
+                                className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary"
                             />
                         </div>
 
@@ -180,7 +180,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, current
                                     step="0.01"
                                     value={selectedItem.opacity ?? 1}
                                     onChange={(e) => onUpdateOpacity(parseFloat(e.target.value))}
-                                    className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-[#F48969]"
+                                    className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary"
                                 />
                             </div>
                         )}
@@ -192,7 +192,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, current
                                     <span>Visibility</span>
                                     <button
                                         onClick={() => onUpdateVisibility(!(selectedItem.visible ?? true))}
-                                        className={`p-1 rounded ${selectedItem.visible !== false ? 'text-studio-accent bg-studio-accent/10' : 'text-gray-500 hover:text-white'}`}
+                                        className={`p-1 rounded ${selectedItem.visible !== false ? 'text-primary bg-primary/10' : 'text-gray-500 hover:text-white'}`}
                                     >
                                         {selectedItem.visible !== false ? <Eye size={16} /> : <EyeOff size={16} />}
                                     </button>
@@ -216,7 +216,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, current
                                 key={rate}
                                 onClick={() => onUpdateSpeed(rate)}
                                 className={`flex-1 text-xs py-1.5 rounded transition-all ${currentGlobalSpeed === rate
-                                    ? 'bg-[#F48969] text-white font-medium shadow-sm'
+                                    ? 'bg-primary text-primary-foreground font-medium shadow-sm'
                                     : 'text-gray-400 hover:text-white hover:bg-white/5'
                                     }`}
                             >
@@ -231,7 +231,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, current
                 {/* Actions */}
                 <button
                     onClick={onDelete}
-                    className="w-full py-2 flex items-center justify-center gap-2 text-red-400 border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 rounded-lg transition-colors text-sm"
+                    className="w-full py-2 flex items-center justify-center gap-2 text-destructive border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 rounded-lg transition-colors text-sm"
                 >
                     <Trash2 size={14} />
                     <span>حذف العنصر (Delete)</span>

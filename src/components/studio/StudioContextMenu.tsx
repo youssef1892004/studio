@@ -82,7 +82,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, visible, type, onClose,
                         step="0.05"
                         value={currentVolume}
                         onChange={(e) => onAction('volume', parseFloat(e.target.value))}
-                        className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-[#F48969]"
+                        className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary"
                         onClick={(e) => e.stopPropagation()}
                     />
                 </div>
