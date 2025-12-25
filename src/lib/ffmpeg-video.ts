@@ -153,14 +153,19 @@ export async function renderTimelineToVideo(
             // Let's assume we handle it in filter.
 
             const isVideo = fname.endsWith('mp4');
+            const rate = item.playbackRate || 1;
             let chain = `[${inputIdx}:v]`;
 
             if (isVideo) {
-                chain += `trim=start=${relStart.toFixed(3)}:duration=${relDuration.toFixed(3)},setpts=PTS-STARTPTS`;
+                // Calculate source start and duration based on rate
+                const sourceRelStart = ((start - item.start) * rate) + (item.mediaStartOffset || 0);
+                const sourceDuration = duration * rate;
+
+                // Apply trim and speed change
+                chain += `trim=start=${sourceRelStart.toFixed(3)}:duration=${sourceDuration.toFixed(3)},setpts=(PTS-STARTPTS)/${rate}`;
             } else {
-                // Image: loop it to fill duration
-                // Using loop filter is explicit
-                chain += `loop=loop=-1:size=1:start=0,trim=duration=${relDuration.toFixed(3)},setpts=PTS-STARTPTS`;
+                // Image: loop it to fill duration (rate doesn't apply to static image)
+                chain += `loop=loop=-1:size=1:start=0,trim=duration=${duration.toFixed(3)},setpts=PTS-STARTPTS`;
             }
 
             // 2. Scale & Transform
@@ -250,7 +255,14 @@ export async function renderTimelineToVideo(
     onProgress?.(80);
 
     // 4. Audio Mixing (Keep existing logic)
-    const audioSources: { filename: string, start: number, volume?: number }[] = [];
+    const audioSources: {
+        filename: string,
+        start: number,
+        volume?: number,
+        playbackRate?: number,
+        mediaStartOffset?: number,
+        duration?: number
+    }[] = [];
 
     // Extract audio from video items if needed (re-use download logic?)
     // Or extract from original assets?
@@ -264,10 +276,27 @@ export async function renderTimelineToVideo(
             if (fname) {
                 const audName = `aud_${item.id}.wav`;
                 try {
+                    const rate = item.playbackRate || 1;
                     const offset = (item.mediaStartOffset || 0).toFixed(3);
-                    const duration = item.duration.toFixed(3);
-                    await ffmpeg.exec(['-ss', offset, '-i', fname, '-t', duration, '-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2', audName]);
-                    audioSources.push({ filename: audName, start: item.start, volume: item.volume });
+                    // We need source duration = timeline duration * rate
+                    const sourceDurationVal = item.duration * rate;
+                    const durationStr = sourceDurationVal.toFixed(3);
+
+                    await ffmpeg.exec(['-ss', offset, '-i', fname, '-t', durationStr, '-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2', audName]);
+
+                    // We extracted exactly what we need, so for mixing we just need to apply speed.
+                    // mediaStartOffset is handled by extraction (-ss).
+                    // duration is handled by extraction (-t).
+                    // So in mixing: playbackRate needed. offset=0. sourceDuration already cut?
+                    // Actually if we cut it exactly, applying atempo will result in correct timeline duration.
+                    audioSources.push({
+                        filename: audName,
+                        start: item.start,
+                        volume: item.volume,
+                        playbackRate: rate,
+                        duration: item.duration, // Timeline duration
+                        mediaStartOffset: 0 // Already cut
+                    });
                 } catch (e) { }
             }
         }
@@ -285,7 +314,14 @@ export async function renderTimelineToVideo(
         const res = await fetch(url);
         const blob = await res.blob();
         await ffmpeg.writeFile(audName, await fetchFile(blob));
-        audioSources.push({ filename: audName, start: item.start, volume: item.volume });
+        audioSources.push({
+            filename: audName,
+            start: item.start,
+            volume: item.volume,
+            playbackRate: item.playbackRate || 1,
+            mediaStartOffset: item.mediaStartOffset || 0,
+            duration: item.duration
+        });
     }
 
     let mixedFileName = 'mixed_out.mp4';
@@ -299,7 +335,34 @@ export async function renderTimelineToVideo(
             const streamIdx = idx + 1;
             const delay = Math.round(src.start * 1000);
             const vol = src.volume ?? 1;
-            filter += `[${streamIdx}:a]volume=${vol},adelay=${delay}|${delay}[a${idx}];`;
+            const rate = src.playbackRate || 1;
+            const offset = src.mediaStartOffset || 0;
+            // Calculate source duration needed
+            const sourceDur = (src.duration || 0) * rate;
+
+            // Audio Filter Chain: atrim -> atempo -> volume -> adelay
+            let af = `[${streamIdx}:a]`;
+
+            // 1. Trim (if needed)
+            if (offset > 0 || sourceDur > 0) {
+                // Note: atrim uses time seconds. 
+                // If item is the whole file, duration check might be needed?
+                // But safer to always trim to be precise.
+                af += `atrim=start=${offset}:duration=${sourceDur},`;
+                // Reset PTS after trim so valid atempo calculation
+                af += `asetpts=PTS-STARTPTS,`;
+            }
+
+            // 2. Speed (atempo)
+            if (Math.abs(rate - 1) > 0.01) {
+                // Handle rate outside 0.5-2.0 if needed, but for now user has [0.5, 2]
+                af += `atempo=${rate},`;
+            }
+
+            // 3. Volume & Delay
+            af += `volume=${vol},adelay=${delay}|${delay}[a${idx}];`;
+
+            filter += af;
         });
 
         audioSources.forEach((_, i) => filter += `[a${i}]`);

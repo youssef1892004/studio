@@ -90,9 +90,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     localStorage.setItem('user', JSON.stringify(userData));
 
-    // Manual Cookie Fallback: Ensure cookie is set client-side to bypass any server-header rejection issues
-    // This allows middleware to see the token immediately upon redirect
-    document.cookie = `token=${userToken}; path=/; max-age=604800; SameSite=Lax; Secure`;
+    // --- Robust Cookie Setting ---
+
+    // 1. Force clear any existing cookies to avoid conflicts/stale data
+    const cookieDomains = [window.location.hostname, `.${window.location.hostname}`, ''];
+    const cookiePaths = ['/', '/api', '/studio']; // Add other potential paths if needed
+
+    cookieDomains.forEach(domain => {
+      cookiePaths.forEach(path => {
+        // Attempt to clear with and without domain/secure flags
+        document.cookie = `token=; path=${path}; ${domain ? `domain=${domain};` : ''} expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+        document.cookie = `token=; path=${path}; ${domain ? `domain=${domain};` : ''} Secure; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+      });
+    });
+
+    // 2. Set new cookie
+    const isSecure = window.location.protocol === 'https:';
+    const newCookie = `token=${userToken}; path=/; max-age=604800; SameSite=Lax${isSecure ? '; Secure' : ''}`;
+    document.cookie = newCookie;
+
+    // 3. Verify cookie was set
+    const verifyToken = getCookie('token');
+    if (verifyToken !== userToken) {
+      console.error("CRITICAL: Failed to set auth cookie client-side!");
+      console.error("Attempted to set:", newCookie);
+      console.error("Read back:", verifyToken);
+      // Optional: Force reload or show user alert if needed
+    } else {
+      console.log("Auth cookie set successfully.");
+    }
 
     setUser(userData);
     setToken(userToken);

@@ -291,7 +291,7 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                                         item={layer}
                                         currentTime={currentTime}
                                         isPlaying={isPlaying}
-                                        playbackRate={playbackRate}
+                                        playbackRate={layer.playbackRate || playbackRate}
                                         onMouseDown={(e) => isActive && handleLayerMouseDown(e, layer)}
                                         isActive={!!isActive}
                                     />

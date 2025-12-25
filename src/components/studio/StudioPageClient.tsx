@@ -343,21 +343,7 @@ export default function StudioPageClient() {
     }, [activeVideoId, activeCardId, videoTrackItems, cards]);
 
 
-    const handleUpdateItemSpeed = (rate: number) => {
-        if (activeVideoId) {
-            setVideoTrackItems(prev => {
-                const next = prev.map(item => item.id === activeVideoId ? { ...item, playbackRate: rate } : item);
-                recordHistory(cards, next);
-                return next;
-            });
-        } else if (activeCardId) {
-            setCards(prev => {
-                const next = prev.map(c => c.id === activeCardId ? { ...c, playbackRate: rate } : c);
-                recordHistory(next, videoTrackItems);
-                return next;
-            });
-        }
-    };
+
 
     const handleUpdateVolume = (vol: number) => {
         if (activeVideoId) {
@@ -1598,6 +1584,28 @@ export default function StudioPageClient() {
             .filter(item => item.type === 'text' && currentTime >= item.start && currentTime < (item.start + item.duration))
             .map(item => ({ id: item.id, content: item.content, style: item.textStyle }));
     }, [videoTrackItems, currentTime]);
+
+    const handleUpdateItemSpeed = useCallback((newSpeed: number) => {
+        const targetId = activeVideoId || activeMedia?.id;
+        if (!targetId) return;
+
+        setVideoTrackItems(prev => prev.map(item => {
+            if (item.id === targetId) {
+                // Ensure we have sourceDuration (original duration at 1x)
+                const sourceDuration = item.sourceDuration || item.duration;
+                // Calculate new duration: duration = source / speed
+                const newDuration = sourceDuration / newSpeed;
+
+                return {
+                    ...item,
+                    playbackRate: newSpeed,
+                    sourceDuration: sourceDuration,
+                    duration: newDuration
+                };
+            }
+            return item;
+        }));
+    }, [activeVideoId, activeMedia]);
 
 
 

@@ -166,236 +166,187 @@ export default function ProjectsClient() {
     }
 
     return (
-        <div className="min-h-screen bg-background text-foreground transition-colors duration-300 pt-24">
-            {/* Header Section */}
-            <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border transition-all duration-300">
-                <div className="container mx-auto px-6 py-6">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                        <div>
-                            <div className="flex items-center gap-3 mb-1">
-                                <h1 className="text-3xl font-black tracking-tight" style={{ fontFamily: 'inherit' }}>
-                                    مشاريعي
-                                </h1>
-                                <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold">
-                                    {projects.length} مشاريع
-                                </span>
-                            </div>
-                            <p className="text-muted-foreground text-sm">أدر جميع مشاريعك الصوتية والمرئية في مكان واحد.</p>
-                        </div>
+        <div className="min-h-screen bg-background text-foreground pt-16 flex">
+            {/* Sidebar (Tablet/Desktop) */}
+            <aside className="w-64 border-l border-border bg-card/30 hidden md:flex flex-col sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto">
+                <div className="p-6">
+                    <button
+                        onClick={openCreateModal}
+                        className="w-full py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95"
+                    >
+                        <Plus className="w-5 h-5" />
+                        <span>مشروع جديد</span>
+                    </button>
+                </div>
 
-                        <div className="flex items-center gap-4 w-full md:w-auto">
-                            {/* Search */}
-                            <div className="relative flex-1 md:w-64 group">
-                                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                                <input
-                                    type="text"
-                                    placeholder="بحث عن مشروع..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full bg-muted/50 border border-border rounded-xl py-2.5 pr-10 pl-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
-                                />
-                            </div>
+                <nav className="flex-1 px-4 space-y-1">
+                    <SidebarItem icon={LayoutGrid} label="الرئيسية" active />
+                    <SidebarItem icon={Folder} label="مشاريعي" />
+                    <SidebarItem icon={Sparkles} label="أدوات الذكاء الاصطناعي" />
+                    <div className="pt-4 pb-2">
+                        <p className="px-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">الأدوات</p>
+                    </div>
+                    <SidebarItem icon={Mic} label="تحويل النص لكلام" />
+                    <SidebarItem icon={Video} label="محرر الفيديو" />
+                    <SidebarItem icon={ImageIcon} label="توليد الصور" badge="قريباً" />
+                </nav>
 
-                            {/* Actions */}
-                            <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-lg border border-border">
-                                <button
-                                    onClick={() => setViewMode('grid')}
-                                    className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-background shadow text-primary' : 'text-muted-foreground hover:bg-background/50'}`}
-                                >
-                                    <LayoutGrid className="w-4 h-4" />
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('list')}
-                                    className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-background shadow text-primary' : 'text-muted-foreground hover:bg-background/50'}`}
-                                >
-                                    <List className="w-4 h-4" />
-                                </button>
-                            </div>
-
-                            <button
-                                onClick={openCreateModal}
-                                className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl transition-all shadow-lg shadow-primary/20 hover:scale-105 active:scale-95"
-                            >
-                                <Plus className="w-5 h-5" />
-                                <span>جديد</span>
-                            </button>
-                        </div>
+                <div className="p-4 mt-auto">
+                    <div className="bg-gradient-to-br from-primary/10 to-purple-500/10 rounded-xl p-4 border border-primary/20">
+                        <h4 className="font-bold text-sm mb-1">Muejam Pro</h4>
+                        <p className="text-xs text-muted-foreground mb-3">احصل على المزيد من الأصوات والميزات.</p>
+                        <button className="text-xs font-bold text-primary hover:underline">ترقية الخطة &larr;</button>
                     </div>
                 </div>
-            </div>
+            </aside>
 
-            <main className="container mx-auto px-6 py-12">
-                {/* Floating FAB for Mobile */}
-                <button
-                    onClick={openCreateModal}
-                    className="md:hidden fixed bottom-6 left-6 z-50 w-14 h-14 bg-primary text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-90 transition-all"
-                >
-                    <Plus className="w-7 h-7" />
-                </button>
+            {/* Main Content Area */}
+            <main className="flex-1 min-w-0">
+                <div className="container mx-auto px-4 sm:px-6 py-8 max-w-7xl">
 
-                {filteredProjects.length > 0 ? (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className={viewMode === 'grid'
-                            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-                            : "flex flex-col gap-4"
-                        }
-                    >
-                        <AnimatePresence>
-                            {filteredProjects.map((project, index) => (
-                                <motion.div
-                                    key={project.id}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.95 }}
-                                    transition={{ delay: index * 0.05 }}
-                                >
-                                    <Link
-                                        href={`/studio/${project.id}`}
-                                        className={`group relative flex bg-card border border-border/40 rounded-3xl overflow-hidden hover:shadow-2xl hover:shadow-primary/20 transition-all duration-500
-                                            ${viewMode === 'grid'
-                                                ? 'flex-col h-full hover:-translate-y-2'
-                                                : 'flex-row h-auto items-stretch hover:translate-x-[-4px]'
-                                            }`}
-                                    >
-                                        {/* Visual Header */}
-                                        <div className={`relative overflow-hidden shrink-0 bg-gradient-to-br from-primary via-orange-500 to-rose-600
-                                            ${viewMode === 'grid' ? 'h-48 w-full' : 'w-32 sm:w-48 h-auto'}`}
-                                        >
-                                            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
-                                            {/* decorative circle */}
-                                            {viewMode === 'grid' && (
-                                                <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700"></div>
-                                            )}
+                    {/* Hero Banner with Modern Gradient */}
+                    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-600 via-purple-600 to-primary p-8 sm:p-12 mb-10 text-white shadow-2xl">
+                        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                        <div className="absolute bottom-0 left-0 w-48 h-48 bg-black/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
 
-                                            {/* Centered Icon - Always Visible but positioned differently */}
-                                            <div className={`absolute flex items-center justify-center text-white
-                                                ${viewMode === 'grid' ? 'top-4 left-4' : 'inset-0'}`}
-                                            >
-                                                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-lg">
-                                                    <Folder className="w-6 h-6" />
-                                                </div>
-                                            </div>
-
-                                            {/* Date - Show in corner for Grid */}
-                                            {viewMode === 'grid' && (
-                                                <div className="absolute bottom-4 right-4 text-white z-10 w-full px-4">
-                                                    <span className="text-xs font-bold text-white/90 bg-black/20 px-3 py-1.5 rounded-full backdrop-blur-md border border-white/10 shadow-sm flex items-center gap-1.5 w-fit ml-auto">
-                                                        <Clock className="w-3 h-3" />
-                                                        {new Date(project.crated_at).toLocaleDateString('ar-EG')}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Content Body */}
-                                        <div className={`flex-1 p-5 flex relative bg-card
-                                            ${viewMode === 'grid' ? 'flex-col justify-between' : 'flex-row items-center justify-between gap-6'}`}
-                                        >
-                                            {/* Text Area */}
-                                            <div className="space-y-2 flex-1 min-w-0">
-                                                <div className="flex items-center gap-3">
-                                                    <h2 className="text-xl sm:text-2xl font-bold text-foreground leading-tight group-hover:text-primary transition-colors truncate">
-                                                        {project.name || "مشروع بدون عنوان"}
-                                                    </h2>
-                                                    {viewMode === 'list' && (
-                                                        <span className="text-[10px] sm:text-xs text-muted-foreground bg-secondary/50 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
-                                                            <Clock className="w-3 h-3" />
-                                                            {new Date(project.crated_at).toLocaleDateString('ar-EG')}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <p className="text-sm sm:text-base text-muted-foreground/80 leading-relaxed font-medium line-clamp-2">
-                                                    {project.description || "لا يوجد وصف إضافي للمشروع..."}
-                                                </p>
-                                            </div>
-
-                                            {/* Actions Area */}
-                                            <div className={`flex items-center gap-3
-                                                ${viewMode === 'grid' ? 'justify-between pt-6 mt-2 border-t border-border/50 w-full' : 'shrink-0'}`}
-                                            >
-                                                {viewMode === 'grid' && (
-                                                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 border-2 border-card flex items-center justify-center text-[10px] text-white font-bold shadow-sm">ME</div>
-                                                )}
-
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={(e) => handleEditClick(project, e)}
-                                                        className="w-9 h-9 flex items-center justify-center bg-secondary/50 hover:bg-primary hover:text-white text-muted-foreground rounded-full transition-all duration-300 shadow-sm hover:shadow-lg hover:scale-110"
-                                                        title="تعديل"
-                                                    >
-                                                        <Edit className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => handleDeleteClick(project, e)}
-                                                        className="w-9 h-9 flex items-center justify-center bg-secondary/50 hover:bg-red-500 hover:text-white text-muted-foreground rounded-full transition-all duration-300 shadow-sm hover:shadow-lg hover:scale-110"
-                                                        title="حذف"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </Link>
-                                </motion.div>
-                            ))}
-                        </AnimatePresence>
-                    </motion.div>
-                ) : (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="flex flex-col items-center justify-center py-24 text-center"
-                    >
-                        <div className="w-32 h-32 bg-gradient-to-tr from-primary/20 to-orange-500/20 rounded-full flex items-center justify-center mb-8 relative">
-                            <div className="absolute inset-0 rounded-full border-2 border-primary/20 border-dashed animate-spin-slow" />
-                            <Folder className="w-14 h-14 text-primary" />
+                        <div className="relative z-10 max-w-2xl">
+                            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 leading-tight">
+                                اصنع محتواك <br />
+                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-orange-200">بالذكاء الاصطناعي</span>
+                            </h1>
+                            <p className="text-white/90 text-lg mb-8 max-w-lg leading-relaxed">
+                                استوديو متكامل يجمع بين قوة الصوت والفيديو. حول نصوصك إلى قصص مرئية مذهلة في ثوانٍ.
+                            </p>
+                            <div className="flex flex-wrap gap-4">
+                                <button onClick={openCreateModal} className="px-6 py-3 bg-white text-primary font-bold rounded-xl shadow-lg hover:bg-gray-50 transition-colors flex items-center gap-2">
+                                    <Video className="w-5 h-5" />
+                                    <span>إنشاء فيديو</span>
+                                </button>
+                                <button className="px-6 py-3 bg-white/20 backdrop-blur-md text-white font-bold rounded-xl border border-white/30 hover:bg-white/30 transition-colors flex items-center gap-2">
+                                    <Mic className="w-5 h-5" />
+                                    <span>استنساخ صوت</span>
+                                </button>
+                            </div>
                         </div>
-                        <h3 className="text-3xl font-bold text-foreground mb-3">لا توجد مشاريع حتى الآن</h3>
-                        <p className="text-muted-foreground max-w-md mx-auto mb-8 text-lg">
-                            مساحة عملك فارغة. ابدأ رحلتك الإبداعية الآن بإنشاء أول مشروع لك.
-                        </p>
-                        <button
-                            onClick={openCreateModal}
-                            className="btn btn-primary px-8 py-4 text-lg rounded-full shadow-xl shadow-primary/30 flex items-center gap-3 hover:scale-105 transition-transform"
-                        >
-                            <Plus className="w-6 h-6" />
-                            <span>إنشاء مشروع جديد</span>
-                        </button>
-                    </motion.div>
-                )}
-
-                {/* Upcoming Features Teaser */}
-                <div className="mt-32">
-                    <div className="flex items-center gap-4 mb-8">
-                        <div className="h-px flex-1 bg-border" />
-                        <span className="text-sm font-bold text-muted-foreground uppercase tracking-wider px-4 border border-border rounded-full py-1">قريباً في MuejamStudio</span>
-                        <div className="h-px flex-1 bg-border" />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {upcomingFeatures.map((feature, index) => (
-                            <div
-                                key={index}
-                                className="group relative p-6 bg-card hover:bg-muted/30 border border-border rounded-2xl transition-all duration-300 hover:border-primary/30"
-                            >
-                                <div className={`w-12 h-12 ${feature.bg} ${feature.color} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                                    <feature.icon className="w-6 h-6" />
+                    {/* Quick Tools Grid (Magic Tools) */}
+                    <div className="mb-12">
+                        <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+                            <Sparkles className="w-5 h-5 text-amber-500" />
+                            <span>أدوات سحرية</span>
+                        </h2>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <QuickToolCard
+                                icon={Video}
+                                title="محرر الفيديو"
+                                desc="مونتاج احترافي"
+                                color="bg-blue-500"
+                                onClick={openCreateModal}
+                            />
+                            <QuickToolCard
+                                icon={Mic}
+                                title="النص إلى كلام"
+                                desc="أصوات عربية واضحة"
+                                color="bg-orange-500"
+                                onClick={() => { }}
+                            />
+                            <QuickToolCard
+                                icon={Users}
+                                title="استنساخ الصوت"
+                                desc="بصمة صوتية خاصة"
+                                color="bg-purple-500"
+                                onClick={() => { }}
+                            />
+                            <QuickToolCard
+                                icon={ImageIcon}
+                                title="توليد الصور"
+                                desc="قريباً"
+                                color="bg-rose-500"
+                                isComingSoon
+                                onClick={() => { }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Recent Projects Section */}
+                    <div>
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-xl font-bold flex items-center gap-2">
+                                <Clock className="w-5 h-5 text-primary" />
+                                <span>المشاريع الأخيرة</span>
+                            </h2>
+                            <div className="flex items-center gap-2">
+                                {/* Search - Smaller version */}
+                                <div className="relative group hidden sm:block">
+                                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                                    <input
+                                        type="text"
+                                        placeholder="بحث..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-48 bg-muted/50 border border-border rounded-lg py-2 pr-9 pl-4 text-sm focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-all"
+                                    />
                                 </div>
-                                <h3 className="text-base font-bold text-foreground mb-2">
-                                    {feature.title}
-                                </h3>
-                                <p className="text-xs text-muted-foreground leading-relaxed">
-                                    {feature.description}
-                                </p>
+                                <div className="flex bg-muted p-1 rounded-lg">
+                                    <button
+                                        onClick={() => setViewMode('grid')}
+                                        className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-background shadow text-primary' : 'text-muted-foreground'}`}
+                                    >
+                                        <LayoutGrid className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode('list')}
+                                        className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-background shadow text-primary' : 'text-muted-foreground'}`}
+                                    >
+                                        <List className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
-                        ))}
+                        </div>
+
+                        {filteredProjects.length > 0 ? (
+                            <motion.div
+                                layout
+                                className={viewMode === 'grid'
+                                    ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+                                    : "flex flex-col gap-3"
+                                }
+                            >
+                                <AnimatePresence>
+                                    {filteredProjects.map((project, index) => (
+                                        <ProjectCard
+                                            key={project.id}
+                                            project={project}
+                                            viewMode={viewMode}
+                                            onEdit={(e) => handleEditClick(project, e)}
+                                            onDelete={(e) => handleDeleteClick(project, e)}
+                                            index={index}
+                                        />
+                                    ))}
+                                </AnimatePresence>
+                            </motion.div>
+                        ) : (
+                            <div className="text-center py-20 bg-muted/20 rounded-3xl border border-dashed border-border">
+                                <Folder className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+                                <h3 className="text-lg font-bold text-muted-foreground mb-2">لا توجد مشاريع</h3>
+                                <button onClick={openCreateModal} className="text-primary font-bold hover:underline">ابدأ مشروعك الأول</button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </main>
 
-            {/* Create/Edit Modal */}
+            {/* Mobile FAB */}
+            <button
+                onClick={openCreateModal}
+                className="md:hidden fixed bottom-6 left-6 z-50 w-14 h-14 bg-primary text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-90 transition-all"
+            >
+                <Plus className="w-7 h-7" />
+            </button>
+
+            {/* Modals (Create/Edit/Delete) - Preserved Logic */}
             <AnimatePresence>
                 {showCreateOrEditModal && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -467,7 +418,6 @@ export default function ProjectsClient() {
                 )}
             </AnimatePresence>
 
-            {/* Delete Confirmation Modal */}
             <AnimatePresence>
                 {projectToDelete && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -514,4 +464,106 @@ export default function ProjectsClient() {
             </AnimatePresence>
         </div>
     );
+}
+
+// --- Helper Components ---
+
+function SidebarItem({ icon: Icon, label, active, badge }: { icon: any, label: string, active?: boolean, badge?: string }) {
+    return (
+        <button className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group
+            ${active
+                ? 'bg-primary/10 text-primary font-bold'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`
+        }>
+            <div className="flex items-center gap-3">
+                <Icon className={`w-5 h-5 ${active ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`} />
+                <span>{label}</span>
+            </div>
+            {badge && (
+                <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold">
+                    {badge}
+                </span>
+            )}
+        </button>
+    )
+}
+
+function QuickToolCard({ icon: Icon, title, desc, color, onClick, isComingSoon }: any) {
+    return (
+        <div
+            onClick={!isComingSoon ? onClick : undefined}
+            className={`relative p-5 bg-card border border-border/50 rounded-2xl hover:shadow-xl hover:border-primary/30 transition-all duration-300 group cursor-pointer ${isComingSoon ? 'opacity-70 grayscale' : ''}`}
+        >
+            <div className={`w-12 h-12 ${color} bg-opacity-20 rounded-xl flex items-center justify-center mb-4 text-white relative overflow-hidden`}>
+                <div className={`absolute inset-0 ${color} opacity-20`}></div>
+                <Icon className={`w-6 h-6 relative z-10 ${color.replace('bg-', 'text-')}`} />
+            </div>
+            <h3 className="font-bold text-lg mb-1">{title}</h3>
+            <p className="text-sm text-muted-foreground">{desc}</p>
+            {isComingSoon && <span className="absolute top-3 right-3 text-[10px] font-bold bg-muted text-muted-foreground px-2 py-0.5 rounded-full">قريباً</span>}
+        </div>
+    )
+}
+
+function ProjectCard({ project, viewMode, onEdit, onDelete, index }: any) {
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ delay: index * 0.05 }}
+        >
+            <Link
+                href={`/studio/${project.id}`}
+                className={`group relative flex bg-card border border-border/40 rounded-2xl overflow-hidden hover:shadow-2xl hover:shadow-primary/10 transition-all duration-300
+                    ${viewMode === 'grid'
+                        ? 'flex-col h-full hover:-translate-y-1'
+                        : 'flex-row h-auto items-center hover:translate-x-[-2px]'
+                    }`}
+            >
+                {/* Visual Header */}
+                <div className={`relative overflow-hidden shrink-0 bg-secondary
+                    ${viewMode === 'grid' ? 'h-40 w-full' : 'w-24 h-24 m-2 rounded-xl'}`}
+                >
+                    {/* Placeholder Gradient */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/20"></div>
+                    <div className="absolute inset-0 flex items-center justify-center text-primary/20">
+                        <Folder className="w-10 h-10" />
+                    </div>
+                </div>
+
+                {/* Content */}
+                <div className={`flex-1 p-4 flex
+                    ${viewMode === 'grid' ? 'flex-col justify-between' : 'flex-row items-center justify-between px-4'}`}
+                >
+                    <div className="min-w-0">
+                        <h3 className="font-bold text-foreground text-lg mb-1 truncate">{project.name}</h3>
+                        <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{project.description || "لا يوجد وصف"}</p>
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground/70">
+                            <Clock className="w-3 h-3" />
+                            {new Date(project.crated_at).toLocaleDateString('ar-EG')}
+                        </div>
+                    </div>
+
+                    <div className={`flex items-center gap-1 
+                         ${viewMode === 'grid' ? 'mt-4 pt-3 border-t border-border/40 justify-end' : ''}`}
+                    >
+                        <button
+                            onClick={onEdit}
+                            className="p-2 hover:bg-secondary rounded-lg text-muted-foreground hover:text-primary transition-colors"
+                        >
+                            <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={onDelete}
+                            className="p-2 hover:bg-red-500/10 rounded-lg text-muted-foreground hover:text-red-500 transition-colors"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+            </Link>
+        </motion.div>
+    )
 }

@@ -119,18 +119,30 @@ export async function POST(request: NextRequest) {
 
     const response = NextResponse.json({
       accessToken: token,
-      user: { id: user.id, displayName: user.displayName, email: user.email, roles: allowedRoles }
+      user: { id: user.id, displayName: user.displayName, email: user.email, roles: allowedRoles },
+      debug: {
+        serverTime: new Date().toISOString(),
+        iat: claims.iat,
+        exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24), // 1 day approx
+        env: process.env.NODE_ENV,
+        forwardedProto: request.headers.get('x-forwarded-proto'),
+      }
     }, { status: 200 });
 
-    // Determine secure status robustly (Cloudflare/Vercel proxies usually set x-forwarded-proto)
+    // Determine secure status robustly
     const forwardedProto = request.headers.get('x-forwarded-proto');
-    const isSecure = process.env.NODE_ENV === 'production' || forwardedProto === 'https';
+    // Use secure cookies if the request was made via HTTPS (either directly or via proxy)
+    // Default to false for development unless explicit
+    const isConnectionSecure = forwardedProto === 'https' || request.url.startsWith('https://');
+    const isSecure = process.env.NODE_ENV === 'production' ? isConnectionSecure : false;
+
+    console.log(`[Auth] Setting cookie. Secure: ${isSecure}, ForwardedProto: ${forwardedProto}`);
 
     response.cookies.set({
       name: 'token',
       value: token,
       httpOnly: false, // Client needs to read this for AuthContext
-      secure: isSecure,
+      secure: isSecure, // Only set secure if we are confident it is HTTPS
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 7, // 7 days

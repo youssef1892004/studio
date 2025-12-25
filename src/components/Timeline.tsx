@@ -60,6 +60,7 @@ export interface TimelineItem {
     layerIndex?: number; // 0 is background, higher is foreground
     opacity?: number; // 0.0 - 1.0
     visible?: boolean;
+    sourceDuration?: number; // Original duration at 1x speed
 }
 
 // --- Helper Components ---
