@@ -146,10 +146,16 @@ export async function parseMuejamFile(file: File): Promise<MuejamProjectFile> {
     // Restore Timeline Items
     for (const item of projectData.content.timelineItems) {
         if (item.type === 'image' || item.type === 'video' || item.type === 'scene') {
-            item.content = await getAssetUrl(item.content);
+            const resolvedUrl = await getAssetUrl(item.content);
+            if (resolvedUrl) {
+                item.content = resolvedUrl;
+            }
         }
         if (item.audioUrl) {
-            item.audioUrl = await getAssetUrl(item.audioUrl);
+            const resolvedAudio = await getAssetUrl(item.audioUrl);
+            if (resolvedAudio) {
+                item.audioUrl = resolvedAudio;
+            }
         }
 
         // Ensure sourceDuration is preserved (it should be in JSON)
@@ -158,7 +164,10 @@ export async function parseMuejamFile(file: File): Promise<MuejamProjectFile> {
     // Restore Voice Cards
     for (const card of projectData.content.voiceBlocks) {
         if (card.audioUrl) {
-            card.audioUrl = await getAssetUrl(card.audioUrl);
+            const resolvedAudio = await getAssetUrl(card.audioUrl);
+            if (resolvedAudio) {
+                card.audioUrl = resolvedAudio;
+            }
         }
     }
 

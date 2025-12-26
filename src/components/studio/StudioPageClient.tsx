@@ -2200,6 +2200,7 @@ export default function StudioPageClient() {
                                             ));
                                         }
                                     }}
+                                    onUpdateAnimation={handleUpdateAnimation}
                                 />
                             </div>
                         </div>
