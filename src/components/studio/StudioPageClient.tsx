@@ -272,7 +272,8 @@ export default function StudioPageClient() {
     const dynamicPanelRef = useRef<HTMLDivElement>(null);
     const [playbackRate, setPlaybackRate] = useState(1);
 
-    const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
+    const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+    const activeVideoId = selectedItemIds.length > 0 ? selectedItemIds[0] : null; // Computed for compatibility
 
     const scrollToTop = () => {
         if (dynamicPanelRef.current) {
@@ -325,16 +326,40 @@ export default function StudioPageClient() {
         };
     }, [contextMenu.visible]);
 
+    const handleVideoClick = useCallback((id: string, e?: React.MouseEvent) => {
+        if (e?.shiftKey) {
+            setSelectedItemIds(prev => {
+                if (prev.includes(id)) {
+                    return prev.filter(item => item !== id);
+                } else {
+                    return [...prev, id];
+                }
+            });
+        } else {
+            setSelectedItemIds([id]);
+        }
+        setActiveCardId(null); // Clear card selection when selecting video
+    }, []);
+
     const handleVideoSelect = (id: string) => {
-        setActiveVideoId(id);
+        setSelectedItemIds([id]);
         setActiveCardId(null);
     };
 
     const handleBlockClick = (blockId: string) => {
         setActiveCardId(blockId);
-        setActiveVideoId(null); // Deselect video
+        setSelectedItemIds([]); // Deselect video
         setActiveLeftTool('voice');
         setIsSidebarOpen(true);
+    };
+
+    const handleCanvasClick = (e: React.MouseEvent) => {
+        // If clicked on canvas background (not on an item)
+        // We rely on bubbling being stopped by items.
+        // But if we click on "EditorCanvas" wrapper...
+        // For now, if this triggers, we deselect.
+        setSelectedItemIds([]); // Deselect video
+        setActiveCardId(null);
     };
 
     // Selection Logic for Properties Panel (New)
@@ -426,14 +451,14 @@ export default function StudioPageClient() {
                         toast.error("فشل الحذف");
                         // Ideally revert UI here, but complex with history
                     });
-                } else if (activeVideoId) {
+                } else if (selectedItemIds.length > 0) {
                     setVideoTrackItems(prev => {
-                        const next = prev.filter(i => i.id !== activeVideoId);
+                        const next = prev.filter(i => !selectedItemIds.includes(i.id));
                         recordHistory(cards, next);
                         return next;
                     });
-                    setActiveVideoId(null);
-                    toast.success('تم حذف العنصر');
+                    setSelectedItemIds([]);
+                    toast.success(`Deleted ${selectedItemIds.length} items`);
                 }
                 break;
             case 'copy':
@@ -475,7 +500,7 @@ export default function StudioPageClient() {
                             recordHistory(cards, next);
                             return next;
                         });
-                        setActiveVideoId(null);
+                        setSelectedItemIds([]);
                         toast.success('تم قص العنصر');
                     }
                 }
@@ -1810,7 +1835,7 @@ export default function StudioPageClient() {
                     : item
             );
         });
-        setActiveVideoId(id);
+        setSelectedItemIds([id]);
     }, []);
 
     const handleUpdateText = useCallback((content: string, style: any) => {
@@ -2141,8 +2166,8 @@ export default function StudioPageClient() {
                                 onActiveMediaChange={setActiveMedia}
                                 onTimeUpdate={setCurrentTime}
                                 onIsPlayingChange={setIsPlaying}
-                                activeVideoId={activeVideoId}
-                                onVideoClick={handleVideoSelect}
+                                selectedItemIds={selectedItemIds}
+                                onVideoClick={handleVideoClick}
                                 onPlaybackRateChange={setPlaybackRate}
                                 activeTool={activeTool}
                                 onSplit={handleSplit}

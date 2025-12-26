@@ -160,6 +160,10 @@ export interface TimelineItem {
   volume?: number;
   playbackRate?: number;
   mediaStartOffset?: number; // Trimming offset
+  sourceDuration?: number; // Original media duration for limiting resize
+  isDurationResolved?: boolean; // True if metadata has been confirmed
+  durationFallback?: boolean; // True if metadata failed and we used a safe default
+
 
   // Text specific
   textStyle?: {
@@ -178,7 +182,7 @@ export interface TimelineItem {
   blockId?: string; // Link to Voice Block
   isGenerating?: boolean; // UI State
   visible?: boolean;
-  sourceDuration?: number;
+
 }
 
 export interface TimelineLayer {
