@@ -4,12 +4,12 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import { fetchVoices } from '@/lib/tts';
-import { Voice, StudioBlock, Project, ASPECT_RATIO_PRESETS } from '@/lib/types';
+import { Voice, StudioBlock, Project, ASPECT_RATIO_PRESETS, TimelineItem, TimelineLayer, ProjectDataV2 } from '@/lib/types';
 import { LoaderCircle, List } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getProjectById, updateProject, subscribeToBlocks, deleteBlock, deleteBlockByIndex, executeGraphQL, UPDATE_PROJECT_BLOCKS } from '@/lib/graphql';
 import { structureTimelineData, flattenTimelineData } from '@/lib/timeline-adapters';
-import { TimelineItem, TimelineLayer, ProjectDataV2 } from '@/lib/types';
+
 
 
 
@@ -710,48 +710,8 @@ export default function StudioPageClient() {
         fetchData();
     }, [projectId, token]);
 
-    // Persist Video Timeline to Project.blocks_json
-    // Persist Video Timeline to Project.blocks_json
-    useEffect(() => {
-        if (!projectId || !token || !timelineLoaded) return;
 
-        const timer = setTimeout(async () => {
-            try {
-                // Sanitize items before saving
-                const sanitizedItems = videoTrackItems.map(item => ({
-                    id: item.id,
-                    start: item.start,
-                    duration: item.duration,
-                    content: item.content,
-                    type: item.type,
-                    mediaStartOffset: item.mediaStartOffset,
-                    blockId: item.blockId,
-                    // Only save persistent URLs
-                    audioUrl: item.audioUrl?.startsWith('blob:') ? undefined : item.audioUrl,
-                    volume: item.volume,
-                    playbackRate: item.playbackRate,
-                    textStyle: item.textStyle
-                }));
 
-                const res = await executeGraphQL<any>({
-                    query: UPDATE_PROJECT_BLOCKS,
-                    variables: {
-                        id: projectId,
-                        blocks_json: sanitizedItems
-                    },
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                if (res.errors) throw new Error(res.errors[0].message);
-            } catch (e: any) {
-                if (e.message !== 'connection error') {
-                    console.error("Failed to save timeline", e);
-                    toast.error(`Auto-save failed: ${e.message}`);
-                }
-            }
-        }, 2000);
-
-        return () => clearTimeout(timer);
-    }, [videoTrackItems, projectId, token, timelineLoaded]);
 
     // Keep track of active card ID in a ref to use inside subscription callback
     const activeCardIdRef = useRef<string | null>(null);
@@ -891,6 +851,8 @@ export default function StudioPageClient() {
     useEffect(() => {
         if (isInitialLoad.current) return;
         if (!token) return;
+        if (!project) return; // Guard: Project not loaded
+        if (!projectTitle || projectTitle.trim() === "") return; // Guard: Empty title overwrite prevents
 
         console.log("[AutoSave] Queueing metadata save:", { projectTitle, projectDescription });
 
@@ -903,7 +865,7 @@ export default function StudioPageClient() {
                 });
         }, 2000);
         return () => clearTimeout(handler);
-    }, [projectTitle, projectDescription, projectId, token]);
+    }, [projectTitle, projectDescription, projectId, token, project]);
 
     // --- Persistence Logic ---
 
@@ -994,6 +956,7 @@ export default function StudioPageClient() {
             isInitialLoad.current = false;
             return;
         }
+        if (!timelineLoaded) return; // Guard: Do not save if timeline not loaded (prevents wiping)
 
         const handler = setTimeout(() => {
             const currentItemsString = JSON.stringify(videoTrackItems);
@@ -1004,7 +967,7 @@ export default function StudioPageClient() {
             }
         }, 1000);
         return () => clearTimeout(handler);
-    }, [videoTrackItems, saveTimeline]);
+    }, [videoTrackItems, saveTimeline, timelineLoaded]);
 
     const addCard = useCallback((currentVoices = voices) => {
         const newCardId = uuidv4();
