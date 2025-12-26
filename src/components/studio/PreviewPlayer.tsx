@@ -114,6 +114,7 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
     onEditItem
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
+    const moveableRef = useRef<any>(null); // Ref for Moveable to force updateRect
     const [target, setTarget] = useState<HTMLElement | SVGElement | null>(null);
 
     // Backward compatibility: If no layers passed but activeMedia exists, create a temp layer
@@ -136,6 +137,15 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
             setTarget(null);
         }
     }, [activeId, displayLayers, activeTextItems]);
+
+    // Force Moveable to recalculate rect when items change (especially texts)
+    useEffect(() => {
+        if (moveableRef.current) {
+            setTimeout(() => {
+                moveableRef.current.updateRect();
+            }, 50); // Small delay to allow DOM to settle
+        }
+    }, [activeTextItems, activeTransform, activeId]);
 
     const toggleFullscreen = () => {
         if (!document.fullscreenElement) containerRef.current?.requestFullscreen();
@@ -298,6 +308,7 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                 })}
 
                 <Moveable
+                    ref={moveableRef}
                     target={target}
                     draggable={true}
                     scalable={true}
@@ -335,10 +346,21 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                                 const currentX = textItem.style?.xPosition ?? 50;
                                 const currentY = textItem.style?.yPosition ?? 50;
 
+                                const newX = currentX + xPercent;
+                                const newY = currentY + yPercent;
+
+                                // OPTIMISTIC UPDATE:
+                                // Manually set DOM position immediately to prevent "jump back" while waiting for React render.
+                                if (target) {
+                                    target.style.left = `${newX}%`;
+                                    target.style.top = `${newY}%`;
+                                    target.style.transform = "translate(-50%, -50%)"; // Clear the drag transform
+                                }
+
                                 onTextUpdate(activeId, {
                                     ...textItem.style,
-                                    xPosition: currentX + xPercent,
-                                    yPosition: currentY + yPercent
+                                    xPosition: newX,
+                                    yPosition: newY
                                 });
                             }
                         } else if (onTransformUpdate && activeTransform) {
@@ -352,8 +374,8 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                     onScale={({ target, drag }) => {
                         target!.style.transform = drag.transform;
                     }}
-                    onScaleEnd={({ lastEvent }) => {
-                        if (!lastEvent) return;
+                    onScaleEnd={({ lastEvent, target }) => {
+                        if (!lastEvent || !target) return;
                         const isText = activeTextItems.some(t => t.id === activeId);
 
                         if (isText && onTextUpdate && activeId) {
@@ -361,9 +383,17 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                             if (textItem) {
                                 const scaleFactor = lastEvent.scale[0];
                                 const currentSize = textItem.style?.fontSize || 24;
+                                const newSize = currentSize * scaleFactor;
+
+                                // OPTIMISTIC UPDATE for Scale
+                                if (target) {
+                                    target.style.fontSize = `${newSize * 1.5}px`; // Match render logic ((size * 1.5))
+                                    target.style.transform = "translate(-50%, -50%)";
+                                }
+
                                 onTextUpdate(activeId, {
                                     ...textItem.style,
-                                    fontSize: currentSize * scaleFactor
+                                    fontSize: newSize
                                 });
                             }
                         } else if (onTransformUpdate && activeTransform) {
