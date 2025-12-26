@@ -27,22 +27,22 @@ export default function ProjectHeader({
   return (
     <div className="flex items-center justify-between px-4 h-full w-full overflow-x-auto">
       <div className="flex items-center gap-4 whitespace-nowrap">
-        <button onClick={() => router.push('/projects')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Back to projects">
-          <ArrowRight className="w-5 h-5 text-gray-600" />
+        <button onClick={() => router.push('/projects')} className="p-2 hover:bg-muted rounded-lg transition-colors" title="Back to projects">
+          <ArrowRight className="w-5 h-5 text-muted-foreground" />
         </button>
         <div className="flex flex-col">
           <input
             type="text"
             value={projectTitle}
             onChange={(e) => setProjectTitle(e.target.value)}
-            className="text-md font-semibold text-gray-800 bg-transparent focus:outline-none focus:ring-0 border-0 p-0"
+            className="text-h2 bg-transparent focus:outline-none focus:ring-0 border-0 p-0"
             placeholder="Project name"
           />
           <input
             type="text"
             value={projectDescription}
             onChange={(e) => setProjectDescription(e.target.value)}
-            className="text-xs text-gray-500 bg-transparent focus:outline-none focus:ring-0 border-0 p-0"
+            className="text-helper bg-transparent focus:outline-none focus:ring-0 border-0 p-0"
             placeholder="Project description..."
           />
         </div>
@@ -52,8 +52,8 @@ export default function ProjectHeader({
         {subscription && <SubscriptionStatus subscription={subscription} />}
 
         {handleSave && (
-          <button onClick={handleSave} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors" title="Save Project">
-            <Save className="w-5 h-5 text-gray-700" />
+          <button onClick={handleSave} className="p-2 bg-muted hover:bg-muted/80 rounded-lg transition-colors" title="Save Project">
+            <Save className="w-5 h-5 text-foreground" />
           </button>
         )}
 
@@ -62,8 +62,8 @@ export default function ProjectHeader({
           {isGenerating ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 -scale-x-100" />}
         </button>
 
-        <button onClick={handleDownloadAll} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors" title="Download All">
-          <Download className="w-5 h-5 text-gray-700" />
+        <button onClick={handleDownloadAll} className="p-2 bg-muted hover:bg-muted/80 rounded-lg transition-colors" title="Download All">
+          <Download className="w-5 h-5 text-foreground" />
         </button>
 
       </div>

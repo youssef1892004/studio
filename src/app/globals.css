@@ -23,6 +23,25 @@
     .btn-glass {
       @apply bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 shadow-lg hover:shadow-xl hover:scale-105;
     }
+
+    /* Muejam Typography System */
+    .text-h1 {
+      @apply text-[length:var(--heading-1)] font-semibold text-[hsl(var(--heading-1))];
+      font-size: clamp(36px, 4vw, 48px);
+    }
+
+    .text-h2 {
+      @apply font-medium text-[hsl(var(--heading-2))];
+      font-size: clamp(22px, 2.5vw, 28px);
+    }
+
+    .text-body {
+      @apply text-base font-normal text-foreground;
+    }
+
+    .text-helper {
+      @apply text-xs text-muted-foreground;
+    }
   }
 
   :root {
@@ -81,19 +100,27 @@
     --popover: 240 22% 19%;
 
     /* 2️⃣ Typography */
-    /* Primary Text: #E6E6EB (Restful White) */
-    --foreground: 240 10% 91%;
-    /* Secondary Text: #B5B5C8 */
-    --card-foreground: 240 10% 91%;
-    --popover-foreground: 240 10% 91%;
+    /* Primary / Body: #9AA6B2 (Medium Gray-Blue) */
+    --foreground: 210 12% 65%;
 
-    /* Muted Text / Hints: #8A8AA5 & #5E5E75 */
+    /* Headings */
+    --heading-1: 208 30% 93%;
+    /* #E6EDF3 */
+    --heading-2: 210 18% 82%;
+    /* #C7D1DB */
+
+    /* Secondary Text: #C7D1DB */
+    --card-foreground: 210 18% 82%;
+    --popover-foreground: 210 18% 82%;
+
+    /* Muted / Helper: #6B7280 */
     --muted: 240 21% 15%;
-    --muted-foreground: 240 12% 60%;
+    /* Background for muted elements */
+    --muted-foreground: 220 9% 46%;
 
     /* 3️⃣ Brand Colors */
-    /* Primary Action: #4E56C0 (Deep Purple-Blue) */
-    --primary: 236 47% 53%;
+    /* Accent / Highlights: #4E5EC0 */
+    --primary: 232 47% 53%;
     --primary-foreground: 0 0% 100%;
 
     /* Secondary / AI Accent: #9B5DE0 (Vivid Purple) */
@@ -104,9 +131,9 @@
     --accent: 285 73% 75%;
     --accent-foreground: 240 18% 7%;
 
-    /* Destructive */
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
+    /* Destructive: #E5484D */
+    --destructive: 358 75% 59%;
+    --destructive-foreground: 0 0% 100%;
 
     /* Borders & Inputs */
     /* Border: #25253A (Elevated Color) or darker */
