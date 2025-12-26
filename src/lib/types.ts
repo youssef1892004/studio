@@ -128,3 +128,91 @@ export const ASPECT_RATIO_PRESETS: AspectRatioPreset[] = [
     icon: 'twitter'
   }
 ];
+
+
+// --- Timeline & Layer Architecture (V2) ---
+
+export interface TimelineItem {
+  id: string;
+  type: 'video' | 'image' | 'text' | 'audio' | 'scene' | 'voice' | 'effect' | 'music';
+  // Layer Logic
+  layerIndex?: number; // @deprecated in V2 (UI only, derived from Layer.order)
+  layerId?: string;    // Link to Parent Layer
+
+  // Timing
+  start: number;
+  duration: number;
+
+  // Content
+  content: string; // Text, Image URL, or Effect Name
+  audioUrl?: string; // For Voice/Audio
+
+  // Properties
+  transform?: {
+    x: number;
+    y: number;
+    scale: number;
+    rotation: number;
+    width?: number; // Original width
+    height?: number; // Original height
+  };
+  opacity?: number;
+  volume?: number;
+  playbackRate?: number;
+  mediaStartOffset?: number; // Trimming offset
+
+  // Text specific
+  textStyle?: {
+    fontSize?: number;
+    color?: string;
+    backgroundColor?: string;
+    fontFamily?: string;
+    fontWeight?: 'normal' | 'bold';
+    textAlign?: 'left' | 'center' | 'right';
+    backgroundOpacity?: number;
+    yPosition?: number; // % from top
+    xPosition?: number; // % from left
+  };
+
+  // Linkage
+  blockId?: string; // Link to Voice Block
+  isGenerating?: boolean; // UI State
+  visible?: boolean;
+  sourceDuration?: number;
+}
+
+export interface TimelineLayer {
+  id: string; // UUID
+  type: 'visual' | 'audio';
+  order: number; // 0-indexed (Bottom to Top)
+  name?: string;
+  isLocked: boolean;
+  isVisible: boolean;
+  clips: TimelineItem[];
+}
+
+export interface ProjectDataV2 {
+  version: 2;
+  kind: "projectData";
+  layers: TimelineLayer[];
+  settings?: {
+    activePresetId?: string;
+  };
+}
+
+export interface MuejamProjectFile {
+  version: string;
+  metadata: {
+    title: string;
+    description: string;
+    createdAt: string;
+    exportedAt: string;
+  };
+  settings: {
+    activePresetId: string;
+  };
+  content: {
+    voiceBlocks: StudioBlock[];
+    timelineItems: TimelineItem[];
+  };
+}

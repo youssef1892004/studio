@@ -1,6 +1,6 @@
 'use client';
 
-import { Voice, StudioBlock } from '@/lib/types';
+import { Voice, StudioBlock, TimelineItem } from '@/lib/types';
 import { Play, Pause, ZoomIn, ZoomOut, Volume2, VolumeX, Eye, EyeOff, Lock, Unlock, Scissors, ChevronRight, ChevronLeft, Settings, SkipBack, SkipForward, Plus, Wand2, Trash2, Undo2, Redo2, MousePointer2, Layers } from 'lucide-react';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
@@ -26,42 +26,7 @@ interface Track {
     items: TimelineItem[];
 }
 
-export interface TimelineItem {
-    id: string;
-    start: number;
-    duration: number;
-    content: string; // Text, Image URL, or Effect Name
-    type: TrackType;
-    mediaStartOffset?: number; // Offset into the media file (seconds)
-    // For voice items, we link back to the StudioBlock
-    blockId?: string;
-    audioUrl?: string;
-    isGenerating?: boolean; // Added loading state
-    volume?: number; // 0-1
-    playbackRate?: number;
-    textStyle?: {
-        fontSize?: number;
-        color?: string;
-        backgroundColor?: string;
-        fontFamily?: string;
-        fontWeight?: 'normal' | 'bold';
-        textAlign?: 'left' | 'center' | 'right';
-        backgroundOpacity?: number;
-        yPosition?: number; // % from top
-        xPosition?: number; // % from left
-    };
-    transform?: {
-        scale: number;
-        x: number;
-        y: number;
-        rotation: number;
-    };
-    // Multi-Layer Support
-    layerIndex?: number; // 0 is background, higher is foreground
-    opacity?: number; // 0.0 - 1.0
-    visible?: boolean;
-    sourceDuration?: number; // Original duration at 1x speed
-}
+
 
 // --- Helper Components ---
 
@@ -86,9 +51,9 @@ const TimeRuler = ({ duration, zoomLevel, currentTime, onSeek }: { duration: num
     for (let i = 0; i <= duration; i += step) {
         const position = i * zoomLevel;
         ticks.push(
-            <div key={i} className="absolute top-0 bottom-0 border-l border-[#C2C1C1] opacity-50" style={{ left: `${position}px`, height: i % 5 === 0 ? '100%' : '30%' }}>
+            <div key={i} className="absolute top-0 bottom-0 border-l border-white/20 opacity-50" style={{ left: `${position}px`, height: i % 5 === 0 ? '100%' : '30%' }}>
                 {i % 5 === 0 && (
-                    <span className="absolute top-1 left-1 text-[10px] text-[#C2C1C1] font-mono font-bold select-none">
+                    <span className="absolute top-1 left-1 text-[10px] text-muted-foreground font-mono font-bold select-none">
                         {formatTimeShort(i)}
                     </span>
                 )}
@@ -99,7 +64,7 @@ const TimeRuler = ({ duration, zoomLevel, currentTime, onSeek }: { duration: num
     return (
         <div
             ref={rulerRef}
-            className="h-8 bg-[#2A2A2A] border-b border-[#8E8D8D] relative cursor-pointer overflow-hidden"
+            className="h-8 bg-black/40 border-b border-white/10 relative cursor-pointer overflow-hidden backdrop-blur-sm"
             onMouseDown={handleMouseDown}
             style={{ width: `${Math.max(totalWidth, 100)}px` }}
         >
@@ -115,10 +80,10 @@ const TimeRuler = ({ duration, zoomLevel, currentTime, onSeek }: { duration: num
 
 const TrackHeader = ({ track, onToggleMute, onToggleHide, onToggleLock }: { track: Track, onToggleMute: () => void, onToggleHide: () => void, onToggleLock: () => void }) => {
     return (
-        <div className="w-48 flex-shrink-0 bg-[#2A2A2A] border-r border-[#8E8D8D] border-b border-[#8E8D8D]/20 flex items-center justify-between px-3 h-20 group hover:bg-[#353535] transition-colors">
+        <div className="w-48 flex-shrink-0 bg-card/50 backdrop-blur-sm border-r border-white/10 border-b border-white/5 flex items-center justify-between px-3 h-20 group hover:bg-white/5 transition-colors">
             <div className="flex flex-col">
-                <span className="text-gray-300 font-medium text-sm truncate w-24" title={track.name}>{track.name}</span>
-                <span className="text-xs text-gray-500 capitalize">{track.type}</span>
+                <span className="text-gray-200 font-medium text-sm truncate w-24" title={track.name}>{track.name}</span>
+                <span className="text-xs text-muted-foreground capitalize">{track.type}</span>
             </div>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button onClick={onToggleHide} className={`p-1 rounded hover:bg-white/10 ${track.isHidden ? 'text-primary' : 'text-gray-400'}`}>
@@ -179,6 +144,9 @@ interface TimelineProps {
     onRedo?: () => void;
     canUndo?: boolean;
     canRedo?: boolean;
+    // New Props
+    zoomLevel?: number;
+    manualLayerCount?: number;
 }
 
 export interface TimelineHandle {
@@ -188,15 +156,22 @@ export interface TimelineHandle {
     togglePlayPause: () => void;
 }
 
-const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voices, onCardsUpdate, isBlocksProcessing, onBlockClick, onAddBlock, onGenerateAll, videoTrackItems = [], onVideoTrackUpdate, activeBlockId, onActiveMediaChange, onTimeUpdate, onIsPlayingChange, activeVideoId, onVideoClick, onPlaybackRateChange, activeTool, onSplit, onToolChange, onDelete, onUndo, onRedo, canUndo, canRedo }, ref) => {
+const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
+    cards, voices, onCardsUpdate, isBlocksProcessing, onBlockClick,
+    onAddBlock, onGenerateAll, videoTrackItems = [], onVideoTrackUpdate,
+    activeBlockId, onActiveMediaChange, onTimeUpdate, onIsPlayingChange,
+    activeVideoId, onVideoClick, onPlaybackRateChange, activeTool,
+    onSplit, onToolChange, onDelete, onUndo, onRedo, canUndo, canRedo,
+    zoomLevel = 50, manualLayerCount = 2
+}, ref) => {
 
     const [isPlaying, setIsPlaying] = useState(false);
     const { settings } = usePerformance();
+    // Zoom/Layer state lifted to parent
+    // const [zoomLevel, setZoomLevel] = useState(50); 
     const [currentTime, setCurrentTime] = useState(0);
-    const [zoomLevel, setZoomLevel] = useState(50); // Pixels per second
     const [totalDuration, setTotalDuration] = useState(30); // Default 30s
     const [scrollLeft, setScrollLeft] = useState(0);
-    const [currentCardIndex, setCurrentCardIndex] = useState(0);
     const [playbackRate, setPlaybackRate] = useState(1);
 
     // Resizing State
@@ -214,7 +189,9 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
     const activeVoiceIdRef = useRef<string | null>(null);
     const activeMusicIdRef = useRef<string | null>(null);
     const timelineScrollRef = useRef<HTMLDivElement>(null);
+    // const headersScrollRef = useRef<HTMLDivElement>(null); // No longer needed? Wait, headers sync is usually good.
     const headersScrollRef = useRef<HTMLDivElement>(null);
+
     const animationFrameRef = useRef<number>();
     const lastActiveItemIdRef = useRef<string | null>(null);
     const lastActiveVolumeRef = useRef<number | undefined>(undefined);
@@ -230,7 +207,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
 
     const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
     const [dragTargetIndex, setDragTargetIndex] = useState<number | null>(null);
-    const [manualLayerCount, setManualLayerCount] = useState(2); // Default to 2 layers (0 and 1)
+    // const [manualLayerCount, setManualLayerCount] = useState(2); // Lifted
 
     // Resize State
 
@@ -350,7 +327,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                 items: videoTrackItems.filter(i => i.type === 'music')
             }
         ];
-    }, [displayVoiceItems, videoTrackItems]);
+    }, [displayVoiceItems, videoTrackItems, manualLayerCount]);
 
     // --- Drag and Drop Handlers ---
     // --- Drag and Drop Handlers ---
@@ -597,44 +574,68 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                 const x = e.clientX - rect.left + scrollLeft;
                 let dropTime = Math.max(0, x / zoomLevel);
 
-                // Collision Detection & Snapping
                 const movingItem = videoTrackItems.find(i => i.id === data.id);
                 if (movingItem) {
                     const targetLayer = (trackId && trackId.startsWith('t-video-'))
                         ? parseInt(trackId.replace('t-video-', ''))
                         : (movingItem.layerIndex || 0);
 
+                    console.log(`[Timeline Drop] Check: Item ${movingItem.type} -> Target Layer: ${targetLayer}`);
+
                     const duration = movingItem.duration;
 
-                    // Filter others based on track type AND LAYER
+                    // Filter others on TARGET LAYER
                     const isTextItem = movingItem.type === 'text';
                     const isMusicItem = movingItem.type === 'music';
-                    const isVisual = !isTextItem && !isMusicItem;
 
                     const others = videoTrackItems.filter(i =>
                         i.id !== movingItem.id &&
                         (isTextItem ? i.type === 'text' :
                             isMusicItem ? i.type === 'music' :
                                 (i.type !== 'text' && i.type !== 'music' && (i.layerIndex || 0) === targetLayer))
-                    );
+                    ).sort((a, b) => a.start - b.start);
 
-                    // Sort others by start time for consistent checking
-                    others.sort((a, b) => a.start - b.start);
+                    // Find Valid Gaps
+                    const gaps: { start: number, end: number }[] = [];
+                    let lastEnd = 0;
 
-                    for (const other of others) {
-                        const otherEnd = other.start + other.duration;
-                        // If overlap:
-                        if (dropTime < otherEnd && (dropTime + duration) > other.start) {
-                            // Snap to closest edge
-                            const distToLeft = Math.abs((dropTime + duration) - other.start);
-                            const distToRight = Math.abs(dropTime - otherEnd);
+                    for (const item of others) {
+                        if (item.start > lastEnd) {
+                            gaps.push({ start: lastEnd, end: item.start });
+                        }
+                        lastEnd = item.start + item.duration;
+                    }
+                    gaps.push({ start: lastEnd, end: Infinity }); // Final open gap
 
-                            if (distToLeft < distToRight) {
-                                dropTime = Math.max(0, other.start - duration);
-                            } else {
-                                dropTime = otherEnd;
+                    // Find usable gaps (where item fits)
+                    const validGaps = gaps.filter(g => (g.end - g.start) >= duration);
+
+                    if (validGaps.length === 0) {
+                        // No space? Should be impossible due to Infinity gap, unless logic err.
+                        // Ideally return to old position or force end.
+                        dropTime = lastEnd;
+                    } else {
+                        // Find gap closest to current dropTime
+                        // We check if dropTime falls in a gap, or is close to one.
+                        let bestGap = validGaps[0];
+                        let minGapDist = Infinity;
+
+                        const itemMid = dropTime + duration / 2;
+
+                        for (const gap of validGaps) {
+                            // Distance from itemMid to Gap Center? Or simple inclusion.
+                            // If dropTime is inside gap (clamped), dist is 0.
+                            const clampedStart = Math.max(gap.start, Math.min(dropTime, gap.end - duration));
+                            const dist = Math.abs(clampedStart - dropTime);
+
+                            if (dist < minGapDist) {
+                                minGapDist = dist;
+                                bestGap = gap;
                             }
                         }
+
+                        // Apply position within best gap
+                        dropTime = Math.max(bestGap.start, Math.min(dropTime, bestGap.end - duration));
                     }
                     onVideoTrackUpdate(videoTrackItems.map(item => {
                         if (item.id === data.id) {
@@ -916,21 +917,9 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
     const handleSeek = (time: number) => {
         setCurrentTime(time);
 
-        const index = voiceTrackItems.findIndex(item => time >= item.start && time < item.start + item.duration);
-        if (index !== -1) {
-            setCurrentCardIndex(index);
-        }
+        // Removed setCurrentCardIndex as it was local state and not used
     };
 
-    const handleZoom = (direction: 'in' | 'out') => {
-        setZoomLevel(prev => Math.max(10, Math.min(200, direction === 'in' ? prev * 1.2 : prev / 1.2)));
-    };
-
-    const toggleSpeed = () => {
-        const rates = [0.5, 1, 1.5, 2];
-        const next = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
-        setPlaybackRate(next);
-    };
 
     const handleResizeStart = (e: React.MouseEvent, item: TimelineItem, handle: 'start' | 'end') => {
         e.stopPropagation();
@@ -952,15 +941,35 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                 let newStart = initialItemStart;
                 let newDuration = initialItemDuration;
 
+                // Max duration cap (only for video/music/scene if sourceDuration exists)
+                // Images and text have infinite duration capabilities
+                const maxDuration = (item.type === 'video' || item.type === 'scene' || item.type === 'music') && item.sourceDuration
+                    ? item.sourceDuration
+                    : Infinity;
+
                 if (resizeHandle === 'start') {
+                    // Logic for dragging left handle
+                    // Restrict start time: can't be less than 0
+                    // But also, duration cannot exceed maxDuration.
+                    // Actually, for video, changing start usually trims from the left.
+                    // This logic assumes "start" changes the timeline position, NOT the media start offset.
+                    // If we want to trim media start, we need `mediaStartOffset`.
+                    // Current request: "extend to allowed limit". This usually applies to the right handle.
+
                     newStart = Math.max(0, initialItemStart + deltaX);
                     newDuration = initialItemDuration - (newStart - initialItemStart);
-                    if (newDuration < 0.1) { // Minimum duration
+
+                    if (newDuration < 0.1) { // Min duration
                         newDuration = 0.1;
                         newStart = initialItemStart + initialItemDuration - newDuration;
                     }
                 } else { // 'end' handle
                     newDuration = Math.max(0.1, initialItemDuration + deltaX);
+
+                    // Apply Cap
+                    if (newDuration > maxDuration) {
+                        newDuration = maxDuration;
+                    }
                 }
 
                 return { ...item, start: newStart, duration: newDuration };
@@ -1087,102 +1096,8 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
             <audio ref={audioRef} className="hidden" />
             <audio ref={musicAudioRef} className="hidden" />
 
-            {/* Toolbar */}
-            <div className="h-16 bg-[#1a1a1a] border-b border-[#333] flex items-center justify-between px-4 z-30 shadow-md relative">
+            {/* Toolbar Removed (Lifted to Parent) */}
 
-                {/* Left: Tools & History */}
-                <div className="flex items-center gap-4">
-                    {/* History Group */}
-                    <div className="flex items-center gap-1 bg-[#252525] p-1 rounded-lg border border-[#333]">
-                        <button onClick={onUndo} disabled={!canUndo} className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-md disabled:opacity-30 transition-colors" title="Undo (Ctrl+Z)">
-                            <Undo2 size={18} />
-                        </button>
-                        <button onClick={onRedo} disabled={!canRedo} className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-md disabled:opacity-30 transition-colors" title="Redo (Ctrl+Y)">
-                            <Redo2 size={18} />
-                        </button>
-                    </div>
-
-                    <div className="w-px h-8 bg-[#333]" />
-
-                    {/* Tools Group */}
-                    <div className="flex items-center gap-1 bg-[#252525] p-1 rounded-lg border border-[#333]">
-                        <button
-                            onClick={() => onToolChange?.('select')}
-                            className={`p-2 rounded-md transition-all flex items-center justify-center ${activeTool === 'select' || !activeTool ? 'bg-[#333] text-white shadow-inner' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
-                            title="Select Tool (V)"
-                        >
-                            <MousePointer2 size={18} />
-                        </button>
-                        <button
-                            onClick={() => onToolChange?.('razor')}
-                            className={`p-2 rounded-md transition-all flex items-center justify-center ${activeTool === 'razor' ? 'bg-[#F48969] text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
-                            title="Split Tool (C)"
-                        >
-                            <Scissors size={18} />
-                        </button>
-                        <button onClick={onDelete} className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-400/10 rounded-md transition-colors flex items-center justify-center" title="Delete (Del)">
-                            <Trash2 size={18} />
-                        </button>
-                    </div>
-
-                    <div className="w-px h-8 bg-[#333]" />
-
-                    {/* Layer Tools */}
-                    <div className="flex items-center gap-1 bg-[#252525] p-1 rounded-lg border border-[#333]">
-                        <button
-                            onClick={() => setManualLayerCount(prev => prev + 1)}
-                            className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors flex items-center justify-center gap-2"
-                            title="Add Layer"
-                        >
-                            <Layers size={18} />
-                            <Plus size={12} className="-ml-1" />
-                        </button>
-                    </div>
-                </div>
-
-                {/* Center: Playback (Absolute Centered) */}
-                <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center gap-4">
-                    <Button variant="ghost" size="sm" className="h-10 w-10 rounded-full hover:bg-white/5 text-gray-300 hover:text-white" onClick={() => handleSeek(0)}>
-                        <SkipBack size={22} className="fill-current" />
-                    </Button>
-                    <button
-                        onClick={handlePlayPause}
-                        className="h-12 w-12 flex items-center justify-center rounded-full bg-[#F48969] hover:bg-[#E07858] text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
-                    >
-                        {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
-                    </button>
-                    <Button variant="ghost" size="sm" className="h-10 w-10 rounded-full hover:bg-white/5 text-gray-300 hover:text-white" onClick={() => handleSeek(totalDuration)}>
-                        <SkipForward size={22} className="fill-current" />
-                    </Button>
-                </div>
-
-                {/* Right: Info & Zoom */}
-                <div className="flex items-center gap-4">
-                    <div className="bg-[#151515] px-3 py-1.5 rounded-md font-mono text-[#F48969] border border-[#F48969]/20 shadow-inner text-sm tracking-wider">
-                        {formatTimeFull(currentTime)}
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={toggleSpeed} title="Playback Speed" className="text-xs font-bold text-gray-400 hover:text-white">
-                        {playbackRate}x
-                    </Button>
-                    <div className="hidden md:flex items-center gap-1 bg-[#252525] rounded-lg p-1 border border-[#333]">
-                        <button
-                            className="h-8 w-8 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-all flex items-center justify-center p-0"
-                            onClick={() => handleZoom('out')}
-                            title="Zoom Out"
-                        >
-                            <ZoomOut size={16} />
-                        </button>
-                        <span className="text-xs w-10 text-center text-gray-500 font-medium select-none">{Math.round(zoomLevel)}%</span>
-                        <button
-                            className="h-8 w-8 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-all flex items-center justify-center p-0"
-                            onClick={() => handleZoom('in')}
-                            title="Zoom In"
-                        >
-                            <ZoomIn size={16} />
-                        </button>
-                    </div>
-                </div>
-            </div>
 
             {/* Timeline Area */}
             <div className="flex-1 flex overflow-hidden relative">
@@ -1191,21 +1106,23 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                     ref={headersScrollRef}
                     className="w-48 flex-shrink-0 bg-[#2A2A2A] border-r border-[#8E8D8D] z-20 flex flex-col pt-8 shadow-xl overflow-hidden"
                 >
-                    {tracks.map(track => (
-                        <TrackHeader
-                            key={track.id}
-                            track={track}
-                            onToggleMute={() => { }}
-                            onToggleHide={() => { }}
-                            onToggleLock={() => { }}
-                        />
-                    ))}
+                    {
+                        tracks.map(track => (
+                            <TrackHeader
+                                key={track.id}
+                                track={track}
+                                onToggleMute={() => { }}
+                                onToggleHide={() => { }}
+                                onToggleLock={() => { }}
+                            />
+                        ))
+                    }
                 </div>
 
                 {/* Right Scrollable Area (Tracks) */}
                 <div
                     ref={timelineScrollRef}
-                    className="flex-1 overflow-auto relative custom-scrollbar bg-[#1E1E1E]"
+                    className="flex-1 overflow-auto relative custom-scrollbar bg-background/50"
                     onScroll={(e) => {
                         setScrollLeft(e.currentTarget.scrollLeft);
                         if (headersScrollRef.current) {
@@ -1233,28 +1150,30 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
 
                         {/* Global Playhead Line */}
                         <div
-                            className="absolute top-0 bottom-0 w-px bg-[#F48969] z-30 pointer-events-none shadow-[0_0_10px_rgba(244,137,105,0.5)]"
+                            className="absolute top-0 bottom-0 w-px bg-primary z-30 pointer-events-none shadow-[0_0_10px_rgba(0,166,251,0.5)]"
                             style={{ left: `${currentTime * zoomLevel}px` }}
                         />
 
                         {/* Razor Cursor */}
-                        {activeTool === 'razor' && mouseTime >= 0 && (
-                            <div
-                                className="absolute top-0 bottom-0 border-l border-dashed border-red-500/70 pointer-events-none z-50 flex flex-col items-center"
-                                style={{ left: `${mouseTime * zoomLevel}px` }}
-                            >
-                                <div className="absolute -top-4 text-red-500 bg-white dark:bg-black rounded-full p-0.5 shadow-sm border border-red-500/20">
-                                    <Scissors size={14} />
+                        {
+                            activeTool === 'razor' && mouseTime >= 0 && (
+                                <div
+                                    className="absolute top-0 bottom-0 border-l border-dashed border-red-500/70 pointer-events-none z-50 flex flex-col items-center"
+                                    style={{ left: `${mouseTime * zoomLevel}px` }}
+                                >
+                                    <div className="absolute -top-4 text-red-500 bg-white dark:bg-black rounded-full p-0.5 shadow-sm border border-red-500/20">
+                                        <Scissors size={14} />
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )
+                        }
 
                         {/* Tracks */}
                         <div className="flex flex-col">
                             {tracks.map(track => (
                                 <div
                                     key={track.id}
-                                    className="h-20 border-b border-[#8E8D8D]/20 relative bg-[#2F2F2F] group"
+                                    className="h-20 border-b border-white/5 relative bg-card/10 group"
                                     onDragOver={(e) => e.preventDefault()}
                                     onDrop={(e) => handleDrop(e, track.type, track.id)}
                                 >
@@ -1303,7 +1222,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                                                 style={{
                                                     left: `${left}px`,
                                                     width: `${width}px`,
-                                                    backgroundColor: track.type === 'voice' ? '#4A4A4A' : (track.type === 'music' ? '#3B5360' : '#333'),
+                                                    backgroundColor: track.type === 'voice' ? '#1e293b' : (track.type === 'music' ? '#0f172a' : '#020617'),
                                                 }}
                                             >
                                                 {/* Item Content */}
@@ -1328,8 +1247,8 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                                                                 audioUrl={item.audioUrl}
                                                                 duration={item.duration}
                                                                 isPlaying={isPlaying && currentTime >= item.start && currentTime < item.start + item.duration}
-                                                                color={isPlaying && currentTime >= item.start && currentTime < item.start + item.duration ? '#F48969' : '#8E8D8D'}
-                                                                progressColor="#F48969"
+                                                                color={isPlaying && currentTime >= item.start && currentTime < item.start + item.duration ? '#00A6FB' : '#475569'}
+                                                                progressColor="#00A6FB"
                                                                 zoomLevel={zoomLevel}
                                                                 playbackTime={Math.max(0, currentTime - item.start)}
                                                                 onSeek={(t) => handleSeek(item.start + t)}
@@ -1437,7 +1356,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                                         >
                                             <button
                                                 onClick={onAddBlock}
-                                                className="w-8 h-8 rounded-full bg-[#F48969]/20 border border-[#F48969] flex items-center justify-center text-[#F48969] hover:bg-[#F48969] hover:text-white transition-all shadow-lg hover:shadow-[#F48969]/50 hover:scale-110"
+                                                className="w-8 h-8 rounded-full bg-primary/20 border border-primary flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all shadow-lg hover:shadow-primary/50 hover:scale-110"
                                                 title="Add Voice Block"
                                             >
                                                 <Plus size={18} strokeWidth={3} />
@@ -1450,8 +1369,6 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({ cards, voice
                     </div>
                 </div>
             </div>
-
-            <audio ref={audioRef} className="hidden" />
         </div>
     );
 });

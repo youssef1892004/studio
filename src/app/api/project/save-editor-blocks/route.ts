@@ -10,7 +10,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
     }
 
-    const { projectId, blocksJson } = await request.json();
+    const bodyText = await request.text();
+    // console.log("API Received Body Length:", bodyText.length);
+
+    if (!bodyText) {
+      return NextResponse.json({ error: 'Empty request body' }, { status: 400 });
+    }
+
+    let bodyData;
+    try {
+      bodyData = JSON.parse(bodyText);
+    } catch (e) {
+      console.error("JSON Parse Error. Body snippet:", bodyText.slice(0, 100));
+      throw e;
+    }
+    const { projectId, blocksJson } = bodyData;
 
     if (!projectId || !blocksJson) {
       return NextResponse.json({ error: 'Missing projectId or blocksJson' }, { status: 400 });

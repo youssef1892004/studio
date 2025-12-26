@@ -1,5 +1,5 @@
-import React from 'react';
-import { Undo, Redo, Scissors, ZoomIn, Filter, Sliders, Volume2, Download, ArrowRight, Image as ImageIcon } from 'lucide-react';
+import React, { useRef } from 'react';
+import { Undo, Redo, Scissors, ZoomIn, Filter, Sliders, Volume2, Download, ArrowRight, Image as ImageIcon, Save, Upload, FileDown, FolderUp } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 interface ToolbarProps {
@@ -16,6 +16,9 @@ interface ToolbarProps {
     onBack?: () => void;
     activePresetId?: string;
     onPresetChange?: (presetId: string) => void;
+    handleSave?: () => void;
+    onImportProject?: (file: File) => void;
+    onExportProject?: () => void;
 }
 
 import { ASPECT_RATIO_PRESETS } from '@/lib/types';
@@ -34,7 +37,21 @@ const Toolbar: React.FC<ToolbarProps> = ({
     onBack,
     activePresetId = 'youtube',
     onPresetChange,
+    handleSave,
+    onImportProject,
+    onExportProject
 }) => {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file && onImportProject) {
+            onImportProject(file);
+        }
+        // Reset
+        if (e.target) e.target.value = '';
+    };
+
     const showComingSoon = (feature: string) => {
         toast((t) => (
             <div className="flex flex-col gap-1 min-w-[200px]">
@@ -70,6 +87,37 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 >
                     <ArrowRight className="w-5 h-5" />
                 </button>
+                <div className="w-px h-6 bg-studio-border-light dark:bg-studio-border mx-2"></div>
+
+                {onImportProject && (
+                    <>
+                        <input
+                            type="file"
+                            accept=".muejam"
+                            ref={fileInputRef}
+                            className="hidden"
+                            onChange={handleFileChange}
+                        />
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="p-2 rounded-md text-studio-text-light dark:text-studio-text hover:bg-studio-panel-light dark:hover:bg-studio-panel hover:text-studio-accent transition-all"
+                            title="استيراد مشروع (.muejam)"
+                        >
+                            <FolderUp className="w-5 h-5" />
+                        </button>
+                    </>
+                )}
+
+                {onExportProject && (
+                    <button
+                        onClick={onExportProject}
+                        className="p-2 rounded-md text-studio-text-light dark:text-studio-text hover:bg-studio-panel-light dark:hover:bg-studio-panel hover:text-studio-accent transition-all"
+                        title="تصدير مشروع (.muejam)"
+                    >
+                        <FileDown className="w-5 h-5" />
+                    </button>
+                )}
+
                 <div className="w-px h-6 bg-studio-border-light dark:bg-studio-border mx-2"></div>
 
                 <div className="flex items-center bg-studio-panel-light dark:bg-studio-panel/50 rounded-lg p-1">
@@ -181,6 +229,17 @@ const Toolbar: React.FC<ToolbarProps> = ({
                     ))}
                 </select>
                 <div className="w-px h-6 bg-studio-border-light dark:bg-studio-border mx-2"></div>
+
+                {handleSave && (
+                    <button
+                        onClick={handleSave}
+                        className="flex items-center gap-2 px-3 py-2 bg-studio-panel-light dark:bg-studio-panel hover:bg-studio-accent/10 border border-studio-border-light dark:border-studio-border hover:border-studio-accent text-studio-text-light dark:text-studio-text hover:text-studio-accent rounded-full transition-all duration-300 shadow-sm mr-2"
+                        title="حفظ المشروع (Save Project)"
+                    >
+                        <Save className="w-4 h-4" />
+                        <span className="hidden md:inline font-medium">حفظ</span>
+                    </button>
+                )}
 
                 <button
                     onClick={onExport}

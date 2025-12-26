@@ -8,7 +8,7 @@ interface TextPanelProps {
 const TextPanel: React.FC<TextPanelProps> = ({ onAddText }) => {
     return (
         <div className="h-full flex flex-col p-4 gap-6">
-            <h2 className="text-xl font-bold bg-gradient-to-r from-[#F48969] to-[#E07858] bg-clip-text text-transparent">
+            <h2 className="text-xl font-bold text-primary">
                 Text & Titles
             </h2>
 
@@ -17,7 +17,7 @@ const TextPanel: React.FC<TextPanelProps> = ({ onAddText }) => {
                     onClick={() => onAddText?.('heading')}
                     className="w-full flex items-center justify-start gap-4 h-16 bg-[#2A2A2A] hover:bg-[#333] border border-[#3A3A3A] rounded-xl group transition-all"
                 >
-                    <div className="w-10 h-10 rounded-lg bg-[#F48969]/10 flex items-center justify-center text-[#F48969] group-hover:bg-[#F48969] group-hover:text-white transition-colors">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                         <Heading1 size={24} />
                     </div>
                     <div className="flex flex-col items-start gap-0.5">

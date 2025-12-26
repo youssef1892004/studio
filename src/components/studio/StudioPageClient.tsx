@@ -8,6 +8,8 @@ import { Voice, StudioBlock, Project, ASPECT_RATIO_PRESETS } from '@/lib/types';
 import { LoaderCircle, List } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getProjectById, updateProject, subscribeToBlocks, deleteBlock, deleteBlockByIndex, executeGraphQL, UPDATE_PROJECT_BLOCKS } from '@/lib/graphql';
+import { structureTimelineData, flattenTimelineData } from '@/lib/timeline-adapters';
+import { TimelineItem, TimelineLayer, ProjectDataV2 } from '@/lib/types';
 
 
 
@@ -19,7 +21,8 @@ import ProjectHeader from '@/components/studio/ProjectHeader';
 // import RightSidebar from '@/components/studio/RightSidebar'; // Removed
 import StudioSidebar from '@/components/studio/Sidebar';
 import Toolbar from '@/components/studio/Toolbar';
-import Timeline, { TimelineHandle, TimelineItem } from '@/components/Timeline';
+import StudioToolbar from './StudioToolbar';
+import Timeline, { TimelineHandle } from '@/components/Timeline';
 import CenteredLoader from '@/components/CenteredLoader';
 import PreviewPlayer from '@/components/studio/PreviewPlayer';
 import DynamicPanel from '@/components/studio/DynamicPanel';
@@ -46,6 +49,18 @@ export default function StudioPageClient() {
     const [showExportModal, setShowExportModal] = useState(false);
     const [activePresetId, setActivePresetId] = useState('youtube');
     // const [exportSettings, setExportSettings] = useState({ resolution: '720p', fps: 30 }); // Moved to Modal logic
+
+
+
+    // Lifted State for Middle Toolbar (Zoom & Layers)
+    const [zoomLevel, setZoomLevel] = useState(50);
+    const [manualLayerCount, setManualLayerCount] = useState(2);
+    const [layersState, setLayersState] = useState<TimelineLayer[]>([]); // V2 Layer Metadata Tracker
+
+    // --- Toolbar Actions ---
+    const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 10, 200));
+    const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 10, 10));
+    const handleAddLayer = () => setManualLayerCount(prev => prev + 1);
 
     // Undo/Redo History
     const {
@@ -580,13 +595,65 @@ export default function StudioPageClient() {
                 }));
 
                 setProject(projectData);
-                if (projectData.blocks_json && Array.isArray(projectData.blocks_json)) {
-                    setVideoTrackItems(projectData.blocks_json);
+                if (projectData.blocks_json) {
+                    let loadedItems = [];
+                    let loadedLayers: TimelineLayer[] = [];
+                    let settings: any = {};
+                    let layerCount = 2;
+
+                    // V2: Layer-Based Architecture
+                    if (!Array.isArray(projectData.blocks_json) && projectData.blocks_json.kind === "projectData") {
+                        console.log("[Persistence] Loading V2 Project Data");
+                        const projectDataV2 = projectData.blocks_json as ProjectDataV2;
+                        const flattened = flattenTimelineData(projectDataV2);
+
+                        loadedItems = flattened.items;
+                        layerCount = flattened.layerCount;
+                        loadedLayers = flattened.layers;
+                        if (flattened.settings?.activePresetId) {
+                            setActivePresetId(flattened.settings.activePresetId);
+                        }
+                    }
+                    // V1: Legacy Flat Array
+                    else if (Array.isArray(projectData.blocks_json)) {
+                        console.log("[Persistence] Loading V1 Legacy Data");
+                        loadedItems = projectData.blocks_json;
+
+                        // Extract Settings (Legacy Piggyback)
+                        const settingsItemIndex = loadedItems.findIndex((i: any) => i.type === 'settings');
+                        if (settingsItemIndex !== -1) {
+                            try {
+                                const s = JSON.parse(loadedItems[settingsItemIndex].content);
+                                if (s.activePresetId) setActivePresetId(s.activePresetId);
+                            } catch (e) {
+                                console.error('[Persistence] Failed to parse settings', e);
+                            }
+                            loadedItems.splice(settingsItemIndex, 1);
+                        }
+
+                        // Sanitize Items logic (same as before)
+                        loadedItems = loadedItems.map((item: any) => ({
+                            ...item,
+                            start: Number(item.start) || 0,
+                            duration: Number(item.duration) || 5,
+                            layerIndex: (item.layerIndex !== undefined && item.layerIndex !== null) ? Number(item.layerIndex) : 0,
+                            transform: item.transform || { scale: 1, x: 0, y: 0, rotation: 0 }
+                        }));
+
+                        // Calculate Max Layer
+                        loadedItems.forEach((item: any) => {
+                            if (item.layerIndex !== undefined) {
+                                layerCount = Math.max(layerCount, item.layerIndex + 1);
+                            }
+                        });
+                    }
+
+                    setVideoTrackItems(loadedItems);
+                    setManualLayerCount(layerCount);
+                    setLayersState(loadedLayers); // Sync V2 layers
                 }
+
                 setTimelineLoaded(true);
-                setProjectTitle(projectData.name || "Untitled Project");
-                setProjectDescription(projectData.description || "");
-                setVoices(allVoices);
                 setProjectTitle(projectData.name || "Untitled Project");
                 setProjectDescription(projectData.description || "");
                 setVoices(allVoices);
@@ -686,11 +753,17 @@ export default function StudioPageClient() {
         return () => clearTimeout(timer);
     }, [videoTrackItems, projectId, token, timelineLoaded]);
 
-    // Keep track of active card ID in a ref to use inside subscription callback without re-running effect
+    // Keep track of active card ID in a ref to use inside subscription callback
     const activeCardIdRef = useRef<string | null>(null);
     useEffect(() => {
         activeCardIdRef.current = activeCardId;
     }, [activeCardId]);
+
+    // Keep track of layers in a ref to avoid circular dependencies in saveTimeline
+    const layersStateRef = useRef<TimelineLayer[]>([]);
+    useEffect(() => {
+        layersStateRef.current = layersState;
+    }, [layersState]);
 
     // Subscription Effect
     useEffect(() => {
@@ -818,8 +891,13 @@ export default function StudioPageClient() {
     useEffect(() => {
         if (isInitialLoad.current) return;
         if (!token) return;
+
+        console.log("[AutoSave] Queueing metadata save:", { projectTitle, projectDescription });
+
         const handler = setTimeout(() => {
+            console.log("[AutoSave] Executing metadata save...", { projectTitle });
             updateProject(projectId, projectTitle, projectDescription, token)
+                .then(res => console.log("[AutoSave] Metadata saved details:", res))
                 .catch(err => {
                     console.error("Auto-save for metadata failed:", err);
                 });
@@ -833,13 +911,16 @@ export default function StudioPageClient() {
     const saveVoiceBlocks = useCallback(async (blocksToSave: StudioBlock[]) => {
         // console.log("Saving voice blocks...", blocksToSave.length);
         try {
+            const payload = JSON.stringify({
+                projectId: projectId,
+                blocksJson: blocksToSave,
+            });
+            console.log(`[Persistence] Saving blocks. Payload size: ${payload.length} chars`);
+
             await fetch(`/api/project/save-editor-blocks`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    projectId: projectId,
-                    blocksJson: blocksToSave,
-                }),
+                body: payload,
             });
         } catch (err) {
             console.error("Voice blocks save failed:", err);
@@ -848,20 +929,40 @@ export default function StudioPageClient() {
 
     // 2. Timeline Persistence (videoTrackItems -> projects.blocks_json)
     const saveTimeline = useCallback(async (itemsToSave: TimelineItem[]) => {
-        // console.log("Saving timeline...", itemsToSave.length);
+        // V2: Structure Data
+        const structuredData = structureTimelineData(
+            itemsToSave,
+            manualLayerCount,
+            activePresetId,
+            layersStateRef.current
+        );
+
+        console.log(`[Persistence] Saving Timeline V2 (${structuredData.layers.length} layers, ${itemsToSave.length} clips)`);
+
+        // Sync back generated IDs/Layers to state so we permit them next time
+        // Only update if IDs changed or new layers added to avoid loops
+        const hasChanges = structuredData.layers.length !== layersStateRef.current.length ||
+            structuredData.layers.some((l, i) => l.id !== layersStateRef.current[i]?.id);
+
+        if (hasChanges) {
+            console.log("[Persistence] Updating Layer State with new IDs");
+            // We need to defer this to avoid "cannot update while rendering" if triggered synchronously
+            setTimeout(() => setLayersState(structuredData.layers), 0);
+        }
+
         try {
             await fetch(`/api/project/save-timeline`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     projectId: projectId,
-                    blocksJson: itemsToSave,
+                    blocksJson: structuredData,
                 }),
             });
-        } catch (err) {
+        } catch (err: any) {
             console.error("Timeline save failed:", err);
         }
-    }, [projectId]);
+    }, [projectId, activePresetId, manualLayerCount]);
 
     const lastSavedCardsState = useRef<string>("");
     const lastSavedTimelineState = useRef<string>("");
@@ -1609,14 +1710,86 @@ export default function StudioPageClient() {
 
 
 
+
+
+
+
+
+
+
+    const handleManualSave = useCallback(async () => {
+        const toastId = toast.loading('Saving project...');
+        try {
+            await Promise.all([
+                saveVoiceBlocks(cards),
+                saveTimeline(videoTrackItems)
+            ]);
+            toast.success('Project saved successfully!', { id: toastId });
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to save project', { id: toastId });
+        }
+    }, [cards, videoTrackItems, saveVoiceBlocks, saveTimeline]);
+
+    // --- Import/Export Project File ---
+    const handleExportProject = useCallback(async () => {
+        const toastId = toast.loading('Packing project file (this might take a while)...');
+        try {
+            const { createMuejamFile } = await import('@/lib/project-file');
+            const blob = await createMuejamFile(projectTitle, cards, videoTrackItems, activePresetId);
+
+            // Download
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${projectTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.muejam`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            toast.success('Project exported successfully!', { id: toastId });
+        } catch (e) {
+            console.error(e);
+            toast.error('Failed to export project', { id: toastId });
+        }
+    }, [projectTitle, cards, videoTrackItems, activePresetId]);
+
+    const handleImportProject = useCallback(async (file: File) => {
+        const toastId = toast.loading('Importing project & unpacking assets...');
+        try {
+            const { parseMuejamFile } = await import('@/lib/project-file');
+            const projectData = await parseMuejamFile(file);
+
+            // Restore State
+            setProjectTitle(projectData.metadata.title);
+            setProjectDescription(projectData.metadata.description);
+            if (projectData.settings?.activePresetId) {
+                setActivePresetId(projectData.settings.activePresetId);
+            }
+
+            // IMPORTANT: cards need to be mapped to be compatible if needed, assuming direct match for now
+            // But checking types is safer.
+            setCards(projectData.content.voiceBlocks);
+            setVideoTrackItems(projectData.content.timelineItems);
+
+            // Auto-Save imported state
+            await Promise.all([
+                saveVoiceBlocks(projectData.content.voiceBlocks),
+                saveTimeline(projectData.content.timelineItems)
+            ]);
+
+            toast.success('Project imported successfully!', { id: toastId });
+        } catch (e) {
+            console.error(e);
+            toast.error('Failed to import project', { id: toastId });
+        }
+    }, [saveVoiceBlocks, saveTimeline]);
+
+
     if (!user) {
         return null;
     }
-
-
-
-
-
 
     return (
         <PerformanceProvider>
@@ -1639,9 +1812,11 @@ export default function StudioPageClient() {
                         </div>
                         <div className="w-full bg-studio-panel-light dark:bg-studio-panel h-2 rounded-full overflow-hidden border border-studio-border-light dark:border-studio-border relative">
                             <div
-                                className="absolute top-0 left-0 h-full bg-studio-accent transition-all duration-300 ease-out rounded-full"
+                                className="h-full bg-studio-accent transition-all duration-300 ease-out relative overflow-hidden"
                                 style={{ width: `${loadingProgress}%` }}
-                            />
+                            >
+                                <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                            </div>
                         </div>
                         <p className="text-studio-text-light/70 dark:text-studio-text/70 animate-pulse font-medium">
                             {loadingMessage}
@@ -1676,48 +1851,30 @@ export default function StudioPageClient() {
                             onBack={() => router.push('/projects')}
                             activePresetId={activePresetId}
                             onPresetChange={setActivePresetId}
+                            handleSave={handleManualSave}
+                            onExportProject={handleExportProject}
+                            onImportProject={handleImportProject}
                         />
 
                         {/* Middle Area: Split View (Properties + Center + Dynamic) */}
                         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
 
-                            {/* Right: Properties Panel (First in DOM -> Right in RTL) */}
-                            <div className="w-full lg:w-[300px] flex-shrink-0 bg-[#1E1E1E] border-l border-studio-border z-10 overflow-y-auto">
-                                <PropertiesPanel
-                                    selectedItem={selectedItem as any}
-                                    currentGlobalSpeed={selectedItem?.playbackRate ?? playbackRate}
-                                    onUpdateVolume={handleUpdateVolume}
-                                    onUpdateSpeed={handleUpdateItemSpeed}
-                                    onDelete={handleDeleteSelection}
-                                    onUpdateText={handleUpdateText}
-                                    onUpdateTransform={(newTransform) => {
-                                        // Update transform for the selected item (activeVideoId)
-                                        if (activeVideoId) {
-                                            setVideoTrackItems(prev => prev.map(item =>
-                                                item.id === activeVideoId
-                                                    ? { ...item, transform: newTransform }
-                                                    : item
-                                            ));
-                                        }
-                                    }}
-                                    onUpdateOpacity={(newOpacity) => {
-                                        if (activeVideoId) {
-                                            setVideoTrackItems(prev => prev.map(item =>
-                                                item.id === activeVideoId
-                                                    ? { ...item, opacity: newOpacity }
-                                                    : item
-                                            ));
-                                        }
-                                    }}
-                                    onUpdateVisibility={(visible) => {
-                                        if (activeVideoId) {
-                                            setVideoTrackItems(prev => prev.map(item =>
-                                                item.id === activeVideoId
-                                                    ? { ...item, visible: visible }
-                                                    : item
-                                            ));
-                                        }
-                                    }}
+                            {/* Right: Dynamic Panel (Reordered: First in DOM -> Right in RTL) */}
+                            {/* This puts the Library/Tools NEXT to the Sidebar which is exactly what we want */}
+                            <div ref={dynamicPanelRef} className={`w-full lg:w-[340px] flex-shrink-0 bg-studio-bg-light dark:bg-studio-bg border-l border-studio-border-light dark:border-studio-border z-10 overflow-y-auto ${!activeLeftTool ? 'hidden' : ''}`}>
+                                <DynamicPanel
+                                    voices={voices}
+                                    activeTool={activeLeftTool}
+                                    onGenerateVoice={handleCreateAndGenerateVoice}
+                                    activeBlock={activeCard}
+                                    blockIndex={activeCardId ? (cards.findIndex(c => c.id === activeCardId) + 1) : undefined}
+                                    onUpdateBlock={handleUpdateBlock}
+                                    onDeleteBlock={handleDeleteBlock}
+                                    onClearSelection={() => setActiveCardId(null)}
+                                    onAddGhostBlock={handleAddGhostBlock}
+                                    project={project}
+                                    onAssetsUpdated={handleAssetsUpdated}
+                                    onAddText={handleAddText}
                                 />
                             </div>
 
@@ -1758,28 +1915,74 @@ export default function StudioPageClient() {
                                 />
                             </div>
 
-                            {/* Left: Dynamic Panel (Last in DOM -> Left in RTL) */}
-                            <div ref={dynamicPanelRef} className={`w-full lg:w-[340px] flex-shrink-0 bg-studio-bg-light dark:bg-studio-bg border-r border-studio-border-light dark:border-studio-border z-10 overflow-y-auto ${!activeLeftTool ? 'hidden' : ''}`}>
-                                <DynamicPanel
-                                    voices={voices}
-                                    activeTool={activeLeftTool}
-                                    onGenerateVoice={handleCreateAndGenerateVoice}
-                                    activeBlock={activeCard}
-                                    blockIndex={activeCardId ? (cards.findIndex(c => c.id === activeCardId) + 1) : undefined}
-                                    onUpdateBlock={handleUpdateBlock}
-                                    onDeleteBlock={handleDeleteBlock}
-                                    onClearSelection={() => setActiveCardId(null)}
-                                    onAddGhostBlock={handleAddGhostBlock}
-                                    project={project}
-                                    onAssetsUpdated={handleAssetsUpdated}
-                                    onAddText={handleAddText}
+                            {/* Left: Properties Panel (Reordered: Last in DOM -> Left in RTL) */}
+                            <div className="w-full lg:w-[300px] flex-shrink-0 bg-[#1E1E1E] border-r border-studio-border z-10 overflow-y-auto">
+                                <PropertiesPanel
+                                    selectedItem={selectedItem as any}
+                                    currentGlobalSpeed={selectedItem?.playbackRate ?? playbackRate}
+                                    onUpdateVolume={handleUpdateVolume}
+                                    onUpdateSpeed={handleUpdateItemSpeed}
+                                    onDelete={handleDeleteSelection}
+                                    onUpdateText={handleUpdateText}
+                                    onUpdateTransform={(newTransform) => {
+                                        // Update transform for the selected item (activeVideoId)
+                                        if (activeVideoId) {
+                                            setVideoTrackItems(prev => prev.map(item =>
+                                                item.id === activeVideoId
+                                                    ? { ...item, transform: newTransform }
+                                                    : item
+                                            ));
+                                        }
+                                    }}
+                                    onUpdateOpacity={(newOpacity) => {
+                                        if (activeVideoId) {
+                                            setVideoTrackItems(prev => prev.map(item =>
+                                                item.id === activeVideoId
+                                                    ? { ...item, opacity: newOpacity }
+                                                    : item
+                                            ));
+                                        }
+                                    }}
+                                    onUpdateVisibility={(visible) => {
+                                        if (activeVideoId) {
+                                            setVideoTrackItems(prev => prev.map(item =>
+                                                item.id === activeVideoId
+                                                    ? { ...item, visible: visible }
+                                                    : item
+                                            ));
+                                        }
+                                    }}
                                 />
                             </div>
                         </div>
 
+                        {/* Middle Action Bar (CapCut Style) */}
+                        <StudioToolbar
+                            isPlaying={isPlaying}
+                            onPlayPause={() => timelineRef.current?.togglePlayPause()}
+                            onSeekStart={() => timelineRef.current?.seek(0)}
+                            zoomLevel={zoomLevel}
+                            onZoomIn={handleZoomIn}
+                            onZoomOut={handleZoomOut}
+                            activeTool={activeTool}
+                            onToolChange={setActiveTool}
+                            onUndo={handleUndo}
+                            onRedo={handleRedo}
+                            canUndo={canUndo}
+                            canRedo={canRedo}
+                            onDelete={handleDeleteSelection}
+                            onSplit={() => {
+                                // We can trigger split logic here if needed, or keeping tool selection is often enough
+                                // For now, the razor tool is selected via onToolChange
+                            }}
+                            onAddLayer={handleAddLayer}
+                            currentTime={currentTime}
+                        />
+
                         {/* Timeline Area (Fixed at bottom of main content) */}
-                        <div className="h-[280px] flex-shrink-0 border-t border-studio-border-light dark:border-studio-border bg-studio-panel-light dark:bg-studio-panel z-20">
+                        <div className="h-[280px] flex-shrink-0 border-t border-border bg-muted/30 backdrop-blur-md z-20">
                             <Timeline
+                                ref={timelineRef}
                                 cards={cards}
                                 voices={voices}
                                 onCardsUpdate={setCards}
@@ -1804,7 +2007,9 @@ export default function StudioPageClient() {
                                 onRedo={handleRedo}
                                 canUndo={canUndo}
                                 canRedo={canRedo}
-                                ref={timelineRef}
+                                // Lifted Props
+                                zoomLevel={zoomLevel}
+                                manualLayerCount={manualLayerCount}
                             />
                         </div>
                     </div>
