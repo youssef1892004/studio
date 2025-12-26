@@ -48,6 +48,7 @@ export default function StudioPageClient() {
     const [isExporting, setIsExporting] = useState(false);
     const [videoTrackItems, setVideoTrackItems] = useState<TimelineItem[]>([]);
     const [showExportModal, setShowExportModal] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null); // Quick Upload Ref
     const [activePresetId, setActivePresetId] = useState('youtube');
     // const [exportSettings, setExportSettings] = useState({ resolution: '720p', fps: 30 }); // Moved to Modal logic
 
@@ -1919,6 +1920,38 @@ export default function StudioPageClient() {
         }));
     }, [activeVideoId]);
 
+    // Fast Quick Upload Handlers (Phase 6)
+    const handleQuickUpload = useCallback(() => {
+        fileInputRef.current?.click();
+    }, []);
+
+    const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const url = URL.createObjectURL(file);
+        const type = file.type.startsWith('video') ? 'video' : 'image';
+
+        // Basic creation - simple duration for now
+        const newItem: TimelineItem = {
+            id: uuidv4(),
+            type: type,
+            start: currentTime,
+            duration: 5, // Default duration
+            content: url,
+            transform: { x: 0, y: 0, scale: 1, rotation: 0 },
+            opacity: 1,
+            visible: true,
+            layerIndex: 0
+        };
+
+        setVideoTrackItems(prev => [...prev, newItem]);
+        toast.success(`${type === 'video' ? 'Video' : 'Image'} added to timeline`);
+
+        // Reset input
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    }, [currentTime]);
+
     // --------------------------------------------------------------------------------
 
     const activeTextItems = useMemo(() => {
@@ -2268,6 +2301,14 @@ export default function StudioPageClient() {
                                 onDuplicateLayer={handleDuplicateLayer}
                             />
                         </div>
+                        {/* Hidden Input for Quick Upload */}
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileChange}
+                            className="hidden"
+                            accept="image/*,video/*"
+                        />
                     </div>
                 </div>
             )}
