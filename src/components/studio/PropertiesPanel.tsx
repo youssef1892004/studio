@@ -1,5 +1,6 @@
 import React from 'react';
-import { Trash2, Volume2, Gauge, Maximize2, RotateCcw, Eye, EyeOff } from 'lucide-react';
+import { Trash2, Volume2, Gauge, Maximize2, RotateCcw, Eye, EyeOff, Type, Heading1, Heading2, AlignLeft, AlignCenter, AlignRight, Check } from 'lucide-react';
+import { TEXT_PRESETS, TEXT_COLORS } from '@/lib/constants';
 
 interface PropertiesPanelProps {
     selectedItem: {
@@ -22,9 +23,10 @@ interface PropertiesPanelProps {
     onUpdateTransform?: (transform: { scale: number; x: number; y: number; rotation: number }) => void;
     onUpdateOpacity?: (val: number) => void;
     onUpdateVisibility?: (visible: boolean) => void;
+    onApplyPreset?: (preset: string) => void;
 }
 
-const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, currentGlobalSpeed, onUpdateVolume, onUpdateSpeed, onDelete, onUpdateText, onUpdateTransform, onUpdateOpacity, onUpdateVisibility }) => {
+const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, currentGlobalSpeed, onUpdateVolume, onUpdateSpeed, onDelete, onUpdateText, onUpdateTransform, onUpdateOpacity, onUpdateVisibility, onApplyPreset }) => {
 
     if (!selectedItem) {
         return (
@@ -66,9 +68,25 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, current
                     </div>
                 )}
 
-                {/* Text Controls */}
+                {/* Text Controls - Enhanced (Phase 4.5) */}
                 {selectedItem.type === 'text' && onUpdateText && (
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-6">
+                        {/* Section 1: Presets Grid */}
+                        <div className="space-y-2">
+                            <label className="text-xs font-medium text-gray-400">Presets</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {Object.keys(TEXT_PRESETS).map((key) => (
+                                    <button
+                                        key={key}
+                                        onClick={() => onApplyPreset?.(key)}
+                                        className="px-3 py-2 bg-[#2A2A2A] hover:bg-[#333] border border-[#3A3A3A] rounded text-sm font-medium capitalize transition-colors text-left text-gray-200"
+                                    >
+                                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
                         {/* Content */}
                         <div className="flex flex-col gap-2">
                             <span className="text-xs text-gray-400">Content</span>
@@ -76,58 +94,95 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, current
                                 value={selectedItem.content || ''}
                                 onChange={(e) => onUpdateText(e.target.value, selectedItem.textStyle)}
                                 className="w-full bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg p-2 text-sm text-gray-200 focus:outline-none focus:border-primary"
-                                rows={3}
+                                rows={2}
                             />
                         </div>
 
-                        {/* Font Size */}
-                        <div className="flex flex-col gap-2">
-                            <div className="flex justify-between items-center text-xs text-gray-400">
-                                <span>Font Size</span>
-                                <span>{selectedItem.textStyle?.fontSize || 24}px</span>
+                        {/* Typography Section */}
+                        <div className="space-y-4 border-t border-[#333] pt-4">
+                            <label className="text-xs font-medium text-gray-400">Typography</label>
+
+                            {/* Font Size */}
+                            <div className="space-y-2">
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-gray-400">Size</span>
+                                    <span className="text-gray-200">{selectedItem.textStyle?.fontSize || 24}px</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="12"
+                                    max="120"
+                                    step="1"
+                                    value={selectedItem.textStyle?.fontSize || 24}
+                                    onChange={(e) => onUpdateText(selectedItem.content!, { ...selectedItem.textStyle, fontSize: parseInt(e.target.value) })}
+                                    className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary"
+                                />
                             </div>
-                            <input
-                                type="range"
-                                min="12"
-                                max="120"
-                                value={selectedItem.textStyle?.fontSize || 24}
-                                onChange={(e) => onUpdateText(selectedItem.content!, { ...selectedItem.textStyle, fontSize: parseInt(e.target.value) })}
-                                className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary"
-                            />
-                        </div>
 
-                        {/* Color & Position */}
-                        <div className="grid grid-cols-2 gap-2">
-                            <div className="flex flex-col gap-1">
+                            {/* Font Weight */}
+                            <div className="space-y-1">
+                                <span className="text-xs text-gray-400">Weight</span>
+                                <div className="flex bg-[#333] rounded-lg p-1 gap-1">
+                                    {['normal', 'bold'].map((w) => (
+                                        <button
+                                            key={w}
+                                            onClick={() => onUpdateText(selectedItem.content!, { ...selectedItem.textStyle, fontWeight: w })}
+                                            className={`flex-1 py-1.5 text-xs rounded-md transition-all ${selectedItem.textStyle?.fontWeight === w ? 'bg-primary text-white font-bold shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                                        >
+                                            {w === 'normal' ? 'Reg' : 'Bold'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Alignment */}
+                            <div className="space-y-1">
+                                <span className="text-xs text-gray-400">Align</span>
+                                <div className="flex bg-[#333] rounded-lg p-1 gap-1">
+                                    {[
+                                        { val: 'left', icon: <AlignLeft size={14} /> },
+                                        { val: 'center', icon: <AlignCenter size={14} /> },
+                                        { val: 'right', icon: <AlignRight size={14} /> }
+                                    ].map((opt) => (
+                                        <button
+                                            key={opt.val}
+                                            onClick={() => onUpdateText(selectedItem.content!, { ...selectedItem.textStyle, textAlign: opt.val })}
+                                            className={`flex-1 py-1.5 flex justify-center items-center rounded-md transition-all ${selectedItem.textStyle?.textAlign === opt.val ? 'bg-primary text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                                        >
+                                            {opt.icon}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Color Palette */}
+                            <div className="space-y-2">
                                 <span className="text-xs text-gray-400">Color</span>
-                                <input
-                                    type="color"
-                                    value={selectedItem.textStyle?.color || '#ffffff'}
-                                    onChange={(e) => onUpdateText(selectedItem.content!, { ...selectedItem.textStyle, color: e.target.value })}
-                                    className="w-full h-8 bg-transparent cursor-pointer rounded overflow-hidden"
-                                />
-                            </div>
-                            <div className="flex flex-col gap-1">
-                                <span className="text-xs text-gray-400">X ({selectedItem.textStyle?.xPosition !== undefined ? Math.round(selectedItem.textStyle.xPosition) : 50}%)</span>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="100"
-                                    value={selectedItem.textStyle?.xPosition !== undefined ? selectedItem.textStyle.xPosition : 50}
-                                    onChange={(e) => onUpdateText(selectedItem.content!, { ...selectedItem.textStyle, xPosition: parseInt(e.target.value) })}
-                                    className="w-full h-8 bg-transparent cursor-pointer accent-primary"
-                                />
-                            </div>
-                            <div className="flex flex-col gap-1">
-                                <span className="text-xs text-gray-400">Y ({selectedItem.textStyle?.yPosition !== undefined ? Math.round(selectedItem.textStyle.yPosition) : 50}%)</span>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="100"
-                                    value={selectedItem.textStyle?.yPosition || 50}
-                                    onChange={(e) => onUpdateText(selectedItem.content!, { ...selectedItem.textStyle, yPosition: parseInt(e.target.value) })}
-                                    className="w-full h-8 bg-transparent cursor-pointer accent-primary"
-                                />
+                                <div className="flex flex-wrap gap-2">
+                                    {TEXT_COLORS.map((color) => (
+                                        <button
+                                            key={color}
+                                            onClick={() => onUpdateText(selectedItem.content!, { ...selectedItem.textStyle, color })}
+                                            className={`w-6 h-6 rounded-full border border-white/10 relative transition-transform hover:scale-110 ${selectedItem.textStyle?.color === color ? 'ring-2 ring-primary ring-offset-1 ring-offset-[#1E1E1E]' : ''}`}
+                                            style={{ backgroundColor: color }}
+                                        >
+                                            {selectedItem.textStyle?.color === color && (
+                                                <Check size={12} className="absolute inset-0 m-auto text-black/50 drop-shadow-sm" />
+                                            )}
+                                        </button>
+                                    ))}
+                                    {/* Custom Color Picker */}
+                                    <div className="relative w-6 h-6 rounded-full overflow-hidden border border-white/10 hover:scale-110 transition-transform cursor-pointer">
+                                        <input
+                                            type="color"
+                                            value={selectedItem.textStyle?.color || '#ffffff'}
+                                            onChange={(e) => onUpdateText(selectedItem.content!, { ...selectedItem.textStyle, color: e.target.value })}
+                                            className="absolute inset-0 w-[150%] h-[150%] -top-1/4 -left-1/4 p-0 m-0 cursor-pointer border-none"
+                                            title="Custom Color"
+                                        />
+                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-gradient-to-br from-red-500 via-green-500 to-blue-500 opacity-80" />
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -202,29 +257,31 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, current
                     </div>
                 )}
 
-                {/* Speed Control */}
-                <div className="flex flex-col gap-2">
-                    <div className="flex justify-between items-center text-sm text-gray-400">
-                        <div className="flex items-center gap-2">
-                            <Gauge size={14} />
-                            <span>السرعة (Speed)</span>
+                {/* Speed Control (Hidden for Text) */}
+                {selectedItem.type !== 'text' && (
+                    <div className="flex flex-col gap-2">
+                        <div className="flex justify-between items-center text-sm text-gray-400">
+                            <div className="flex items-center gap-2">
+                                <Gauge size={14} />
+                                <span>السرعة (Speed)</span>
+                            </div>
+                        </div>
+                        <div className="flex bg-[#333] rounded-lg p-1">
+                            {[0.5, 1, 1.5, 2].map(rate => (
+                                <button
+                                    key={rate}
+                                    onClick={() => onUpdateSpeed(rate)}
+                                    className={`flex-1 text-xs py-1.5 rounded transition-all ${currentGlobalSpeed === rate
+                                        ? 'bg-primary text-primary-foreground font-medium shadow-sm'
+                                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                        }`}
+                                >
+                                    {rate}x
+                                </button>
+                            ))}
                         </div>
                     </div>
-                    <div className="flex bg-[#333] rounded-lg p-1">
-                        {[0.5, 1, 1.5, 2].map(rate => (
-                            <button
-                                key={rate}
-                                onClick={() => onUpdateSpeed(rate)}
-                                className={`flex-1 text-xs py-1.5 rounded transition-all ${currentGlobalSpeed === rate
-                                    ? 'bg-primary text-primary-foreground font-medium shadow-sm'
-                                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                                    }`}
-                            >
-                                {rate}x
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                )}
 
                 <div className="h-px bg-[#333] my-2" />
 

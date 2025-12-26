@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import { fetchVoices } from '@/lib/tts';
 import { Voice, StudioBlock, Project, ASPECT_RATIO_PRESETS, TimelineItem, TimelineLayer, ProjectDataV2 } from '@/lib/types';
+import { TEXT_PRESETS } from '@/lib/constants';
 import { LoaderCircle, List } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getProjectById, updateProject, subscribeToBlocks, deleteBlock, deleteBlockByIndex, executeGraphQL, UPDATE_PROJECT_BLOCKS } from '@/lib/graphql';
@@ -1857,6 +1858,56 @@ export default function StudioPageClient() {
         });
     }, [activeVideoId]);
 
+    // Phase 4: Text Logic
+    // --------------------------------------------------------------------------------
+    const selectedTextItem = useMemo(() => {
+        if (!activeVideoId) return null;
+        return videoTrackItems.find(i => i.id === activeVideoId && i.type === 'text') || null;
+    }, [activeVideoId, videoTrackItems]);
+
+    const handleApplyPreset = useCallback((presetKey: string) => {
+        if (!activeVideoId) return;
+        const preset = TEXT_PRESETS[presetKey as keyof typeof TEXT_PRESETS];
+        if (!preset) return;
+
+        setVideoTrackItems(prev => prev.map(item => {
+            if (item.id === activeVideoId && item.type === 'text') {
+                return {
+                    ...item,
+                    textStyle: {
+                        ...item.textStyle,
+                        ...preset.textStyle
+                    },
+                    transform: {
+                        ...item.transform,
+                        x: preset.layout.x,
+                        y: preset.layout.y
+                        // Preserve scale/rotation
+                    } as any // Cast to any to bypass strict type check for now if needed, or ensure type matches
+                };
+            }
+            return item;
+        }));
+    }, [activeVideoId]);
+
+    const handleUpdateTextStyle = useCallback((newStyle: Partial<any>) => {
+        if (!activeVideoId) return;
+        setVideoTrackItems(prev => prev.map(item => {
+            if (item.id === activeVideoId && item.type === 'text') {
+                return {
+                    ...item,
+                    textStyle: {
+                        ...item.textStyle,
+                        ...newStyle
+                    }
+                };
+            }
+            return item;
+        }));
+    }, [activeVideoId]);
+
+    // --------------------------------------------------------------------------------
+
     const activeTextItems = useMemo(() => {
         return videoTrackItems
             .filter(item => item.type === 'text' && currentTime >= item.start && currentTime < (item.start + item.duration))
@@ -2093,7 +2144,7 @@ export default function StudioPageClient() {
                             </div>
 
                             {/* Left: Properties Panel (Reordered: Last in DOM -> Left in RTL) */}
-                            <div className="w-full lg:w-[300px] flex-shrink-0 bg-[#1E1E1E] border-r border-studio-border z-10 overflow-y-auto">
+                            <div className="w-full lg:w-[360px] flex-shrink-0 bg-[#1E1E1E] border-r border-studio-border z-10 overflow-y-auto">
                                 <PropertiesPanel
                                     selectedItem={selectedItem as any}
                                     currentGlobalSpeed={selectedItem?.playbackRate ?? playbackRate}

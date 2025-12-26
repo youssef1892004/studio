@@ -171,7 +171,7 @@ export interface TimelineItem {
     color?: string;
     backgroundColor?: string;
     fontFamily?: string;
-    fontWeight?: 'normal' | 'bold';
+    fontWeight?: string | 'normal' | 'bold';
     textAlign?: 'left' | 'center' | 'right';
     backgroundOpacity?: number;
     yPosition?: number; // % from top
