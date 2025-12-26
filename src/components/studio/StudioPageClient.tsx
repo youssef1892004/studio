@@ -1718,9 +1718,16 @@ export default function StudioPageClient() {
             id: uuidv4(),
             type: 'text',
             start: currentTime, // Add at current playhead
-            duration: 5,
+            duration: 3,
             content: textContent,
-            textStyle: style as any
+            textStyle: style as any,
+            transform: {
+                x: 50,
+                y: 50,
+                scale: 1,
+                rotation: 0
+            },
+            layerIndex: -1 // -1 = Text Layer
         };
 
         setVideoTrackItems(prev => [...prev, newItem]);

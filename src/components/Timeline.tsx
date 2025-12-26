@@ -560,7 +560,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
     const visualMaxTime = useMemo(() => {
         let max = 0;
         videoTrackItems.forEach(item => {
-            if (item.type === 'scene' || item.type === 'video' || item.type === 'image') {
+            if (item.type === 'scene' || item.type === 'video' || item.type === 'image' || item.type === 'text') {
                 if (Number.isFinite(item.start) && Number.isFinite(item.duration) && item.duration > 0) {
                     max = Math.max(max, item.start + item.duration);
                 }
@@ -964,7 +964,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
                     // Filter items on target layer
                     const layerItems = videoTrackItems.filter(i => {
                         const iLayer = i.layerIndex || 0;
-                        const isVisual = i.type === 'image' || i.type === 'scene' || i.type === 'video';
+                        const isVisual = i.type === 'image' || i.type === 'scene' || i.type === 'video' || i.type === 'text';
                         // Text and Music have their own logic/tracks usually, but if on video track...
                         // Assuming video tracks only contain visual items.
                         return isVisual && iLayer === targetLayer;
@@ -1842,24 +1842,30 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
                                                                 </span>
                                                             </div>
                                                         )
-                                                    ) : (track.type === 'image' || track.type === 'video') ? (
-                                                        <div className="w-full h-full flex items-center justify-center bg-muted border border-white/10 overflow-hidden relative rounded-sm">
-                                                            {item.audioUrl ? (
+                                                    ) : (track.type === 'image' || track.type === 'video' || track.type === 'text') ? (
+                                                        <div className={`w-full h-full flex items-center justify-center overflow-hidden relative rounded-sm ${track.type === 'text' ? 'bg-primary/20 border-primary/50 text-primary-foreground' : 'bg-muted border-white/10'}`}>
+                                                            {track.type === 'text' ? (
+                                                                // Text Item Preview
+                                                                <div className="w-full h-full flex px-2 items-center overflow-hidden">
+                                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                                        <span className="flex-shrink-0 w-4 h-4 rounded bg-primary text-[10px] uppercase font-bold text-white flex items-center justify-center">T</span>
+                                                                        <span className="truncate text-xs font-medium text-white/90 drop-shadow-md">
+                                                                            {item.content || 'Text'}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            ) : item.audioUrl ? (
                                                                 <>
                                                                     {item.type === 'scene' || (item.content && (item.content.toLowerCase().endsWith('.mp4') || item.content.toLowerCase().endsWith('.mov'))) ? (
                                                                         <video
-                                                                            src={`/api/asset-proxy?url=${encodeURIComponent(item.audioUrl)}#t=0.1`}
-                                                                            className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                                                                            draggable={false}
-                                                                            muted
-                                                                            preload="metadata"
+                                                                            src={item.audioUrl}
+                                                                            className="w-full h-full object-cover opacity-50 pointer-events-none"
                                                                         />
                                                                     ) : (
                                                                         <img
-                                                                            src={`/api/asset-proxy?url=${encodeURIComponent(item.audioUrl)}`}
-                                                                            alt={item.content}
-                                                                            className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                                                                            draggable={false}
+                                                                            src={item.audioUrl}
+                                                                            className="w-full h-full object-cover opacity-50 pointer-events-none"
+                                                                            alt="media thumbnail"
                                                                         />
                                                                     )}
 
@@ -1871,7 +1877,8 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
                                                                     </div>
                                                                 </>
                                                             ) : (
-                                                                <span className="text-xs truncate px-2">{item.content}</span>
+                                                                // Fallback / Loading
+                                                                <div className="animate-pulse bg-white/5 w-full h-full" />
                                                             )}
                                                         </div>
                                                     ) : (
