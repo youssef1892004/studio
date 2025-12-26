@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Trash2, Volume2, Gauge, Maximize2, RotateCcw, Eye, EyeOff, Type, Heading1, Heading2, AlignLeft, AlignCenter, AlignRight, Check, Sparkles, MousePointerClick } from 'lucide-react';
 import { TEXT_PRESETS, TEXT_COLORS } from '@/lib/constants';
 
@@ -75,6 +75,23 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     };
 
     // --- CASE 1: EMPTY STATE (Inspector Mode) ---
+    // Focus Handler for Double Click
+    useEffect(() => {
+        const handleFocus = () => {
+            const input = document.getElementById('properties-text-editor');
+            if (input) {
+                input.focus();
+                (input as HTMLTextAreaElement).select();
+                // Ensure the accordion section is open
+                if (!openSections.includes('content')) {
+                    setOpenSections(prev => [...prev, 'content']);
+                }
+            }
+        };
+        window.addEventListener('studio:focus-text', handleFocus);
+        return () => window.removeEventListener('studio:focus-text', handleFocus);
+    }, [openSections]);
+
     if (!selectedItem) {
         return (
             <div className="h-full w-full bg-[#1E1E1E] border-l border-[#333] flex flex-col items-center justify-center p-6 text-center">
@@ -117,6 +134,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                         >
                             <div className="space-y-3">
                                 <textarea
+                                    id="properties-text-editor"
                                     value={selectedItem.content || ''}
                                     onChange={(e) => onUpdateText(e.target.value, selectedItem.textStyle)}
                                     className="w-full bg-[#1E1E1E] border border-[#333] rounded-lg p-3 text-sm text-gray-100 focus:outline-none focus:border-primary resize-none"

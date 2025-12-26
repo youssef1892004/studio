@@ -2182,6 +2182,9 @@ export default function StudioPageClient() {
                                             ? (videoTrackItems.find(i => i.id === activeVideoId)?.transform || { scale: 1, x: 0, y: 0, rotation: 0 })
                                             : (activeMedia?.id ? videoTrackItems.find(i => i.id === activeMedia.id)?.transform : { scale: 1, x: 0, y: 0, rotation: 0 })
                                     }
+                                    onEditItem={(id, type) => {
+                                        if (type === 'text') window.dispatchEvent(new Event('studio:focus-text'));
+                                    }}
                                     onTransformUpdate={(newTransform) => {
                                         // Update the SELECTED item (activeVideoId) if available, otherwise activeMedia
                                         const targetId = activeVideoId || activeMedia?.id;
