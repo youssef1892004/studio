@@ -255,7 +255,7 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
         >
             <div
                 ref={containerRef}
-                className="w-full max-w-4xl bg-black rounded-lg shadow-2xl overflow-hidden relative flex items-center justify-center border border-studio-border dark:border-studio-border group select-none"
+                className="w-full max-w-4xl bg-black rounded-lg shadow-2xl overflow-hidden relative flex items-center justify-center border border-border group select-none"
                 style={{ aspectRatio: aspectRatio, maxHeight: '80vh' }}
                 onWheel={handleWheel}
             >
@@ -323,7 +323,7 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                     ) : (
                         <div className="flex items-center justify-center h-full pointer-events-none">
                             <div className="text-center opacity-50">
-                                <Play className="w-12 h-12 mx-auto mb-2 text-studio-accent" />
+                                <Play className="w-12 h-12 mx-auto mb-2 text-primary" />
                                 <p>No media selected</p>
                             </div>
                         </div>

@@ -1970,25 +1970,25 @@ export default function StudioPageClient() {
                 isExporting={isExporting}
             />
             {isCriticalLoading && (
-                <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-studio-bg-light dark:bg-studio-bg transition-colors duration-300">
+                <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background transition-colors duration-300">
                     <div className="w-full max-w-md px-6 flex flex-col items-center gap-6">
                         <div className="flex items-center gap-3 mb-4">
-                            <div className="w-12 h-12 rounded-xl bg-studio-accent flex items-center justify-center shadow-lg shadow-studio-accent/20">
+                            <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
                                 <span className="text-white font-bold text-2xl">S</span>
                             </div>
-                            <h1 className="text-2xl font-bold text-studio-text-light dark:text-studio-text">
+                            <h1 className="text-2xl font-bold text-foreground">
                                 Studio muejam
                             </h1>
                         </div>
-                        <div className="w-full bg-studio-panel-light dark:bg-studio-panel h-2 rounded-full overflow-hidden border border-studio-border-light dark:border-studio-border relative">
+                        <div className="w-full bg-muted h-2 rounded-full overflow-hidden border border-border relative">
                             <div
-                                className="h-full bg-studio-accent transition-all duration-300 ease-out relative overflow-hidden"
+                                className="h-full bg-primary transition-all duration-300 ease-out relative overflow-hidden"
                                 style={{ width: `${loadingProgress}%` }}
                             >
                                 <div className="absolute inset-0 bg-white/20 animate-pulse" />
                             </div>
                         </div>
-                        <p className="text-studio-text-light/70 dark:text-studio-text/70 animate-pulse font-medium">
+                        <p className="text-muted-foreground animate-pulse font-medium">
                             {loadingMessage}
                         </p>
                     </div>
@@ -1996,7 +1996,7 @@ export default function StudioPageClient() {
             )}
 
             {project && (
-                <div className="flex h-screen bg-studio-bg-light dark:bg-studio-bg font-sans overflow-hidden text-studio-text-light dark:text-studio-text flex-row">
+                <div className="flex h-screen bg-background font-sans overflow-hidden text-foreground flex-row">
                     {/* Left Sidebar - Always Visible */}
                     <StudioSidebar
                         activeItem={activeLeftTool}
@@ -2031,7 +2031,7 @@ export default function StudioPageClient() {
 
                             {/* Right: Dynamic Panel (Reordered: First in DOM -> Right in RTL) */}
                             {/* This puts the Library/Tools NEXT to the Sidebar which is exactly what we want */}
-                            <div ref={dynamicPanelRef} className={`w-full lg:w-[340px] flex-shrink-0 bg-studio-bg-light dark:bg-studio-bg border-l border-studio-border-light dark:border-studio-border z-10 overflow-y-auto ${!activeLeftTool ? 'hidden' : ''}`}>
+                            <div ref={dynamicPanelRef} className={`w-full lg:w-[340px] flex-shrink-0 bg-card border-l border-border z-10 overflow-y-auto ${!activeLeftTool ? 'hidden' : ''}`}>
                                 <DynamicPanel
                                     voices={voices}
                                     activeTool={activeLeftTool}

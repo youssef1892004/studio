@@ -136,15 +136,15 @@ const VoiceGenerationPanel: React.FC<VoiceGenerationPanelProps> = ({
     };
 
     return (
-        <div className="h-full flex flex-col bg-studio-bg-light dark:bg-studio-bg p-6 space-y-6 overflow-y-auto custom-scrollbar">
+        <div className="h-full flex flex-col bg-card p-6 space-y-6 overflow-y-auto custom-scrollbar">
             {/* Header */}
             <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-studio-accent/20 rounded-xl">
-                        <Mic className="w-6 h-6 text-studio-accent" />
+                    <div className="p-2.5 bg-primary/20 rounded-xl">
+                        <Mic className="w-6 h-6 text-primary" />
                     </div>
                     <div>
-                        <h2 className="text-xl font-bold text-studio-text-light dark:text-studio-text flex items-center gap-2">
+                        <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
                             {activeBlock ? (
                                 <>
                                     تعديل الصوت
@@ -154,7 +154,7 @@ const VoiceGenerationPanel: React.FC<VoiceGenerationPanelProps> = ({
                                 </>
                             ) : 'توليد الصوت'}
                         </h2>
-                        <p className="text-sm text-studio-text-light/70 dark:text-studio-text/70">
+                        <p className="text-sm text-muted-foreground">
                             {activeBlock ? 'Edit Voice Block' : 'Voice Generation'}
                         </p>
                     </div>
@@ -163,7 +163,7 @@ const VoiceGenerationPanel: React.FC<VoiceGenerationPanelProps> = ({
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => window.location.reload()}
-                            className="p-2 bg-studio-accent/10 hover:bg-studio-accent/20 text-studio-accent rounded-lg transition-colors"
+                            className="p-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg transition-colors"
                             title="تحديث الصفحة"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -175,7 +175,7 @@ const VoiceGenerationPanel: React.FC<VoiceGenerationPanelProps> = ({
                         </button>
                         <button
                             onClick={onClearSelection}
-                            className="p-2 bg-studio-accent/10 hover:bg-studio-accent/20 text-studio-accent rounded-lg transition-colors"
+                            className="p-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg transition-colors"
                             title="إنشاء مقطع جديد"
                         >
                             <Plus className="w-5 h-5" />
@@ -208,7 +208,7 @@ const VoiceGenerationPanel: React.FC<VoiceGenerationPanelProps> = ({
             `}</style>
 
             {voices.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-studio-text-light/50 dark:text-studio-text/50">
+                <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
                     <Loader2 className="w-8 h-8 animate-spin mb-2" />
                     <p>جاري تحميل الأصوات...</p>
                 </div>
@@ -227,16 +227,16 @@ const VoiceGenerationPanel: React.FC<VoiceGenerationPanelProps> = ({
                 <>
                     {/* Provider Selection */}
                     <div className="space-y-2">
-                        <label className="block text-sm font-bold text-studio-text-light dark:text-studio-text">
+                        <label className="block text-sm font-bold text-foreground">
                             المزود (Provider)
                         </label>
                         <select
                             value={provider}
                             onChange={(e) => setProvider(e.target.value)}
-                            className="w-full px-4 py-3 bg-studio-panel-light dark:bg-studio-panel border border-studio-border-light dark:border-studio-border rounded-xl text-studio-text-light dark:text-studio-text focus:outline-none focus:ring-2 focus:ring-studio-accent capitalize appearance-none cursor-pointer"
+                            className="w-full px-4 py-3 bg-muted border border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary capitalize appearance-none cursor-pointer"
                         >
                             {providers.map(p => (
-                                <option key={p} value={p} className="bg-studio-panel-light dark:bg-studio-panel text-studio-text-light dark:text-studio-text">
+                                <option key={p} value={p} className="bg-muted text-foreground">
                                     {p}
                                 </option>
                             ))}
@@ -253,24 +253,24 @@ const VoiceGenerationPanel: React.FC<VoiceGenerationPanelProps> = ({
                             // Collapsed View (Selected Voice)
                             <button
                                 onClick={() => setIsVoiceListOpen(true)}
-                                className="w-full flex items-center justify-between p-4 bg-studio-panel-light dark:bg-studio-panel border border-studio-border-light dark:border-studio-border rounded-2xl shadow-sm hover:border-studio-accent transition-all group"
+                                className="w-full flex items-center justify-between p-4 bg-muted border border-border rounded-2xl shadow-sm hover:border-primary transition-all group"
                             >
                                 <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-full bg-studio-bg-light dark:bg-studio-bg flex items-center justify-center text-xl shadow-inner border border-studio-border-light dark:border-studio-border">
-                                        {selectedVoice ? getCountryFlag(selectedVoice.countryCode) : <User className="w-5 h-5 text-studio-text-light/50 dark:text-studio-text/50" />}
+                                    <div className="w-10 h-10 rounded-full bg-card flex items-center justify-center text-xl shadow-inner border border-border">
+                                        {selectedVoice ? getCountryFlag(selectedVoice.countryCode) : <User className="w-5 h-5 text-muted-foreground/50" />}
                                     </div>
                                     <div className="flex flex-col items-start gap-0.5">
-                                        <span className="text-base font-bold text-studio-text-light dark:text-studio-text" dir="ltr">
+                                        <span className="text-base font-bold text-foreground" dir="ltr">
                                             {selectedVoice ? (selectedVoice.characterName || selectedVoice.name) : 'Select a voice'}
                                         </span>
                                         {selectedVoice && (
-                                            <span className="text-xs text-studio-text-light/60 dark:text-studio-text/60">
+                                            <span className="text-xs text-muted-foreground/60">
                                                 {selectedVoice.gender === 'Male' ? 'Male' : 'Female'} • {selectedVoice.languageName}
                                             </span>
                                         )}
                                     </div>
                                 </div>
-                                <div className="text-studio-text-light/50 dark:text-studio-text/50 group-hover:text-studio-accent transition-colors">
+                                <div className="text-muted-foreground/50 group-hover:text-primary transition-colors">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="m9 18 6-6-6-6" />
                                     </svg>
@@ -278,18 +278,18 @@ const VoiceGenerationPanel: React.FC<VoiceGenerationPanelProps> = ({
                             </button>
                         ) : (
                             // Expanded View (Voice List)
-                            <div className="flex-1 flex flex-col bg-studio-panel-light dark:bg-studio-panel border border-studio-border-light dark:border-studio-border rounded-2xl shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                            <div className="flex-1 flex flex-col bg-muted border border-border rounded-2xl shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                                 {/* List Header */}
-                                <div className="p-3 border-b border-studio-border-light dark:border-studio-border bg-studio-bg-light/50 dark:bg-studio-bg/50 flex items-center gap-2">
+                                <div className="p-3 border-b border-border bg-card/50 flex items-center gap-2">
                                     <button
                                         onClick={() => setIsVoiceListOpen(false)}
-                                        className="p-1.5 hover:bg-studio-accent/10 text-studio-text-light dark:text-studio-text rounded-lg transition-colors"
+                                        className="p-1.5 hover:bg-primary/10 text-foreground rounded-lg transition-colors"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                             <path d="m15 18-6-6 6-6" />
                                         </svg>
                                     </button>
-                                    <span className="flex-1 font-bold text-sm text-studio-text-light dark:text-studio-text">
+                                    <span className="flex-1 font-bold text-sm text-foreground">
                                         Select Voice ({availableVoices.length})
                                     </span>
                                 </div>
@@ -304,27 +304,27 @@ const VoiceGenerationPanel: React.FC<VoiceGenerationPanelProps> = ({
                                                 setIsVoiceListOpen(false);
                                             }}
                                             className={`w-full flex items-center gap-3 p-3 rounded-xl text-start transition-all ${selectedVoice?.voiceId === voice.voiceId
-                                                ? 'bg-studio-accent/10 border border-studio-accent/20'
-                                                : 'hover:bg-studio-bg-light dark:hover:bg-studio-bg border border-transparent'
+                                                ? 'bg-primary/10 border border-primary/20'
+                                                : 'hover:bg-card border border-transparent'
                                                 }`}
                                         >
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-xl shadow-sm border border-studio-border-light dark:border-studio-border ${selectedVoice?.voiceId === voice.voiceId ? 'bg-studio-panel-light dark:bg-studio-panel' : 'bg-studio-bg-light dark:bg-studio-bg'
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-xl shadow-sm border border-border ${selectedVoice?.voiceId === voice.voiceId ? 'bg-muted' : 'bg-card'
                                                 }`}>
                                                 {getCountryFlag(voice.countryCode)}
                                             </div>
                                             <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                                                 <span
-                                                    className={`text-sm font-bold truncate ${selectedVoice?.voiceId === voice.voiceId ? 'text-studio-accent' : 'text-studio-text-light dark:text-studio-text'}`}
+                                                    className={`text-sm font-bold truncate ${selectedVoice?.voiceId === voice.voiceId ? 'text-primary' : 'text-foreground'}`}
                                                     dir="ltr"
                                                 >
                                                     {voice.characterName || voice.name}
                                                 </span>
-                                                <span className="text-xs text-studio-text-light/60 dark:text-studio-text/60 truncate">
+                                                <span className="text-xs text-muted-foreground/60 truncate">
                                                     {voice.gender === 'Male' ? 'Male' : 'Female'} • {voice.languageName}
                                                 </span>
                                             </div>
                                             {selectedVoice?.voiceId === voice.voiceId && (
-                                                <div className="text-studio-accent">
+                                                <div className="text-primary">
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                                         <polyline points="20 6 9 17 4 12" />
                                                     </svg>
@@ -342,14 +342,14 @@ const VoiceGenerationPanel: React.FC<VoiceGenerationPanelProps> = ({
                     {/* Text Input */}
                     {!isVoiceListOpen && (
                         <div className="space-y-2 animate-in fade-in slide-in-from-top-4 duration-300 delay-75">
-                            <label className="block text-sm font-semibold text-studio-text-light dark:text-studio-text">
+                            <label className="block text-sm font-semibold text-foreground">
                                 النص (Text)
                             </label>
                             <textarea
                                 value={text}
                                 onChange={(e) => setText(e.target.value)}
                                 placeholder="اكتب النص هنا..."
-                                className="w-full min-h-[100px] px-4 py-3 bg-studio-panel-light dark:bg-studio-panel border border-studio-border-light dark:border-studio-border rounded-xl text-studio-text-light dark:text-studio-text placeholder-studio-text-light/50 dark:placeholder-studio-text/50 focus:outline-none focus:ring-2 focus:ring-studio-accent resize-none"
+                                className="w-full min-h-[100px] px-4 py-3 bg-muted border border-border rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                             />
                         </div>
                     )}
@@ -361,7 +361,7 @@ const VoiceGenerationPanel: React.FC<VoiceGenerationPanelProps> = ({
                                 <button
                                     onClick={handleGenerate}
                                     disabled={!text || !selectedVoice || isGenerating}
-                                    className={`w-full flex items-center justify-center gap-2 px-6 py-4 bg-studio-accent hover:bg-studio-accent/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl`}
+                                    className={`w-full flex items-center justify-center gap-2 px-6 py-4 bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl`}
                                 >
                                     {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Mic className="w-5 h-5" />}
                                     {isGenerating ? 'جاري التوليد...' : (activeBlock && (activeBlock.audioUrl || activeBlock.s3_url) ? 'تحديث الصوت' : 'توليد الصوت')}

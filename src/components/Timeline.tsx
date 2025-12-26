@@ -1553,7 +1553,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
     // --- Render ---
 
     return (
-        <div className="flex flex-col h-full bg-[#1E1E1E] text-gray-300 select-none" dir="ltr">
+        <div className="flex flex-col h-full bg-[var(--timeline-bg)] text-[var(--foreground)] select-none" dir="ltr">
             {/* Hidden Audio Players */}
             <audio ref={audioRef} className="hidden" />
             <audio ref={musicAudioRef} className="hidden" />
@@ -1561,7 +1561,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
             {/* Context Menu */}
             {contextMenu && (
                 <div
-                    className="fixed z-50 bg-[#1e1e1e] border border-white/10 rounded shadow-2xl py-1 min-w-[160px] flex flex-col"
+                    className="fixed z-50 bg-[var(--popover)] border border-[var(--border)] rounded shadow-2xl py-1 min-w-[160px] flex flex-col"
                     style={{ left: contextMenu.x, top: contextMenu.y }}
                     onClick={(e) => e.stopPropagation()}
                 >
@@ -1639,7 +1639,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
                 {/* Left Sidebar (Headers) */}
                 <div
                     ref={headersScrollRef}
-                    className="w-48 flex-shrink-0 bg-[#2A2A2A] border-r border-[#8E8D8D] z-20 flex flex-col pt-8 shadow-xl overflow-hidden"
+                    className="w-48 flex-shrink-0 bg-[var(--card)] border-r border-[var(--border)] z-20 flex flex-col pt-8 shadow-xl overflow-hidden"
                 >
                     {
                         tracks.map(track => {
@@ -1703,14 +1703,14 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
 
                         {/* Global Playhead Line */}
                         <div
-                            className="absolute top-0 bottom-0 w-px bg-primary z-30 pointer-events-none shadow-[0_0_10px_rgba(0,166,251,0.5)]"
+                            className="absolute top-0 bottom-0 w-px bg-[var(--playhead)] z-30 pointer-events-none shadow-[0_0_10px_rgba(78,86,192,0.5)]"
                             style={{ left: `${currentTime * zoomLevel}px` }}
                         />
 
                         {/* Snap Guide Line */}
                         {snapLineTime !== null && (
                             <div
-                                className="absolute top-0 bottom-0 w-px bg-yellow-400 z-40 pointer-events-none shadow-[0_0_10px_rgba(250,204,21,0.5)]"
+                                className="absolute top-0 bottom-0 w-px bg-[var(--snap-line)] z-40 pointer-events-none shadow-[0_0_10px_rgba(255,209,102,0.5)]"
                                 style={{ left: `${snapLineTime * zoomLevel}px` }}
                             />
                         )}
@@ -1734,7 +1734,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
                             {tracks.map(track => (
                                 <div
                                     key={track.id}
-                                    className="border-b border-white/10 relative bg-white/5 hover:bg-white/10 transition-colors group overflow-hidden"
+                                    className="border-b border-[var(--timeline-grid-strong)] relative bg-[var(--timeline-grid)] hover:bg-[var(--timeline-grid-strong)] transition-colors group overflow-hidden"
                                     style={{ height: TRACK_HEIGHT }}
                                     onDragOver={(e) => e.preventDefault()}
                                     onDrop={(e) => handleDrop(e, track.type, track.id)}
@@ -1742,7 +1742,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
                                     {/* Grid Lines */}
                                     <div className="absolute inset-0 pointer-events-none opacity-5"
                                         style={{
-                                            backgroundImage: 'linear-gradient(to right, #ffffff 1px, transparent 1px)',
+                                            backgroundImage: 'linear-gradient(to right, var(--timeline-grid-strong) 1px, transparent 1px)',
                                             backgroundSize: `${zoomLevel}px 100%`
                                         }}
                                     />

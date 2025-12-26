@@ -101,23 +101,23 @@ const GenericGridPanel: React.FC<GenericGridPanelProps> = ({ title, description,
     const displayedAssets = activeFolderId ? getFolderAssets(activeFolderId) : [];
 
     return (
-        <div className="h-full flex flex-col bg-studio-bg-light dark:bg-studio-bg p-6 space-y-6 overflow-y-auto">
+        <div className="h-full flex flex-col bg-card p-6 space-y-6 overflow-y-auto">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     {activeFolder && (
                         <button
                             onClick={() => setActiveFolderId(null)}
-                            className="p-2 hover:bg-studio-panel-light dark:hover:bg-studio-panel rounded-lg transition-colors"
+                            className="p-2 hover:bg-muted rounded-lg transition-colors"
                         >
-                            <ArrowLeft className="w-5 h-5 text-studio-text-light dark:text-studio-text" />
+                            <ArrowLeft className="w-5 h-5 text-foreground" />
                         </button>
                     )}
                     <div>
-                        <h2 className="text-xl font-bold text-studio-text-light dark:text-studio-text">
+                        <h2 className="text-xl font-bold text-foreground">
                             {activeFolder ? activeFolder.name : title}
                         </h2>
-                        <p className="text-sm text-studio-text-light/70 dark:text-studio-text/70">
+                        <p className="text-sm text-muted-foreground">
                             {activeFolder ? `${displayedAssets.length} items` : description}
                         </p>
                     </div>
@@ -125,7 +125,7 @@ const GenericGridPanel: React.FC<GenericGridPanelProps> = ({ title, description,
                 {!activeFolderId && (
                     <button
                         onClick={handleAddFolder}
-                        className="p-2 bg-studio-accent/10 hover:bg-studio-accent/20 text-studio-accent rounded-lg transition-colors"
+                        className="p-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg transition-colors"
                     >
                         <Plus className="w-5 h-5" />
                     </button>
@@ -139,15 +139,15 @@ const GenericGridPanel: React.FC<GenericGridPanelProps> = ({ title, description,
                         <div
                             key={folder.id}
                             onClick={() => setActiveFolderId(folder.id)}
-                            className="group p-4 bg-studio-panel-light dark:bg-studio-panel rounded-xl border border-studio-border-light dark:border-studio-border hover:border-studio-accent/50 transition-all cursor-pointer flex flex-col items-center justify-center gap-3 aspect-square"
+                            className="group p-4 bg-muted rounded-xl border border-border hover:border-primary/50 transition-all cursor-pointer flex flex-col items-center justify-center gap-3 aspect-square"
                         >
                             {folder.type === 'video' ? <Film className="w-8 h-8 text-blue-400" /> :
                                 folder.type === 'image' ? <ImageIcon className="w-8 h-8 text-green-400" /> :
                                     folder.type === 'audio' ? <Music className="w-8 h-8 text-orange-400" /> :
-                                        <Folder className="w-8 h-8 text-studio-accent" />}
+                                        <Folder className="w-8 h-8 text-primary" />}
 
-                            <span className="font-medium text-studio-text-light dark:text-studio-text text-center text-sm">{folder.name}</span>
-                            <span className="text-xs text-studio-text-light/50 dark:text-studio-text/50">
+                            <span className="font-medium text-foreground text-center text-sm">{folder.name}</span>
+                            <span className="text-xs text-muted-foreground">
                                 {getFolderAssets(folder.id).length} items
                             </span>
                         </div>
@@ -173,7 +173,7 @@ const GenericGridPanel: React.FC<GenericGridPanelProps> = ({ title, description,
                                         e.dataTransfer.setData('application/json', JSON.stringify(item));
                                         e.dataTransfer.effectAllowed = 'copy';
                                     }}
-                                    className="group relative aspect-square bg-studio-panel-light dark:bg-studio-panel rounded-xl border border-studio-border-light dark:border-studio-border overflow-hidden hover:border-studio-accent/50 transition-all cursor-move focus:outline-none focus:ring-2 focus:ring-studio-accent"
+                                    className="group relative aspect-square bg-muted rounded-xl border border-border overflow-hidden hover:border-primary/50 transition-all cursor-move focus:outline-none focus:ring-2 focus:ring-primary"
                                 >
                                     {item.type === 'image' && item.url ? (
                                         <img
@@ -188,9 +188,9 @@ const GenericGridPanel: React.FC<GenericGridPanelProps> = ({ title, description,
                                         />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center bg-black/5 dark:bg-white/5 fallback">
-                                            {item.type === 'video' ? <Film className="w-8 h-8 text-studio-text-light/30 dark:text-studio-text/30" /> :
-                                                item.type === 'audio' ? <Music className="w-8 h-8 text-studio-text-light/30 dark:text-studio-text/30" /> :
-                                                    <div className="w-8 h-8 rounded-full bg-studio-accent/20"></div>}
+                                            {item.type === 'video' ? <Film className="w-8 h-8 text-muted-foreground/30" /> :
+                                                item.type === 'audio' ? <Music className="w-8 h-8 text-muted-foreground/30" /> :
+                                                    <div className="w-8 h-8 rounded-full bg-primary/20"></div>}
                                         </div>
                                     )}
                                     <div className="absolute inset-x-0 bottom-0 p-2 bg-black/60 backdrop-blur-sm translate-y-full group-hover:translate-y-0 transition-transform">

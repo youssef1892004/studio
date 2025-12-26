@@ -26,7 +26,7 @@ const StudioSidebar: React.FC<StudioSidebarProps> = ({
     onItemClick
 }) => {
     return (
-        <div className="w-20 bg-studio-bg dark:bg-studio-bg border-r border-studio-border-light dark:border-studio-border flex flex-col items-center py-6 gap-4 z-20 shadow-xl shrink-0">
+        <div className="w-20 bg-card border-r border-border flex flex-col items-center py-6 gap-4 z-20 shadow-xl shrink-0">
             {sidebarItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeItem === item.id;

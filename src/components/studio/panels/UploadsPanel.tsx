@@ -191,14 +191,14 @@ const UploadsPanel: React.FC<UploadsPanelProps> = ({ project, onAssetsUpdated })
     const assets = dbAssets;
 
     return (
-        <div className="h-full flex flex-col bg-studio-bg-light dark:bg-studio-bg p-6 space-y-6 overflow-y-auto custom-scrollbar relative">
+        <div className="h-full flex flex-col bg-card p-6 space-y-6 overflow-y-auto custom-scrollbar relative">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-xl font-bold text-studio-text-light dark:text-studio-text">
+                    <h2 className="text-xl font-bold text-foreground">
                         Uploads
                     </h2>
-                    <p className="text-sm text-studio-text-light/70 dark:text-studio-text/70">
+                    <p className="text-sm text-muted-foreground">
                         Manage your uploaded assets
                     </p>
                 </div>
@@ -207,7 +207,7 @@ const UploadsPanel: React.FC<UploadsPanelProps> = ({ project, onAssetsUpdated })
             {/* Upload Area */}
             <div
                 onClick={() => !isUploading && fileInputRef.current?.click()}
-                className={`border-2 border-dashed border-studio-border-light dark:border-studio-border rounded-xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-studio-panel-light dark:hover:bg-studio-panel/50 hover:border-studio-accent'}`}
+                className={`border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted/50 hover:border-primary'}`}
             >
                 <input
                     type="file"
@@ -216,13 +216,13 @@ const UploadsPanel: React.FC<UploadsPanelProps> = ({ project, onAssetsUpdated })
                     className="hidden"
                     accept="image/*,audio/*,video/*"
                 />
-                <div className="p-3 bg-studio-accent/10 rounded-full mb-3">
-                    {isUploading ? <Loader2 className="w-6 h-6 text-studio-accent animate-spin" /> : <UploadCloud className="w-6 h-6 text-studio-accent" />}
+                <div className="p-3 bg-primary/10 rounded-full mb-3">
+                    {isUploading ? <Loader2 className="w-6 h-6 text-primary animate-spin" /> : <UploadCloud className="w-6 h-6 text-primary" />}
                 </div>
-                <p className="text-sm font-medium text-studio-text-light dark:text-studio-text">
+                <p className="text-sm font-medium text-foreground">
                     {isUploading ? 'Uploading...' : 'Click to upload'}
                 </p>
-                <p className="text-xs text-studio-text-light/50 dark:text-studio-text/50 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                     Images, Audio, Video (max. 50MB)
                 </p>
             </div>
@@ -251,7 +251,7 @@ const UploadsPanel: React.FC<UploadsPanelProps> = ({ project, onAssetsUpdated })
                                     e.dataTransfer.effectAllowed = 'copy';
                                 }}
                                 onClick={() => setPreviewAsset(file)}
-                                className="flex items-center gap-3 p-3 bg-studio-panel-light dark:bg-studio-panel rounded-lg border border-studio-border-light dark:border-studio-border group hover:border-studio-accent/50 transition-colors relative cursor-grab active:cursor-grabbing"
+                                className="flex items-center gap-3 p-3 bg-muted rounded-lg border border-border group hover:border-primary/50 transition-colors relative cursor-grab active:cursor-grabbing"
                                 style={{ zIndex: activeMenuId === file.id ? 50 : 1 }}
                             >
                                 <div className="p-2 bg-black/5 dark:bg-white/5 rounded-lg">
@@ -264,7 +264,7 @@ const UploadsPanel: React.FC<UploadsPanelProps> = ({ project, onAssetsUpdated })
                                             type="text"
                                             value={newName}
                                             onChange={(e) => setNewName(e.target.value)}
-                                            className="flex-1 bg-studio-bg-light dark:bg-studio-bg border border-studio-border-light dark:border-studio-border rounded px-2 py-1 text-sm text-studio-text-light dark:text-studio-text focus:outline-none focus:border-studio-accent"
+                                            className="flex-1 bg-muted border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-primary"
                                             autoFocus
                                         />
                                         <button
@@ -282,10 +282,10 @@ const UploadsPanel: React.FC<UploadsPanelProps> = ({ project, onAssetsUpdated })
                                     </div>
                                 ) : (
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-studio-text-light dark:text-studio-text truncate" title={file.name}>
+                                        <p className="text-sm font-medium text-foreground truncate" title={file.name}>
                                             {file.name}
                                         </p>
-                                        <p className="text-xs text-studio-text-light/50 dark:text-studio-text/50">
+                                        <p className="text-xs text-muted-foreground">
                                             {formatSize(file.size || 0)} • {new Date(file.created_at).toLocaleDateString()}
                                         </p>
                                     </div>

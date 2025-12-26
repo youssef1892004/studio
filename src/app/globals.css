@@ -1,321 +1,345 @@
-/* File path: src/app/globals.css */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+  /* File path: src/app/globals.css */
+  @tailwind base;
+  @tailwind components;
+  @tailwind utilities;
 
-@layer components {
-  .btn {
-    @apply inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-bold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none active:scale-95;
-  }
-
-  .btn-primary {
-    @apply bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg hover:shadow-primary/50 hover:-translate-y-1;
-  }
-
-  .btn-secondary {
-    @apply bg-secondary text-secondary-foreground hover:bg-secondary/80 shadow-sm border border-white/5;
-  }
-
-  .btn-outline {
-    @apply border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground;
-  }
-
-  .btn-glass {
-    @apply bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 shadow-lg hover:shadow-xl hover:scale-105;
-  }
-}
-
-:root {
-  /* Light Mode - Blue Palette Adaptation */
-
-  /* Background: White with very subtle blue tint for freshness */
-  --background: 210 40% 98%;
-  /* Text: Deep Blue #003554 */
-  --foreground: 202 100% 16%;
-
-  /* Cards: White */
-  --card: 0 0% 100%;
-  --card-foreground: 202 100% 16%;
-
-  --popover: 0 0% 100%;
-  --popover-foreground: 202 100% 16%;
-
-  /* Primary: #00A6FB (Vibrant Blue) */
-  --primary: 200 100% 49%;
-  --primary-foreground: 0 0% 100%;
-
-  /* Secondary: #E0F2FE (Light Sky Blue) */
-  --secondary: 200 80% 94%;
-  --secondary-foreground: 202 100% 16%;
-
-  /* Muted: #F1F5F9 (Slate 100) */
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-
-  /* Accent: #0582CA (Mid Blue) */
-  --accent: 202 93% 41%;
-  --accent-foreground: 0 0% 100%;
-
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 200 100% 49%;
-
-  --radius: 0.75rem;
-}
-
-.dark {
-  /* Dark Mode - Deep Blue Theme */
-
-  /* Background: #051923 (Deepest Blue) */
-  --background: 200 75% 8%;
-  /* Text: #E0F2FE (Light Blue/White) */
-  --foreground: 200 80% 98%;
-
-  /* Card: #003554 (Dark Blue) */
-  --card: 202 100% 16%;
-  --card-foreground: 200 80% 98%;
-
-  --popover: 202 100% 16%;
-  --popover-foreground: 200 80% 98%;
-
-  /* Primary: #00A6FB (Vibrant Blue) */
-  --primary: 200 100% 49%;
-  --primary-foreground: 0 0% 100%;
-
-  /* Secondary: #006494 (Mid-Dark Blue) */
-  --secondary: 200 100% 29%;
-  --secondary-foreground: 0 0% 100%;
-
-  /* Muted: #006494 with opacity or darker slate */
-  --muted: 200 50% 20%;
-  --muted-foreground: 215 20% 65%;
-
-  /* Accent: #0582CA */
-  --accent: 202 93% 41%;
-  --accent-foreground: 0 0% 100%;
-
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
-
-  --border: 200 50% 20%;
-  --input: 200 50% 20%;
-  --ring: 200 100% 49%;
-}
-
-/* === تأكد أن الـ body يستخدم هذه الألوان === */
-body {
-  color: hsl(var(--foreground));
-  background-color: hsl(var(--background));
-}
-
-/* Custom styles for a cleaner textarea */
-textarea {
-  resize: none;
-}
-
-textarea:focus {
-  outline: none;
-  box-shadow: none;
-}
-
-/* Global Keyframes moved from page.tsx for centralization */
-@layer utilities {
-  @keyframes blob {
-    0% {
-      transform: translate(0px, 0px) scale(1);
+  @layer components {
+    .btn {
+      @apply inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-bold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none active:scale-95;
     }
 
-    33% {
-      transform: translate(30px, -50px) scale(1.1);
+    .btn-primary {
+      @apply bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg hover:shadow-primary/50 hover:-translate-y-1;
     }
 
-    66% {
-      transform: translate(-20px, 20px) scale(0.9);
+    .btn-secondary {
+      @apply bg-secondary text-secondary-foreground hover:bg-secondary/80 shadow-sm border border-white/5;
     }
 
-    100% {
-      transform: translate(0px, 0px) scale(1);
+    .btn-outline {
+      @apply border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground;
+    }
+
+    .btn-glass {
+      @apply bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 shadow-lg hover:shadow-xl hover:scale-105;
     }
   }
 
-  @keyframes fadeInDown {
-    0% {
-      opacity: 0;
-      transform: translateY(-20px);
+  :root {
+    /* Light Mode - Blue Palette Adaptation */
+
+    /* Background: White with very subtle blue tint for freshness */
+    --background: 210 40% 98%;
+    /* Text: Deep Blue #003554 */
+    --foreground: 202 100% 16%;
+
+    /* Cards: White */
+    --card: 0 0% 100%;
+    --card-foreground: 202 100% 16%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 202 100% 16%;
+
+    /* Primary: #00A6FB (Vibrant Blue) */
+    --primary: 200 100% 49%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary: #E0F2FE (Light Sky Blue) */
+    --secondary: 200 80% 94%;
+    --secondary-foreground: 202 100% 16%;
+
+    /* Muted: #F1F5F9 (Slate 100) */
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    /* Accent: #0582CA (Mid Blue) */
+    --accent: 202 93% 41%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 200 100% 49%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    /* ======================================================= */
+    /* Muejam Studio - Dark UI Foundation */
+    /* Focus-driven, Professional NLE Interface */
+    /* ======================================================= */
+
+    /* 1️⃣ Backgrounds */
+    /* Main Background: #0E0E14 */
+    --background: 240 18% 7%;
+    /* Panel/Sidebars: #161622 */
+    --card: 240 21% 11%;
+    /* Elevated/Modals: #25253A */
+    --popover: 240 22% 19%;
+
+    /* 2️⃣ Typography */
+    /* Primary Text: #E6E6EB (Restful White) */
+    --foreground: 240 10% 91%;
+    /* Secondary Text: #B5B5C8 */
+    --card-foreground: 240 10% 91%;
+    --popover-foreground: 240 10% 91%;
+
+    /* Muted Text / Hints: #8A8AA5 & #5E5E75 */
+    --muted: 240 21% 15%;
+    --muted-foreground: 240 12% 60%;
+
+    /* 3️⃣ Brand Colors */
+    /* Primary Action: #4E56C0 (Deep Purple-Blue) */
+    --primary: 236 47% 53%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary / AI Accent: #9B5DE0 (Vivid Purple) */
+    --secondary: 268 68% 62%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Accent (Soft): #D78FEE */
+    --accent: 285 73% 75%;
+    --accent-foreground: 240 18% 7%;
+
+    /* Destructive */
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* Borders & Inputs */
+    /* Border: #25253A (Elevated Color) or darker */
+    --border: 240 21% 15%;
+    --input: 240 21% 15%;
+    --ring: 236 47% 53%;
+
+    /* 4️⃣ Muejam Custom Variables (Timeline Specific) */
+    --timeline-bg: #1E1E2E;
+    --timeline-grid: rgba(255, 255, 255, 0.06);
+    --timeline-grid-strong: rgba(255, 255, 255, 0.12);
+    --clip-normal: #9B5DE0;
+    --clip-hover: #D78FEE;
+    --clip-selected: #4E56C0;
+    --clip-disabled: rgba(155, 93, 224, 0.35);
+    --playhead: #4E56C0;
+    --snap-line: #FFD166;
+    --waveform-base: #475569;
+    --waveform-active: #00A6FB;
+    --waveform-progress: #00A6FB;
+  }
+
+  /* === تأكد أن الـ body يستخدم هذه الألوان === */
+  body {
+    color: hsl(var(--foreground));
+    background-color: hsl(var(--background));
+  }
+
+  /* Custom styles for a cleaner textarea */
+  textarea {
+    resize: none;
+  }
+
+  textarea:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+  /* Global Keyframes moved from page.tsx for centralization */
+  @layer utilities {
+    @keyframes blob {
+      0% {
+        transform: translate(0px, 0px) scale(1);
+      }
+
+      33% {
+        transform: translate(30px, -50px) scale(1.1);
+      }
+
+      66% {
+        transform: translate(-20px, 20px) scale(0.9);
+      }
+
+      100% {
+        transform: translate(0px, 0px) scale(1);
+      }
     }
 
-    100% {
-      opacity: 1;
-      transform: translateY(0);
+    @keyframes fadeInDown {
+      0% {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+
+      100% {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeInUp {
+      0% {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+
+      100% {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeInScale {
+      0% {
+        opacity: 0;
+        transform: scale(0.9);
+      }
+
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    @keyframes float {
+
+      0%,
+      100% {
+        transform: translateY(0px);
+      }
+
+      50% {
+        transform: translateY(-5px);
+      }
     }
   }
 
-  @keyframes fadeInUp {
-    0% {
-      opacity: 0;
-      transform: translateY(20px);
+  /* ======================================================= */
+  /* Editor.js Dark Mode Overrides (FIX for + and Tune icons) */
+  /* ======================================================= */
+
+  /* استهداف العناصر فقط عندما يكون الوضع الداكن مفعلاً (.dark) */
+  :is(.dark) {
+
+    /* خلفية شريط الأدوات الجانبي (حيث يظهر زر الـ +) */
+    .ce-toolbar__actions {
+      background-color: transparent !important;
+      /* <--- جعل الخلفية شفافة */
+      border-color: #4b5563 !important;
+      /* dark:border-gray-600 */
+      box-shadow: none !important;
     }
 
-    100% {
-      opacity: 1;
-      transform: translateY(0);
+    /* لون الأيقونات الافتراضي داخل شريط الأدوات */
+    .ce-toolbar__actions button {
+      color: #d1d5db !important;
+      /* dark:text-gray-300 */
+      background-color: transparent !important;
+      /* <--- جعل خلفية الأزرار شفافة */
+    }
+
+    /* التنسيق الخاص لزر الإضافة (+) */
+    .ce-toolbar__plus {
+      color: #d1d5db !important;
+      /* الأيقونة */
+      background-color: #4b5563 !important;
+      /* خلفية خفيفة فقط للزر نفسه */
+    }
+
+    /* حالة التمرير لزر الإضافة (+) */
+    .ce-toolbar__plus:hover {
+      background-color: #6b7280 !important;
+      /* رمادي أغمق عند التمرير */
+    }
+
+    /* حالة التمرير لأزرار الضبط (Tune buttons) مثل سحب المقاطع */
+    .ce-toolbar__tune-btn:hover {
+      background-color: #4b5563 !important;
+      /* dark:bg-gray-600 */
+    }
+
+    /* شريط أدوات التنسيق المضمن (Inline Toolbar - للـ Bold/Header) */
+    .ce-inline-toolbar {
+      background-color: #374151 !important;
+      /* dark:bg-gray-700 */
+      border-color: #4b5563 !important;
+      /* dark:border-gray-600 */
+      color: #d1d5db !important;
+    }
+
+    /* أيقونات شريط التنسيق المضمن */
+    .ce-inline-toolbar__buttons button {
+      color: #d1d5db !important;
+      /* لون الأيقونات */
+    }
+
+    /* حالة التمرير لأيقونات شريط التنسيق المضمن */
+    .ce-inline-toolbar__buttons button:hover {
+      background-color: #4b5563 !important;
+      /* خلفية التمرير */
+    }
+
+    /* FIX: Tooltip/Popover Text Color in Dark Mode */
+    .codex-tooltip,
+    .ce-toolbar__tip {
+      background-color: #374151 !important;
+      /* خلفية داكنة */
+      color: #f3f4f6 !important;
+      /* نص فاتح جداً */
+      border: 1px solid #4b5563 !important;
+      /* حد خفيف */
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.4) !important;
     }
   }
 
-  @keyframes fadeInScale {
-    0% {
-      opacity: 0;
-      transform: scale(0.9);
-    }
-
-    100% {
-      opacity: 1;
-      transform: scale(1);
-    }
+  /* Custom Scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
   }
 
-  @keyframes float {
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.5);
+    border-radius: 20px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(156, 163, 175, 0.8);
+  }
+
+  @keyframes music-bar-1 {
 
     0%,
     100% {
-      transform: translateY(0px);
+      height: 20%;
+      opacity: 0.5;
     }
 
     50% {
-      transform: translateY(-5px);
+      height: 80%;
+      opacity: 1;
     }
   }
-}
 
-/* ======================================================= */
-/* Editor.js Dark Mode Overrides (FIX for + and Tune icons) */
-/* ======================================================= */
-
-/* استهداف العناصر فقط عندما يكون الوضع الداكن مفعلاً (.dark) */
-:is(.dark) {
-
-  /* خلفية شريط الأدوات الجانبي (حيث يظهر زر الـ +) */
-  .ce-toolbar__actions {
-    background-color: transparent !important;
-    /* <--- جعل الخلفية شفافة */
-    border-color: #4b5563 !important;
-    /* dark:border-gray-600 */
-    box-shadow: none !important;
+  .animate-music-bar-1 {
+    animation: music-bar-1 0.8s ease-in-out infinite alternate;
   }
 
-  /* لون الأيقونات الافتراضي داخل شريط الأدوات */
-  .ce-toolbar__actions button {
-    color: #d1d5db !important;
-    /* dark:text-gray-300 */
-    background-color: transparent !important;
-    /* <--- جعل خلفية الأزرار شفافة */
+  /* Wave Animation for FluidCta */
+  @keyframes wave-slow {
+    0% {
+      transform: translateX(0);
+    }
+
+    100% {
+      transform: translateX(-50%);
+    }
   }
 
-  /* التنسيق الخاص لزر الإضافة (+) */
-  .ce-toolbar__plus {
-    color: #d1d5db !important;
-    /* الأيقونة */
-    background-color: #4b5563 !important;
-    /* خلفية خفيفة فقط للزر نفسه */
+  .animate-wave-slow {
+    animation: wave-slow 20s linear infinite;
   }
-
-  /* حالة التمرير لزر الإضافة (+) */
-  .ce-toolbar__plus:hover {
-    background-color: #6b7280 !important;
-    /* رمادي أغمق عند التمرير */
-  }
-
-  /* حالة التمرير لأزرار الضبط (Tune buttons) مثل سحب المقاطع */
-  .ce-toolbar__tune-btn:hover {
-    background-color: #4b5563 !important;
-    /* dark:bg-gray-600 */
-  }
-
-  /* شريط أدوات التنسيق المضمن (Inline Toolbar - للـ Bold/Header) */
-  .ce-inline-toolbar {
-    background-color: #374151 !important;
-    /* dark:bg-gray-700 */
-    border-color: #4b5563 !important;
-    /* dark:border-gray-600 */
-    color: #d1d5db !important;
-  }
-
-  /* أيقونات شريط التنسيق المضمن */
-  .ce-inline-toolbar__buttons button {
-    color: #d1d5db !important;
-    /* لون الأيقونات */
-  }
-
-  /* حالة التمرير لأيقونات شريط التنسيق المضمن */
-  .ce-inline-toolbar__buttons button:hover {
-    background-color: #4b5563 !important;
-    /* خلفية التمرير */
-  }
-
-  /* FIX: Tooltip/Popover Text Color in Dark Mode */
-  .codex-tooltip,
-  .ce-toolbar__tip {
-    background-color: #374151 !important;
-    /* خلفية داكنة */
-    color: #f3f4f6 !important;
-    /* نص فاتح جداً */
-    border: 1px solid #4b5563 !important;
-    /* حد خفيف */
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.4) !important;
-  }
-}
-
-/* Custom Scrollbar */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(156, 163, 175, 0.5);
-  border-radius: 20px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(156, 163, 175, 0.8);
-}
-
-@keyframes music-bar-1 {
-
-  0%,
-  100% {
-    height: 20%;
-    opacity: 0.5;
-  }
-
-  50% {
-    height: 80%;
-    opacity: 1;
-  }
-}
-
-.animate-music-bar-1 {
-  animation: music-bar-1 0.8s ease-in-out infinite alternate;
-}
-
-/* Wave Animation for FluidCta */
-@keyframes wave-slow {
-  0% {
-    transform: translateX(0);
-  }
-
-  100% {
-    transform: translateX(-50%);
-  }
-}
-
-.animate-wave-slow {
-  animation: wave-slow 20s linear infinite;
-}

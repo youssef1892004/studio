@@ -59,7 +59,7 @@ const DynamicPanel: React.FC<DynamicPanelProps> = ({ activeTool, onGenerateVoice
     };
 
     return (
-        <div className="flex-1 bg-studio-bg-light dark:bg-studio-bg border-t border-studio-border-light dark:border-studio-border overflow-hidden h-full">
+        <div className="flex-1 bg-card border-t border-border overflow-hidden h-full">
             {renderPanel()}
         </div>
     );

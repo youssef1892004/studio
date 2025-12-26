@@ -77,7 +77,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
     };
 
     return (
-        <div className="h-14 bg-studio-bg-light dark:bg-studio-bg border-b border-studio-border-light dark:border-studio-border flex items-center justify-between px-4 shadow-sm z-10">
+        <div className="h-14 bg-card border-b border-border flex items-center justify-between px-4 shadow-sm z-10">
             {/* Left Tools */}
             <div className="flex items-center gap-1">
                 <button

@@ -31,15 +31,15 @@ export default function SegmentPlayer({ audioUrl, text, blockId, projectId, onUr
       isRefreshingRef.current = true;
       setIsRefreshingUrl(true);
       console.log("🔄 تجديد رابط الملف الصوتي للبلوك:", blockId);
-      
+
       const response = await fetch(`/api/project/get-records?projectId=${projectId}`);
       if (!response.ok) {
         throw new Error('فشل في جلب الروابط الجديدة');
       }
-      
+
       const records = await response.json();
       const updatedRecord = records.find((r: any) => r.id === blockId);
-      
+
       if (updatedRecord?.s3_url && !updatedRecord.error) {
         console.log("✅ تم تجديد رابط الملف الصوتي بنجاح");
         onUrlRefresh(updatedRecord.s3_url);
@@ -54,7 +54,7 @@ export default function SegmentPlayer({ audioUrl, text, blockId, projectId, onUr
       isRefreshingRef.current = false;
       setIsRefreshingUrl(false);
     }
-  }, [blockId, projectId, onUrlRefresh]); 
+  }, [blockId, projectId, onUrlRefresh]);
 
   // 1. إدارة أحداث الوسائط وتنظيف URL
   useEffect(() => {
@@ -84,21 +84,21 @@ export default function SegmentPlayer({ audioUrl, text, blockId, projectId, onUr
     // ✅ التحقق من صحة URL
     try {
       const url = new URL(audioUrl);
-      
+
       // ✅ التحقق من انتهاء صلاحية signed URLs
       if (url.hostname.includes('wasabisys.com') || url.hostname.includes('amazonaws.com')) {
         const expiresParam = url.searchParams.get('X-Amz-Expires') || url.searchParams.get('Expires');
         const dateParam = url.searchParams.get('X-Amz-Date');
-        
+
         if (expiresParam && dateParam) {
           const expiresInSeconds = parseInt(expiresParam);
           const dateString = dateParam.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z');
           const signedDate = new Date(dateString);
           const expiryDate = new Date(signedDate.getTime() + (expiresInSeconds * 1000));
-          
+
           if (new Date() > expiryDate) {
             console.warn("❗ SegmentPlayer: انتهت صلاحية رابط الصوت:", audioUrl);
-            
+
             // محاولة تجديد الرابط تلقائياً
             if (blockId && projectId && onUrlRefresh) {
               console.log("🔄 محاولة تجديد الرابط المنتهي الصلاحية...");
@@ -145,7 +145,7 @@ export default function SegmentPlayer({ audioUrl, text, blockId, projectId, onUr
       });
       setIsPlaying(true);
     };
-    
+
     const handleReady = () => {
       setIsMediaReady(true);
     };
@@ -154,63 +154,63 @@ export default function SegmentPlayer({ audioUrl, text, blockId, projectId, onUr
 
     // معالجة الأخطاء (بما في ذلك NotSupportedError)
     const handleError = (e: Event) => {
-        let errorMessage = "خطأ في تشغيل الملف الصوتي";
-        
-        const target = e.target as HTMLAudioElement;
-        
-        if (target && target.error) {
-          switch (target.error.code) {
-            case MediaError.MEDIA_ERR_ABORTED:
-              errorMessage = "تم إلغاء تحميل الملف الصوتي";
-              break;
-            case MediaError.MEDIA_ERR_NETWORK:
-              errorMessage = "خطأ في الشبكة أثناء تحميل الملف الصوتي";
-              break;
-            case MediaError.MEDIA_ERR_DECODE:
-              errorMessage = "الملف الصوتي تالف أو غير مكتمل";
-              break;
-            case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-               // قد يكون السبب انتهاء صلاحية الرابط أو مشكلة في الخادم
-               if (audioUrl.includes('wasabisys.com') || audioUrl.includes('amazonaws.com')) {
-                 // محاولة تجديد الرابط قبل إظهار الخطأ
-                 if (blockId && projectId && onUrlRefresh && !isRefreshingUrl) {
-                   console.log("🔄 محاولة تجديد الرابط بسبب MEDIA_ERR_SRC_NOT_SUPPORTED...");
-                   refreshAudioUrl().then(success => {
-                     if (!success) {
-                       setHasError(true);
-                       setErrorMessage("انتهت صلاحية رابط الملف الصوتي - يرجى إعادة تحميل الصفحة");
-                       setIsPlaying(false);
-                       setIsMediaReady(false);
-                     }
-                   });
-                   return; // لا نعرض الخطأ فوراً، ننتظر نتيجة التجديد
-                 } else {
-                   errorMessage = "انتهت صلاحية رابط الملف الصوتي - يرجى إعادة تحميل الصفحة";
-                 }
-               } else {
-                 errorMessage = "تنسيق الملف الصوتي غير مدعوم";
-               }
-               console.warn("❗ MEDIA_ERR_SRC_NOT_SUPPORTED for URL:", audioUrl);
-               break;
-            default:
-              errorMessage = "فشل في تحميل الملف الصوتي";
-          }
-        } else {
-          // خطأ عام غير متعلق بـ MediaError
-          errorMessage = "لا يمكن تشغيل الملف الصوتي";
+      let errorMessage = "خطأ في تشغيل الملف الصوتي";
+
+      const target = e.target as HTMLAudioElement;
+
+      if (target && target.error) {
+        switch (target.error.code) {
+          case MediaError.MEDIA_ERR_ABORTED:
+            errorMessage = "تم إلغاء تحميل الملف الصوتي";
+            break;
+          case MediaError.MEDIA_ERR_NETWORK:
+            errorMessage = "خطأ في الشبكة أثناء تحميل الملف الصوتي";
+            break;
+          case MediaError.MEDIA_ERR_DECODE:
+            errorMessage = "الملف الصوتي تالف أو غير مكتمل";
+            break;
+          case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+            // قد يكون السبب انتهاء صلاحية الرابط أو مشكلة في الخادم
+            if (audioUrl.includes('wasabisys.com') || audioUrl.includes('amazonaws.com')) {
+              // محاولة تجديد الرابط قبل إظهار الخطأ
+              if (blockId && projectId && onUrlRefresh && !isRefreshingUrl) {
+                console.log("🔄 محاولة تجديد الرابط بسبب MEDIA_ERR_SRC_NOT_SUPPORTED...");
+                refreshAudioUrl().then(success => {
+                  if (!success) {
+                    setHasError(true);
+                    setErrorMessage("انتهت صلاحية رابط الملف الصوتي - يرجى إعادة تحميل الصفحة");
+                    setIsPlaying(false);
+                    setIsMediaReady(false);
+                  }
+                });
+                return; // لا نعرض الخطأ فوراً، ننتظر نتيجة التجديد
+              } else {
+                errorMessage = "انتهت صلاحية رابط الملف الصوتي - يرجى إعادة تحميل الصفحة";
+              }
+            } else {
+              errorMessage = "تنسيق الملف الصوتي غير مدعوم";
+            }
+            console.warn("❗ MEDIA_ERR_SRC_NOT_SUPPORTED for URL:", audioUrl);
+            break;
+          default:
+            errorMessage = "فشل في تحميل الملف الصوتي";
         }
-        
-        console.error("❌ SegmentPlayer Audio Error:", errorMessage, e);
-        setHasError(true);
-        setErrorMessage(errorMessage);
-        setIsPlaying(false);
-        setIsMediaReady(false);
+      } else {
+        // خطأ عام غير متعلق بـ MediaError
+        errorMessage = "لا يمكن تشغيل الملف الصوتي";
+      }
+
+      console.error("❌ SegmentPlayer Audio Error:", errorMessage, e);
+      setHasError(true);
+      setErrorMessage(errorMessage);
+      setIsPlaying(false);
+      setIsMediaReady(false);
     };
 
     audio.addEventListener('loadeddata', handleReady);
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('error', handleError); 
+    audio.addEventListener('error', handleError);
 
     // دالة التنظيف: إلغاء URL الخاص بالـ Blob لمنع تسرب الذاكرة
     return () => {
@@ -225,60 +225,58 @@ export default function SegmentPlayer({ audioUrl, text, blockId, projectId, onUr
   const togglePlayPause = (e: React.MouseEvent) => {
     e.stopPropagation(); // يمنع تفعيل المحرر
     const audio = audioRef.current;
-    
+
     if (audio && isMediaReady) { // التشغيل فقط إذا كان الملف جاهزاً
       if (isPlaying) {
         audio.pause();
       } else {
         // استخدام catch لالتقاط رفض التشغيل (Autoplay Policy)
         audio.play().catch(error => {
-            console.error("Audio play failed (Autoplay/Promise rejection):", error);
-            setIsPlaying(false);
-        }); 
+          console.error("Audio play failed (Autoplay/Promise rejection):", error);
+          setIsPlaying(false);
+        });
       }
     } else if (!isMediaReady) {
-        // لا تفعل شيئاً إذا كان التحميل جارياً
+      // لا تفعل شيئاً إذا كان التحميل جارياً
     }
   };
 
   return (
-    // [MODIFIED] تم إزالة gap-3 لضبط التنسيق، وإزالة كلاسات الوضع الداكن
-    <div className="mt-2 flex items-center p-2 bg-gray-50 rounded-md border border-gray-200 cursor-pointer transition-colors duration-200" onClick={togglePlayPause}>
+    // [MODIFIED] Updated to Muejam Design System
+    <div className="mt-2 flex items-center p-2 bg-card rounded-md border border-border cursor-pointer transition-colors duration-200 hover:border-primary/50" onClick={togglePlayPause}>
       {/* Audio element src is set here and managed by React */}
-      <audio key={audioUrl || 'no-url'} ref={audioRef} src={audioUrl} preload="metadata" className="hidden"></audio> 
-      
+      <audio key={audioUrl || 'no-url'} ref={audioRef} src={audioUrl} preload="metadata" className="hidden"></audio>
+
       <button
         onClick={togglePlayPause}
         disabled={!isMediaReady || hasError} // تعطيل الزر في حالة الخطأ أو التحميل
-        className={`p-2 rounded-full transition-colors flex-shrink-0 ${
-            hasError 
-                ? 'bg-red-100 text-red-500 cursor-not-allowed'
-                : isMediaReady 
-                    ? 'bg-gray-200 hover:bg-gray-300 text-gray-700' 
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-        }`}
+        className={`p-2 rounded-full transition-colors flex-shrink-0 ${hasError
+            ? 'bg-destructive/10 text-destructive cursor-not-allowed'
+            : isMediaReady
+              ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+              : 'bg-muted text-muted-foreground cursor-not-allowed'
+          }`}
       >
         {hasError ? (
-            <X size={16} />
+          <X size={16} />
         ) : !isMediaReady ? (
-            <LoaderCircle size={16} className="animate-spin" />
+          <LoaderCircle size={16} className="animate-spin" />
         ) : isPlaying ? (
-            <Pause size={16} />
+          <Pause size={16} />
         ) : (
-            <Play size={16} className="ml-0.5 -scale-x-100" />
+          <Play size={16} className="ml-0.5 -scale-x-100" />
         )}
       </button>
-      
+
       {/* عرض حالة المشغل مع رسائل الخطأ */}
-      <span className={`flex-1 text-right pr-2 text-sm font-medium truncate select-none ${
-        hasError ? 'text-red-600' : isRefreshingUrl ? 'text-blue-600' : 'text-gray-600'
-      }`} dir="rtl">
-        {hasError 
-          ? `خطأ: ${errorMessage}` 
+      <span className={`flex-1 text-right pr-2 text-sm font-medium truncate select-none ${hasError ? 'text-destructive' : isRefreshingUrl ? 'text-blue-500' : 'text-muted-foreground'
+        }`} dir="rtl">
+        {hasError
+          ? `خطأ: ${errorMessage}`
           : isRefreshingUrl
             ? "جاري تجديد رابط الملف الصوتي..."
-            : isMediaReady 
-              ? "المقطع الصوتي جاهز" 
+            : isMediaReady
+              ? "المقطع الصوتي جاهز"
               : "جاري تحميل المقطع الصوتي..."
         }
       </span>

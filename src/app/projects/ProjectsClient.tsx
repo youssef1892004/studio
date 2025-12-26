@@ -214,7 +214,7 @@ export default function ProjectsClient() {
                 <div className="container mx-auto px-4 sm:px-6 py-8 max-w-7xl">
 
                     {/* Hero Banner with Modern Gradient */}
-                    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-600 via-purple-600 to-primary p-8 sm:p-12 mb-10 text-white shadow-2xl">
+                    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-primary via-secondary to-accent p-8 sm:p-12 mb-10 text-white shadow-2xl">
                         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
                         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
                         <div className="absolute bottom-0 left-0 w-48 h-48 bg-black/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
