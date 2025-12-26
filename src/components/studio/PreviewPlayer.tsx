@@ -15,7 +15,7 @@ interface PreviewPlayerProps {
     onSeek?: (time: number) => void;
     onVolumeChange?: (volume: number) => void;
     playbackRate?: number;
-    activeTextItems?: { id: string; content: string; style: any }[];
+    activeTextItems?: { id: string; content: string; style: any; animation?: any; start?: number; duration?: number }[];
     onTextUpdate?: (id: string, newStyle: any) => void;
     aspectRatio?: number;
     activeTransform?: { scale: number; x: number; y: number; rotation: number };
@@ -331,28 +331,104 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                 </div>
 
                 {/* Text Layer */}
-                {activeTextItems?.map((text, idx) => (
-                    <div
-                        key={idx}
-                        onMouseDown={(e) => handleTextMouseDown(e, text.id)}
-                        style={{
-                            position: 'absolute',
-                            top: `${text.style?.yPosition ?? 50}%`,
-                            left: `${text.style?.xPosition ?? 50}%`,
-                            transform: 'translate(-50%, -50%)',
-                            color: text.style?.color || 'white',
-                            fontSize: `${(text.style?.fontSize || 24) * 1.5}px`,
-                            fontWeight: text.style?.fontWeight || 'normal',
-                            zIndex: 100 + idx,
-                            cursor: 'move',
-                            border: draggingId === text.id ? '1px dashed var(--primary)' : 'none',
-                            padding: '4px',
-                            userSelect: 'none'
-                        }}
-                    >
-                        {text.content}
-                    </div>
-                ))}
+                {activeTextItems?.map((text, idx) => {
+                    // Animation Logic (Phase 5)
+                    const getAnimationStyle = () => {
+                        if (!text.animation || !text.start || !text.duration) return {};
+
+                        const localTime = currentTime - text.start;
+                        const { in: animIn, out: animOut } = text.animation;
+
+                        let animStyle: React.CSSProperties = {};
+                        let transform = '';
+                        let opacity = 1;
+
+                        // IN Animation
+                        if (animIn && animIn.type !== 'none') {
+                            const duration = animIn.duration || 0.5;
+                            if (localTime < duration) {
+                                const t = Math.max(0, Math.min(1, localTime / duration));
+                                // Ease Out Quad
+                                const eased = 1 - (1 - t) * (1 - t);
+
+                                if (animIn.type === 'fade') {
+                                    opacity = eased;
+                                } else if (animIn.type === 'slide') {
+                                    const offset = 50 * (1 - eased); // 50px offset
+                                    if (animIn.direction === 'up') transform += ` translateY(${offset}px)`;
+                                    if (animIn.direction === 'down') transform += ` translateY(-${offset}px)`;
+                                    if (animIn.direction === 'left') transform += ` translateX(${offset}px)`;
+                                    if (animIn.direction === 'right') transform += ` translateX(-${offset}px)`;
+                                    opacity = eased;
+                                } else if (animIn.type === 'scale') {
+                                    transform += ` scale(${eased})`;
+                                    opacity = eased;
+                                } else if (animIn.type === 'pop') {
+                                    const pop = t < 0.8 ? t * 1.1 : 1.1 - (t - 0.8) * 0.5; // simple bounce
+                                    transform += ` scale(${pop})`;
+                                    opacity = eased;
+                                }
+                            }
+                        }
+
+                        // OUT Animation
+                        if (animOut && animOut.type !== 'none') {
+                            const duration = animOut.duration || 0.5;
+                            const endTime = text.duration;
+                            if (localTime > endTime - duration) {
+                                const t = Math.max(0, Math.min(1, (localTime - (endTime - duration)) / duration)); // 0 -> 1
+                                // Ease In Quad
+                                const eased = t * t;
+
+                                if (animOut.type === 'fade') {
+                                    opacity = 1 - eased;
+                                } else if (animOut.type === 'slide') {
+                                    const offset = 50 * eased;
+                                    if (animOut.direction === 'up') transform += ` translateY(-${offset}px)`;
+                                    if (animOut.direction === 'down') transform += ` translateY(${offset}px)`;
+                                    if (animOut.direction === 'left') transform += ` translateX(-${offset}px)`;
+                                    if (animOut.direction === 'right') transform += ` translateX(${offset}px)`;
+                                    opacity = 1 - eased;
+                                } else if (animOut.type === 'scale') {
+                                    transform += ` scale(${1 - eased})`;
+                                    opacity = 1 - eased;
+                                } else if (animOut.type === 'pop') {
+                                    transform += ` scale(${1 + eased * 0.2})`; // pump and fade
+                                    opacity = 1 - eased;
+                                }
+                            }
+                        }
+
+                        return { opacity, transform };
+                    };
+
+                    const animStyle = getAnimationStyle();
+
+                    return (
+                        <div
+                            key={idx}
+                            onMouseDown={(e) => handleTextMouseDown(e, text.id)}
+                            style={{
+                                position: 'absolute',
+                                top: `${text.style?.yPosition ?? 50}%`,
+                                left: `${text.style?.xPosition ?? 50}%`,
+                                transform: `translate(-50%, -50%) ${animStyle.transform || ''}`,
+                                opacity: animStyle.opacity !== undefined ? animStyle.opacity : 1,
+                                color: text.style?.color || 'white',
+                                fontSize: `${(text.style?.fontSize || 24) * 1.5}px`,
+                                fontWeight: text.style?.fontWeight || 'normal',
+                                zIndex: 100 + idx,
+                                cursor: 'move',
+                                border: draggingId === text.id ? '1px dashed var(--primary)' : 'none',
+                                padding: '4px',
+                                userSelect: 'none',
+                                whiteSpace: 'nowrap'
+                            }}
+                        >
+                            {text.content}
+                        </div>
+                    );
+                })}
 
                 {/* Controls Overlay */}
                 <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-auto z-[9999]">

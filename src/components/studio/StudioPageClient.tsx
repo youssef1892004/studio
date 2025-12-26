@@ -1906,12 +1906,32 @@ export default function StudioPageClient() {
         }));
     }, [activeVideoId]);
 
+    const handleUpdateAnimation = useCallback((newAnimation: any) => {
+        if (!activeVideoId) return;
+        setVideoTrackItems(prev => prev.map(item => {
+            if (item.id === activeVideoId && item.type === 'text') {
+                return {
+                    ...item,
+                    animation: newAnimation
+                };
+            }
+            return item;
+        }));
+    }, [activeVideoId]);
+
     // --------------------------------------------------------------------------------
 
     const activeTextItems = useMemo(() => {
         return videoTrackItems
             .filter(item => item.type === 'text' && currentTime >= item.start && currentTime < (item.start + item.duration))
-            .map(item => ({ id: item.id, content: item.content, style: item.textStyle }));
+            .map(item => ({
+                id: item.id,
+                content: item.content,
+                style: item.textStyle,
+                animation: item.animation,
+                start: item.start,
+                duration: item.duration
+            }));
     }, [videoTrackItems, currentTime]);
 
     const handleUpdateItemSpeed = useCallback((newSpeed: number) => {
@@ -2152,7 +2172,7 @@ export default function StudioPageClient() {
                                     onUpdateSpeed={handleUpdateItemSpeed}
                                     onDelete={handleDeleteSelection}
                                     onUpdateText={handleUpdateText}
-                                    onUpdateTransform={(newTransform) => {
+                                    onUpdateTransform={(newTransform: any) => {
                                         // Update transform for the selected item (activeVideoId)
                                         if (activeVideoId) {
                                             setVideoTrackItems(prev => prev.map(item =>
@@ -2162,7 +2182,7 @@ export default function StudioPageClient() {
                                             ));
                                         }
                                     }}
-                                    onUpdateOpacity={(newOpacity) => {
+                                    onUpdateOpacity={(newOpacity: number) => {
                                         if (activeVideoId) {
                                             setVideoTrackItems(prev => prev.map(item =>
                                                 item.id === activeVideoId
@@ -2171,7 +2191,7 @@ export default function StudioPageClient() {
                                             ));
                                         }
                                     }}
-                                    onUpdateVisibility={(visible) => {
+                                    onUpdateVisibility={(visible: boolean) => {
                                         if (activeVideoId) {
                                             setVideoTrackItems(prev => prev.map(item =>
                                                 item.id === activeVideoId

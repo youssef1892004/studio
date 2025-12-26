@@ -14,6 +14,10 @@ interface PropertiesPanelProps {
         transform?: { scale: number; x: number; y: number; rotation: number };
         opacity?: number;
         visible?: boolean;
+        animation?: { // Added for Phase 5
+            in?: any;
+            out?: any;
+        };
     } | null;
     currentGlobalSpeed: number;
     onUpdateVolume: (val: number) => void;
@@ -24,9 +28,13 @@ interface PropertiesPanelProps {
     onUpdateOpacity?: (val: number) => void;
     onUpdateVisibility?: (visible: boolean) => void;
     onApplyPreset?: (preset: string) => void;
+    onUpdateAnimation?: (animationArg: { in?: any; out?: any }) => void;
 }
 
-const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, currentGlobalSpeed, onUpdateVolume, onUpdateSpeed, onDelete, onUpdateText, onUpdateTransform, onUpdateOpacity, onUpdateVisibility, onApplyPreset }) => {
+const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, currentGlobalSpeed, onUpdateVolume, onUpdateSpeed, onDelete, onUpdateText, onUpdateTransform, onUpdateOpacity, onUpdateVisibility, onApplyPreset, onUpdateAnimation }) => {
+
+    // Internal state for Animation Tabs
+    const [animationTab, setAnimationTab] = React.useState<'in' | 'out'>('in');
 
     if (!selectedItem) {
         return (
@@ -185,6 +193,105 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedItem, current
                                 </div>
                             </div>
                         </div>
+
+                        {/* Animations Section (Phase 5) */}
+                        {onUpdateAnimation && (
+                            <div className="space-y-4 border-t border-[#333] pt-4">
+                                <label className="text-xs font-medium text-gray-400">Animate</label>
+
+                                {/* Tabs */}
+                                <div className="flex bg-[#333] rounded-lg p-1 gap-1">
+                                    {(['in', 'out'] as const).map((tab) => (
+                                        <button
+                                            key={tab}
+                                            onClick={() => setAnimationTab(tab)}
+                                            className={`flex-1 py-1 text-xs rounded-md transition-all capitalize ${animationTab === tab ? 'bg-primary text-white font-medium shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                                        >
+                                            {tab}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Animation Controls for Active Tab */}
+                                <div className="flex flex-col gap-3">
+                                    {/* Type Dropdown */}
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-[10px] text-gray-500 uppercase tracking-wider">Type</span>
+                                        <select
+                                            value={selectedItem.animation?.[animationTab]?.type || 'none'}
+                                            onChange={(e) => {
+                                                const newType = e.target.value as any;
+                                                const currentAnim = selectedItem.animation?.[animationTab] || { duration: 0.5 };
+                                                onUpdateAnimation({
+                                                    ...selectedItem.animation,
+                                                    [animationTab]: { ...currentAnim, type: newType }
+                                                });
+                                            }}
+                                            className="w-full bg-[#2A2A2A] border border-[#3A3A3A] text-xs text-gray-200 rounded p-1.5 focus:outline-none focus:border-primary"
+                                        >
+                                            <option value="none">None</option>
+                                            <option value="fade">Fade</option>
+                                            <option value="slide">Slide</option>
+                                            <option value="scale">Scale</option>
+                                            <option value="pop">Pop</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Dynamic Controls (Only if not none) */}
+                                    {selectedItem.animation?.[animationTab]?.type && selectedItem.animation?.[animationTab]?.type !== 'none' && (
+                                        <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
+
+                                            {/* Direction (Only for Slide) */}
+                                            {(selectedItem.animation?.[animationTab]?.type === 'slide') && (
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-[10px] text-gray-500 uppercase tracking-wider">Direction</span>
+                                                    <div className="grid grid-cols-4 gap-1">
+                                                        {['up', 'down', 'left', 'right'].map((dir) => (
+                                                            <button
+                                                                key={dir}
+                                                                onClick={() => {
+                                                                    const currentAnim = selectedItem.animation?.[animationTab]!;
+                                                                    onUpdateAnimation({
+                                                                        ...selectedItem.animation,
+                                                                        [animationTab]: { ...currentAnim, direction: dir }
+                                                                    });
+                                                                }}
+                                                                className={`py-1 rounded text-[10px] border ${selectedItem.animation?.[animationTab]?.direction === dir ? 'bg-primary/20 border-primary text-primary' : 'bg-[#2A2A2A] border-[#3A3A3A] text-gray-400'}`}
+                                                            >
+                                                                {dir}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Duration Slider */}
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex justify-between text-[10px] text-gray-500 uppercase tracking-wider">
+                                                    <span>Duration</span>
+                                                    <span>{selectedItem.animation?.[animationTab]?.duration || 0.5}s</span>
+                                                </div>
+                                                <input
+                                                    type="range"
+                                                    min="0.1"
+                                                    max="2"
+                                                    step="0.1"
+                                                    value={selectedItem.animation?.[animationTab]?.duration || 0.5}
+                                                    onChange={(e) => {
+                                                        const currentAnim = selectedItem.animation?.[animationTab]!;
+                                                        onUpdateAnimation({
+                                                            ...selectedItem.animation,
+                                                            [animationTab]: { ...currentAnim, duration: parseFloat(e.target.value) }
+                                                        });
+                                                    }}
+                                                    className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 

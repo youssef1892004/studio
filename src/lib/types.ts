@@ -178,6 +178,22 @@ export interface TimelineItem {
     xPosition?: number; // % from left
   };
 
+  // Animations (Phase 5)
+  animation?: {
+    in?: {
+      type: 'none' | 'fade' | 'slide' | 'scale' | 'pop';
+      direction?: 'up' | 'down' | 'left' | 'right';
+      duration: number; // in seconds
+      easing?: 'easeOut' | 'easeIn' | 'linear';
+    };
+    out?: {
+      type: 'none' | 'fade' | 'slide' | 'scale' | 'pop';
+      direction?: 'up' | 'down' | 'left' | 'right';
+      duration: number; // in seconds
+      easing?: 'easeOut' | 'easeIn' | 'linear';
+    };
+  };
+
   // Linkage
   blockId?: string; // Link to Voice Block
   isGenerating?: boolean; // UI State
