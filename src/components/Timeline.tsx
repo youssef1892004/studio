@@ -78,12 +78,58 @@ const TimeRuler = ({ duration, zoomLevel, currentTime, onSeek }: { duration: num
     );
 };
 
-const TrackHeader = ({ track, onToggleMute, onToggleHide, onToggleLock }: { track: Track, onToggleMute: () => void, onToggleHide: () => void, onToggleLock: () => void }) => {
+const TrackHeader = ({ track, onToggleMute, onToggleHide, onToggleLock, onRename, isActive }: { track: Track, onToggleMute: () => void, onToggleHide: () => void, onToggleLock: () => void, onRename: (name: string) => void, isActive?: boolean }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editName, setEditName] = useState(track.name);
+
+    useEffect(() => {
+        setEditName(track.name);
+    }, [track.name]);
+
+    const handleSave = () => {
+        const trimmed = editName.trim();
+        if (trimmed && trimmed !== track.name) {
+            onRename(trimmed);
+        } else {
+            setEditName(track.name); // Revert
+        }
+        setIsEditing(false);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') handleSave();
+        if (e.key === 'Escape') {
+            setEditName(track.name);
+            setIsEditing(false);
+        }
+    };
+
     return (
-        <div className="w-48 flex-shrink-0 bg-card/50 backdrop-blur-sm border-r border-white/10 border-b border-white/5 flex items-center justify-between px-3 h-20 group hover:bg-white/5 transition-colors">
-            <div className="flex flex-col">
-                <span className="text-gray-200 font-medium text-sm truncate w-24" title={track.name}>{track.name}</span>
-                <span className="text-xs text-muted-foreground capitalize">{track.type}</span>
+        <div className={`w-48 flex-shrink-0 bg-card/50 backdrop-blur-sm border-r border-white/10 border-b border-white/5 flex items-center justify-between px-3 h-20 group hover:bg-white/5 transition-colors ${isActive ? 'bg-primary/10 border-l-2 border-l-primary' : ''}`}>
+            <div className="flex flex-col flex-1 mr-2">
+                {isEditing ? (
+                    <input
+                        autoFocus
+                        className="bg-black/50 text-white text-sm px-1 py-0.5 rounded border border-primary/50 outline-none w-full"
+                        value={editName}
+                        onChange={e => setEditName(e.target.value)}
+                        onBlur={handleSave}
+                        onKeyDown={handleKeyDown}
+                        // Stop propagation to prevent drag start on input?
+                        // Actually parent is draggable.
+                        // We must prevent drag start if clicking on input.
+                        onMouseDown={e => e.stopPropagation()}
+                    />
+                ) : (
+                    <span
+                        className="text-gray-200 font-medium text-sm truncate w-full cursor-text hover:text-white transition-colors select-none"
+                        title={track.name}
+                        onDoubleClick={() => setIsEditing(true)}
+                    >
+                        {track.name}
+                    </span>
+                )}
+                <span className="text-xs text-muted-foreground capitalize mt-0.5">{track.type}</span>
             </div>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button onClick={onToggleHide} className={`p-1 rounded hover:bg-white/10 ${track.isHidden ? 'text-primary' : 'text-gray-400'}`}>
@@ -150,6 +196,10 @@ interface TimelineProps {
     layers?: TimelineLayer[];
     onLayerUpdate?: (layerId: string, updates: Partial<TimelineLayer>) => void;
     onRequestAddLayer?: () => void;
+    onLayerReorder?: (fromIndex: number, toIndex: number) => void;
+    onDeleteLayer?: (layerId: string) => void;
+    onClearLayer?: (layerId: string) => void;
+    onDuplicateLayer?: (layerId: string) => void;
 }
 
 export interface TimelineHandle {
@@ -165,10 +215,31 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
     activeBlockId, onActiveMediaChange, onTimeUpdate, onIsPlayingChange,
     activeVideoId, onVideoClick, onPlaybackRateChange, activeTool,
     onSplit, onToolChange, onDelete, onUndo, onRedo, canUndo, canRedo,
-    zoomLevel = 50, manualLayerCount = 2, layers, onLayerUpdate, onRequestAddLayer
+    zoomLevel = 50, manualLayerCount = 2, layers, onLayerUpdate, onRequestAddLayer, onLayerReorder,
+    onDeleteLayer, onClearLayer, onDuplicateLayer
 }, ref) => {
 
     const [isPlaying, setIsPlaying] = useState(false);
+
+    // --- Layer Context Menu ---
+    const [contextMenu, setContextMenu] = useState<{ visible: boolean, x: number, y: number, trackId: string } | null>(null);
+
+    useEffect(() => {
+        const handleClick = () => setContextMenu(null);
+        window.addEventListener('click', handleClick);
+        return () => window.removeEventListener('click', handleClick);
+    }, []);
+
+    const handleHeaderContextMenu = (e: React.MouseEvent, trackId: string) => {
+        e.preventDefault();
+        setContextMenu({
+            visible: true,
+            x: e.clientX,
+            y: e.clientY,
+            trackId
+        });
+    };
+
     const { settings } = usePerformance();
     // Zoom/Layer state lifted to parent
     // const [zoomLevel, setZoomLevel] = useState(50); 
@@ -437,11 +508,9 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
                         id: uuidv4(),
                         start: dropTime,
                         duration: 5,
-                        content: data.content || data.name || 'New Item',
+                        content: data.url || data.content || data.name || 'New Item',
                         type: data.type,
                         layerIndex: manualLayerCount, // Assign to the new (upcoming) layer index
-                        // other props?
-                        src: data.url, // For visual items
                         mediaStartOffset: 0
                     };
 
@@ -1148,6 +1217,37 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
         }
     };
 
+
+    const handleLayerDragStart = (e: React.DragEvent, index: number) => {
+        e.dataTransfer.setData('application/layer-index', index.toString());
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleLayerDrop = (e: React.DragEvent, dropIndex: number) => {
+        e.preventDefault();
+        const dragIndexStr = e.dataTransfer.getData('application/layer-index');
+        if (!dragIndexStr) return;
+
+        const dragIndex = parseInt(dragIndexStr);
+        if (isNaN(dragIndex) || dragIndex === dropIndex) return;
+
+        if (onLayerReorder) {
+            onLayerReorder(dragIndex, dropIndex);
+        }
+    };
+
+    const handleRenameLayer = (trackId: string, newName: string) => {
+        if (!onLayerUpdate || !layers) return;
+        const match = trackId.match(/^t-video-(\d+)$/);
+        if (match) {
+            const index = parseInt(match[1]);
+            const layer = layers.find(l => l.order === index);
+            if (layer) {
+                onLayerUpdate(layer.id, { name: newName });
+            }
+        }
+    };
+
     // --- Render ---
 
     return (
@@ -1155,6 +1255,79 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
             {/* Hidden Audio Players */}
             <audio ref={audioRef} className="hidden" />
             <audio ref={musicAudioRef} className="hidden" />
+
+            {/* Context Menu */}
+            {contextMenu && (
+                <div
+                    className="fixed z-50 bg-[#1e1e1e] border border-white/10 rounded shadow-2xl py-1 min-w-[160px] flex flex-col"
+                    style={{ left: contextMenu.x, top: contextMenu.y }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <button
+                        className="px-4 py-2 text-left text-sm hover:bg-white/10 text-gray-200 transition-colors"
+                        onClick={() => {
+                            const match = contextMenu.trackId.match(/^t-video-(\d+)$/);
+                            if (match && onLayerUpdate && layers) {
+                                const index = parseInt(match[1]);
+                                const layer = layers.find(l => l.order === index);
+                                if (layer) {
+                                    const newName = prompt("Rename Layer", layer.name);
+                                    if (newName && newName.trim()) {
+                                        onLayerUpdate(layer.id, { name: newName.trim() });
+                                    }
+                                }
+                            }
+                            setContextMenu(null);
+                        }}
+                    >
+                        Rename
+                    </button>
+                    <button
+                        className="px-4 py-2 text-left text-sm hover:bg-white/10 text-gray-200 transition-colors"
+                        onClick={() => {
+                            const match = contextMenu.trackId.match(/^t-video-(\d+)$/);
+                            if (match && onDuplicateLayer && layers) {
+                                // Need Layer ID
+                                const index = parseInt(match[1]);
+                                const layer = layers.find(l => l.order === index);
+                                if (layer) onDuplicateLayer(layer.id);
+                            }
+                            setContextMenu(null);
+                        }}
+                    >
+                        Duplicate Layer
+                    </button>
+                    <div className="h-px bg-white/10 my-1" />
+                    <button
+                        className="px-4 py-2 text-left text-sm hover:bg-white/10 text-gray-200 transition-colors"
+                        onClick={() => {
+                            const match = contextMenu.trackId.match(/^t-video-(\d+)$/);
+                            if (match && onClearLayer && layers) {
+                                const index = parseInt(match[1]);
+                                const layer = layers.find(l => l.order === index);
+                                if (layer) onClearLayer(layer.id);
+                            }
+                            setContextMenu(null);
+                        }}
+                    >
+                        Clear Contents
+                    </button>
+                    <button
+                        className="px-4 py-2 text-left text-sm hover:bg-red-500/10 text-red-400 hover:text-red-300 transition-colors"
+                        onClick={() => {
+                            const match = contextMenu.trackId.match(/^t-video-(\d+)$/);
+                            if (match && onDeleteLayer && layers) {
+                                const index = parseInt(match[1]);
+                                const layer = layers.find(l => l.order === index);
+                                if (layer) onDeleteLayer(layer.id);
+                            }
+                            setContextMenu(null);
+                        }}
+                    >
+                        Delete Layer
+                    </button>
+                </div>
+            )}
 
             {/* Toolbar Removed (Lifted to Parent) */}
 
@@ -1167,15 +1340,33 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
                     className="w-48 flex-shrink-0 bg-[#2A2A2A] border-r border-[#8E8D8D] z-20 flex flex-col pt-8 shadow-xl overflow-hidden"
                 >
                     {
-                        tracks.map(track => (
-                            <TrackHeader
-                                key={track.id}
-                                track={track}
-                                onToggleMute={() => { }}
-                                onToggleHide={() => handleToggleVisibility(track.id)}
-                                onToggleLock={() => handleToggleLock(track.id)}
-                            />
-                        ))
+                        tracks.map(track => {
+                            const match = track.id.match(/^t-video-(\d+)$/);
+                            const layerIndex = match ? parseInt(match[1]) : -1;
+                            const isActive = activeVideoId ? track.items.some(i => i.id === activeVideoId) : false;
+
+                            return (
+                                <div
+                                    key={track.id}
+                                    draggable={layerIndex !== -1}
+                                    onDragStart={(e) => handleLayerDragStart(e, layerIndex)}
+                                    onDragOver={(e) => e.preventDefault()} // Allow drop
+                                    onDrop={(e) => handleLayerDrop(e, layerIndex)}
+                                    onContextMenu={(e) => handleHeaderContextMenu(e, track.id)}
+                                    className="relative cursor-grab active:cursor-grabbing"
+                                >
+                                    {/* Drop Indicator Logic could go here (border-top?) */}
+                                    <TrackHeader
+                                        track={track}
+                                        isActive={isActive}
+                                        onToggleMute={() => { }}
+                                        onToggleHide={() => handleToggleVisibility(track.id)}
+                                        onToggleLock={() => handleToggleLock(track.id)}
+                                        onRename={(name) => handleRenameLayer(track.id, name)}
+                                    />
+                                </div>
+                            );
+                        })
                     }
                 </div>
 

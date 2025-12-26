@@ -897,6 +897,168 @@ export default function StudioPageClient() {
         setLayersState(prev => prev.map(l => l.id === layerId ? { ...l, ...updates } : l));
     }, []);
 
+    const handleLayerReorder = useCallback((fromIndex: number, toIndex: number) => {
+        setLayersState(prev => {
+            const newLayers = [...prev];
+            // Ensure sorted by order before splice (just in case)
+            newLayers.sort((a, b) => a.order - b.order);
+
+            // Move layer
+            const [movedLayer] = newLayers.splice(fromIndex, 1);
+            newLayers.splice(toIndex, 0, movedLayer);
+
+            // Re-normalize 'order' and build map
+            // Map: LayerID -> NewOrder
+            const orderMap = new Map<string, number>();
+
+            newLayers.forEach((l, index) => {
+                l.order = index;
+                orderMap.set(l.id, index);
+            });
+
+            // Update items to match new layer structure
+            setVideoTrackItems(prevItems => {
+                return prevItems.map(item => {
+                    // Strategy 1: Direct Link (V2)
+                    if (item.layerId && orderMap.has(item.layerId)) {
+                        return { ...item, layerIndex: orderMap.get(item.layerId)! };
+                    }
+
+                    // Strategy 2: Implicit Link (V1 Index Match) - Fallback
+                    // Find which layer WAS at the item's current layerIndex
+                    // But 'prev' (layersState) is closed over.
+                    // Actually, fromIndex/toIndex logic implies we know the permutation.
+                    // But safely, we can see if we can find the layer that effectively claims this item.
+                    // Ideally V1 items should be linked or we rely on 'movedLayer'.
+
+                    // If simple swap:
+                    // If item was at `fromIndex`, it moves to `toIndex`.
+                    // If item was between, it shifts.
+                    // Actually, if we just track ID... 
+                    // Let's assume V2 Linkage is primary. If missing, we might de-sync slightly but V1->V2 migration happens on save.
+                    // Let's rely on mapping current items' layerIndex? 
+                    // No, simpler: 
+                    // If item.layerIndex === fromIndex -> toIndex? 
+                    // This is only true for the moved layer.
+                    // Other layers shifted up/down.
+
+                    // Let's implement robust shift logic for fallback:
+                    let newIndex = item.layerIndex ?? 0;
+                    if (newIndex === fromIndex) {
+                        newIndex = toIndex;
+                    } else if (fromIndex < toIndex) {
+                        // Moved down (e.g. 0 -> 2). Items at 1, 2 shift to 0, 1. (Index - 1)
+                        if (newIndex > fromIndex && newIndex <= toIndex) {
+                            newIndex--;
+                        }
+                    } else if (fromIndex > toIndex) {
+                        // Moved up (e.g. 2 -> 0). Items at 0, 1 shift to 1, 2. (Index + 1)
+                        if (newIndex >= toIndex && newIndex < fromIndex) {
+                            newIndex++;
+                        }
+                    }
+                    return { ...item, layerIndex: newIndex };
+                });
+            });
+
+            return newLayers;
+        });
+    }, []);
+
+    const handleDeleteLayer = useCallback((layerId: string) => {
+        const layer = layersState.find(l => l.id === layerId);
+        if (!layer) return;
+
+        const layerItems = videoTrackItems.filter(i =>
+            // Check by ID or Index fallback
+            (i.layerId === layerId) || (!i.layerId && i.layerIndex === layer.order)
+        );
+
+        if (layerItems.length > 0) {
+            if (!confirm(`Layer "${layer.name}" contains ${layerItems.length} clips. Delete anyway?`)) {
+                return;
+            }
+        }
+
+        // Logic:
+        // 1. Remove items
+        // 2. Remove layer
+        // 3. Shift order & items above down
+
+        setLayersState(prev => {
+            const newLayers = prev.filter(l => l.id !== layerId)
+                .sort((a, b) => a.order - b.order)
+                .map((l, i) => ({ ...l, order: i })); // Re-normalize order
+            return newLayers;
+        });
+
+        setVideoTrackItems(prev => {
+            // Remove items of deleted layer
+            const filtered = prev.filter(i =>
+                !((i.layerId === layerId) || (!i.layerId && i.layerIndex === layer.order))
+            );
+
+            // Shift items?
+            // If item was at layerIndex > deletedLayer.order, decrement layerIndex.
+            // But we should try to link to new layers.
+            // Since we re-normalized layers (0,1,2...), checking strictly by ID is safest if IDs are stable.
+            // But items sticking to `layerId` is best.
+            // Fallback for `layerIndex` shift:
+            return filtered.map(item => {
+                if (item.layerId) return item; // Has ID, will link to layer (which re-normalized)
+
+                // Fallback shift for legacy items without layerId
+                if ((item.layerIndex ?? 0) > layer.order) {
+                    return { ...item, layerIndex: (item.layerIndex ?? 0) - 1 };
+                }
+                return item;
+            });
+        });
+
+        setManualLayerCount(prev => Math.max(1, prev - 1));
+    }, [layersState, videoTrackItems]);
+
+    const handleClearLayer = useCallback((layerId: string) => {
+        const layer = layersState.find(l => l.id === layerId);
+        if (!layer) return;
+
+        if (confirm(`Clear all clips from "${layer.name}"?`)) {
+            setVideoTrackItems(prev => prev.filter(i =>
+                !((i.layerId === layerId) || (!i.layerId && i.layerIndex === layer.order))
+            ));
+        }
+    }, [layersState]);
+
+    const handleDuplicateLayer = useCallback((layerId: string) => {
+        const layer = layersState.find(l => l.id === layerId);
+        if (!layer) return;
+
+        const newLayerId = uuidv4();
+        const newOrder = layersState.length; // Add to top? Or below current?
+        // User behavior: usually duplicates below? Or at bottom?
+        // Let's add at bottom (top of stack visually)
+
+        // Clone Items
+        const layerItems = videoTrackItems.filter(i =>
+            (i.layerId === layerId) || (!i.layerId && i.layerIndex === layer.order)
+        );
+
+        const newItems = layerItems.map(item => ({
+            ...item,
+            id: uuidv4(),
+            layerId: newLayerId,
+            layerIndex: newOrder // Temporary
+        }));
+
+        setLayersState(prev => [
+            ...prev,
+            { ...layer, id: newLayerId, order: newOrder, name: `${layer.name} (Copy)` }
+        ]);
+
+        setVideoTrackItems(prev => [...prev, ...newItems]);
+        setManualLayerCount(prev => prev + 1);
+    }, [layersState, videoTrackItems]);
+
     // 2. Timeline Persistence (videoTrackItems -> projects.blocks_json)
     const saveTimeline = useCallback(async (itemsToSave: TimelineItem[]) => {
         // [Safety Guard] Prevent Empty Saves (Wipe Protection)
@@ -1996,6 +2158,10 @@ export default function StudioPageClient() {
                                 layers={layersState}
                                 onLayerUpdate={handleLayerUpdate}
                                 onRequestAddLayer={handleRequestAddLayer}
+                                onLayerReorder={handleLayerReorder}
+                                onDeleteLayer={handleDeleteLayer}
+                                onClearLayer={handleClearLayer}
+                                onDuplicateLayer={handleDuplicateLayer}
                             />
                         </div>
                     </div>
