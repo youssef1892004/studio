@@ -19,9 +19,10 @@ interface DynamicPanelProps {
     blockIndex?: number;
     voices?: any[]; // Pass voices array
     onAddText?: (type: 'heading' | 'subheading' | 'body') => void;
+    onAddImage?: (file: { url: string; width?: number; height?: number; type: string }) => void;
 }
 
-const DynamicPanel: React.FC<DynamicPanelProps> = ({ activeTool, onGenerateVoice, activeBlock, onUpdateBlock, onDeleteBlock, onClearSelection, onAddGhostBlock, project, onAssetsUpdated, blockIndex, voices = [], onAddText }) => {
+const DynamicPanel: React.FC<DynamicPanelProps> = ({ activeTool, onGenerateVoice, activeBlock, onUpdateBlock, onDeleteBlock, onClearSelection, onAddGhostBlock, project, onAssetsUpdated, blockIndex, voices = [], onAddText, onAddImage }) => {
     const renderPanel = () => {
         switch (activeTool) {
             case 'image':
@@ -44,7 +45,7 @@ const DynamicPanel: React.FC<DynamicPanelProps> = ({ activeTool, onGenerateVoice
             case 'characters':
                 return <GenericGridPanel title="Characters" description="Manage your AI characters" itemName="character" />;
             case 'uploads':
-                return <UploadsPanel project={project} onAssetsUpdated={onAssetsUpdated} />;
+                return <UploadsPanel project={project} onAssetsUpdated={onAssetsUpdated} onAddAsset={onAddImage} />;
             case 'assets':
                 return <GenericGridPanel title="Assets" description="Manage your project assets" itemName="asset" projectId={project?.id} />;
             case 'templates':

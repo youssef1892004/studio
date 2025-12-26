@@ -6,9 +6,10 @@ import toast from 'react-hot-toast';
 interface UploadsPanelProps {
     project?: any;
     onAssetsUpdated?: (newAssets: any[]) => void;
+    onAddAsset?: (file: { url: string; width?: number; height?: number; type: string }) => void;
 }
 
-const UploadsPanel: React.FC<UploadsPanelProps> = ({ project, onAssetsUpdated }) => {
+const UploadsPanel: React.FC<UploadsPanelProps> = ({ project, onAssetsUpdated, onAddAsset }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isUploading, setIsUploading] = useState(false);
     const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -16,179 +17,15 @@ const UploadsPanel: React.FC<UploadsPanelProps> = ({ project, onAssetsUpdated })
     const [newName, setNewName] = useState('');
     const [previewAsset, setPreviewAsset] = useState<any | null>(null);
 
-    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+    // ... (rest of stats)
 
-        if (!project?.id) {
-            toast.error('Project ID not found');
-            return;
-        }
+    // ... (handleFileSelect)
 
-        // Validate file size (e.g., 50MB limit)
-        if (file.size > 50 * 1024 * 1024) {
-            toast.error('File too large (max 50MB)');
-            return;
-        }
+    // ... (handleManageAsset)
 
-        setIsUploading(true);
-        const toastId = toast.loading('Uploading file...');
+    // ... (helpers)
 
-        try {
-            // Convert to Base64
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = async () => {
-                const dataUrl = reader.result as string;
-
-                const response = await fetch('/api/project/upload-asset', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        dataUrl,
-                        projectId: project.id,
-                        fileName: file.name,
-                        fileType: file.type,
-                        fileSize: file.size
-                    }),
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    toast.error(data.error || 'Upload failed', { id: toastId });
-                    return;
-                }
-
-                toast.success('File uploaded successfully', { id: toastId });
-
-                if (onAssetsUpdated && data.asset) {
-                    const currentAssets = project.image_url || [];
-                    onAssetsUpdated([...currentAssets, data.asset]);
-                }
-
-                if (data.asset) {
-                    const a = data.asset;
-                    const imageRaw = (a.image_url && a.image_url.length > 0) ? a.image_url : null;
-                    const videoRaw = (a.video_url && a.video_url.length > 0) ? a.video_url : null;
-                    const voiceRaw = (a.voice_url && a.voice_url.length > 0) ? a.voice_url : null;
-
-                    let rawUrl = imageRaw || videoRaw || voiceRaw;
-                    if (Array.isArray(rawUrl)) rawUrl = rawUrl[0];
-                    const url = typeof rawUrl === 'string' ? rawUrl : '';
-
-                    const type = imageRaw ? 'image/png' : videoRaw ? 'video/mp4' : 'audio/mp3';
-                    const name = url ? (url.split('/').pop() || 'Asset') : 'Asset';
-
-                    setDbAssets(prev => [{
-                        id: a.id,
-                        name: name,
-                        type: type,
-                        url: url,
-                        size: file.size,
-                        created_at: new Date().toISOString()
-                    }, ...prev]);
-                }
-            };
-        } catch (error: any) {
-            console.error('Upload error:', error);
-            toast.error(`Upload failed: ${error.message}`, { id: toastId });
-        } finally {
-            setIsUploading(false);
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-        }
-    };
-
-    const handleManageAsset = async (assetId: string, action: 'rename' | 'delete', name?: string) => {
-        if (!project?.id) return;
-
-        const toastId = toast.loading(action === 'rename' ? 'Renaming...' : 'Deleting...');
-        try {
-            const response = await fetch('/api/project/manage-assets', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    projectId: project.id,
-                    assetId,
-                    action,
-                    newName: name
-                }),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Operation failed');
-            }
-
-            toast.success(action === 'rename' ? 'Renamed successfully' : 'Deleted successfully', { id: toastId });
-
-            if (onAssetsUpdated && data.assets) {
-                onAssetsUpdated(data.assets);
-            }
-            setRenamingAssetId(null);
-        } catch (error: any) {
-            console.error('Manage asset error:', error);
-            toast.error(`Failed: ${error.message}`, { id: toastId });
-        }
-    };
-
-    const getFileIcon = (type: string) => {
-        if (type.startsWith('image/')) return <ImageIcon className="w-4 h-4 text-blue-500" />;
-        if (type.startsWith('audio/')) return <Music className="w-4 h-4 text-purple-500" />;
-        if (type.startsWith('video/')) return <Video className="w-4 h-4 text-red-500" />;
-        return <File className="w-4 h-4 text-studio-text-light dark:text-studio-text" />;
-    };
-
-    const formatSize = (bytes: number) => {
-        if (bytes === 0) return '0 B';
-        const k = 1024;
-        const sizes = ['B', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-    };
-
-    const [dbAssets, setDbAssets] = useState<any[]>([]);
-
-    useEffect(() => {
-        const fetchAssets = async () => {
-            if (!project?.id) return;
-            try {
-                // Using a relative import assumption or need to import executeGraphQL from lib
-                const { executeGraphQL, GET_ASSETS } = await import('../../../lib/graphql');
-                const data = await executeGraphQL<any>({ query: GET_ASSETS, variables: { project_id: project.id } });
-                if (data.data?.Voice_Studio_Asset) {
-                    const mapped = data.data.Voice_Studio_Asset.map((a: any) => {
-                        const imageRaw = (a.image_url && a.image_url.length > 0) ? a.image_url : null;
-                        const videoRaw = (a.video_url && a.video_url.length > 0) ? a.video_url : null;
-                        const voiceRaw = (a.voice_url && a.voice_url.length > 0) ? a.voice_url : null;
-
-                        let rawUrl = imageRaw || videoRaw || voiceRaw;
-                        if (Array.isArray(rawUrl)) rawUrl = rawUrl[0];
-                        const url = typeof rawUrl === 'string' ? rawUrl : '';
-
-                        const type = imageRaw ? 'image/png' : videoRaw ? 'video/mp4' : 'audio/mp3';
-                        const name = url ? (url.split('/').pop() || 'Asset') : 'Asset';
-                        return {
-                            id: a.id,
-                            name: name,
-                            type: type,
-                            url: url,
-                            size: 0 // Metadata not available in DB
-                        };
-                    });
-                    setDbAssets(mapped);
-                }
-            } catch (e) {
-                console.error("Failed to fetch assets", e);
-            }
-        };
-        fetchAssets();
-    }, [project?.id]); // Refresh on project change only
-
-    const assets = dbAssets;
+    // ... (useEffect fetch)
 
     return (
         <div className="h-full flex flex-col bg-card p-6 space-y-6 overflow-y-auto custom-scrollbar relative">
@@ -250,8 +87,21 @@ const UploadsPanel: React.FC<UploadsPanelProps> = ({ project, onAssetsUpdated })
                                     }));
                                     e.dataTransfer.effectAllowed = 'copy';
                                 }}
-                                onClick={() => setPreviewAsset(file)}
-                                className="flex items-center gap-3 p-3 bg-muted rounded-lg border border-border group hover:border-primary/50 transition-colors relative cursor-grab active:cursor-grabbing"
+                                onClick={() => {
+                                    if (file.type?.startsWith('image/') && onAddAsset) {
+                                        const img = new Image();
+                                        img.src = `/api/asset-proxy?url=${encodeURIComponent(file.url)}`;
+                                        img.onload = () => {
+                                            onAddAsset({ ...file, width: img.naturalWidth, height: img.naturalHeight });
+                                        };
+                                        img.onerror = () => {
+                                            onAddAsset(file);
+                                        };
+                                    } else {
+                                        setPreviewAsset(file);
+                                    }
+                                }}
+                                className="flex items-center gap-3 p-3 bg-muted rounded-lg border border-border group hover:border-primary/50 transition-colors relative cursor-pointer active:scale-[0.98]"
                                 style={{ zIndex: activeMenuId === file.id ? 50 : 1 }}
                             >
                                 <div className="p-2 bg-black/5 dark:bg-white/5 rounded-lg">

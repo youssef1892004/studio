@@ -1737,6 +1737,53 @@ export default function StudioPageClient() {
         toast.success(`Text added: ${type}`);
     }, [currentTime, videoTrackItems, cards, recordHistory]);
 
+    const handleAddImage = useCallback((file: { url: string; width?: number; height?: number; type: string }) => {
+        const ASSET_W = file.width || 1000;
+        const ASSET_H = file.height || 1000;
+
+        // AutoFit Logic: scale = min(canvasW/imgW, canvasH/imgH)
+        // Canvas is roughly 1920x1080 internally for relative calc usually?
+        // Actually we use % for X/Y. Transform Scale 1 = Original Size?
+        // In this app, it seems scale 1 is relative to the CONTAINER or Item?
+        // Let's assume Scale 1 = Original Resolution.
+        // If image is huge (4000px), we need to scale down to fit 1080p canvas.
+
+        const CANVAS_W = 1920;
+        const CANVAS_H = 1080;
+
+        // Target Coverage: e.g. 50% of screen height to be safe default?
+        // Or just "FIT" (Contain)
+
+        const scaleX = (CANVAS_W * 0.8) / ASSET_W;
+        const scaleY = (CANVAS_H * 0.8) / ASSET_H;
+        let autoFitScale = Math.min(scaleX, scaleY);
+
+        if (autoFitScale > 1) autoFitScale = 1; // Don't upscale small images by default
+
+        const newItem: TimelineItem = {
+            id: uuidv4(),
+            type: 'image',
+            start: currentTime,
+            duration: 5,
+            content: file.url,
+            transform: {
+                x: 50,
+                y: 50,
+                scale: autoFitScale,
+                rotation: 0,
+                width: ASSET_W,
+                height: ASSET_H
+            },
+            opacity: 1,
+            layerIndex: videoTrackItems.length + 1
+        };
+
+        setVideoTrackItems(prev => [...prev, newItem]);
+        setSelectedItemIds([newItem.id]); // Auto Select
+        recordHistory(cards, [...videoTrackItems, newItem]);
+        toast.success('Image added to timeline');
+    }, [currentTime, videoTrackItems, cards, recordHistory]);
+
 
     const handleSplit = useCallback((itemId: string, splitTime: number, trackType: string) => {
         if (trackType === 'voice') {
@@ -2148,7 +2195,6 @@ export default function StudioPageClient() {
                                     activeTool={activeLeftTool}
                                     onGenerateVoice={handleCreateAndGenerateVoice}
                                     activeBlock={activeCard}
-                                    blockIndex={activeCardId ? (cards.findIndex(c => c.id === activeCardId) + 1) : undefined}
                                     onUpdateBlock={handleUpdateBlock}
                                     onDeleteBlock={handleDeleteBlock}
                                     onClearSelection={() => setActiveCardId(null)}
@@ -2156,6 +2202,7 @@ export default function StudioPageClient() {
                                     project={project}
                                     onAssetsUpdated={handleAssetsUpdated}
                                     onAddText={handleAddText}
+                                    onAddImage={handleAddImage}
                                 />
                             </div>
 

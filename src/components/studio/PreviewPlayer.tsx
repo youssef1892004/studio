@@ -200,9 +200,14 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                                     key={layer.id || index}
                                     id={`layer-${layer.id}`}
                                     style={containerStyle}
+                                    onMouseDown={(e) => {
+                                        // Allow selection on click
+                                        e.stopPropagation();
+                                        onEditItem?.(layer.id, layer.type || 'media');
+                                    }}
                                     onDoubleClick={(e) => {
                                         e.stopPropagation();
-                                        onEditItem?.(layer.id, 'media');
+                                        onEditItem?.(layer.id, layer.type || 'media');
                                     }}
                                 >
                                     <MediaLayer
@@ -307,54 +312,68 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                     );
                 })}
 
+                {/* Moveable Control for Text, Image, and Video */}
                 <Moveable
                     ref={moveableRef}
                     target={target}
-                    draggable={true}
-                    scalable={true}
-                    keepRatio={true}
-                    rotatable={true}
-                    snappable={true}
-                    bounds={{ left: 0, top: 0, right: 0, bottom: 0, position: "css" }}
+                    draggable={!!activeId}
+                    resizable={!!activeId}
+                    rotatable={!!activeId}
                     throttleDrag={0}
-                    throttleScale={0}
+                    throttleResize={0}
                     throttleRotate={0}
+                    keepRatio={true}
                     renderDirections={["nw", "ne", "sw", "se"]}
+                    padding={{ left: 0, top: 0, right: 0, bottom: 0 }}
+                    origin={false}
+                    onDragStart={() => {
+                        if (isPlaying) onPlayPause?.();
+                    }}
                     onDrag={({ target, beforeTranslate }) => {
+                        if (!activeId || !containerRef.current) return;
+
                         const isText = activeTextItems.some(t => t.id === activeId);
-                        if (!containerRef.current) return;
 
                         if (isText) {
+                            // Text uses generic transform logic in this viewer for drag visual
                             target!.style.transform = `translate(-50%, -50%) translate(${beforeTranslate[0]}px, ${beforeTranslate[1]}px) rotate(${activeTransform.rotation}deg) scale(${activeTransform.scale})`;
                         } else {
-                            if (!activeTransform || !onTransformUpdate) return;
+                            // Video/Image Optimistic Update (Visual Only)
+                            // We don't want to commit until DragEnd to avoid performance hit on React State?
+                            // But we need live preview.
+                            // Since we map back to % on DragEnd, we can just move the element visually here?
+                            // Actually, let's try to update state only on DragEnd for performance, 
+                            // BUT we need visual feedback.
+                            // Moveable manages target.style.transform automatically if we don't interfere?
+                            // No, we must apply it.
                             target!.style.transform = `translate(${beforeTranslate[0]}px, ${beforeTranslate[1]}px) rotate(${activeTransform.rotation}deg) scale(${activeTransform.scale})`;
                         }
                     }}
-                    onDragEnd={({ lastEvent }) => {
-                        if (!lastEvent || !containerRef.current) return;
+                    onDragEnd={({ lastEvent, target }) => {
+                        if (!lastEvent || !containerRef.current || !activeId) return;
 
                         const isText = activeTextItems.some(t => t.id === activeId);
                         const rect = containerRef.current.getBoundingClientRect();
                         const [tx, ty] = lastEvent.beforeTranslate;
-                        const xPercent = (tx / rect.width) * 100;
-                        const yPercent = (ty / rect.height) * 100;
 
-                        if (isText && onTextUpdate && activeId) {
+                        // Convert px delta to % delta
+                        const dxPercent = (tx / rect.width) * 100;
+                        const dyPercent = (ty / rect.height) * 100;
+
+                        if (isText && onTextUpdate) {
                             const textItem = activeTextItems.find(t => t.id === activeId);
                             if (textItem) {
                                 const currentX = textItem.style?.xPosition ?? 50;
                                 const currentY = textItem.style?.yPosition ?? 50;
 
-                                const newX = currentX + xPercent;
-                                const newY = currentY + yPercent;
+                                const newX = currentX + dxPercent;
+                                const newY = currentY + dyPercent;
 
-                                // OPTIMISTIC UPDATE:
-                                // Manually set DOM position immediately to prevent "jump back" while waiting for React render.
+                                // Optimistic
                                 if (target) {
                                     target.style.left = `${newX}%`;
                                     target.style.top = `${newY}%`;
-                                    target.style.transform = "translate(-50%, -50%)"; // Clear the drag transform
+                                    target.style.transform = `translate(-50%, -50%) rotate(${activeTransform.rotation}deg) scale(${activeTransform.scale})`;
                                 }
 
                                 onTextUpdate(activeId, {
@@ -364,50 +383,74 @@ const PreviewPlayer: React.FC<PreviewPlayerProps> = ({
                                 });
                             }
                         } else if (onTransformUpdate && activeTransform) {
+                            // Media (Video/Image)
                             onTransformUpdate({
                                 ...activeTransform,
-                                x: xPercent,
-                                y: yPercent
+                                x: activeTransform.x + dxPercent,
+                                y: activeTransform.y + dyPercent
                             });
+
+                            // Reset transform style as React will re-render with new Top/Left/Transform
+                            if (target) {
+                                target.style.transform = '';
+                                // Actually better to let React handle it or set to identity?
+                                // Our render logic sets transform style.
+                            }
                         }
+                    }}
+                    onScaleStart={() => {
+                        if (isPlaying) onPlayPause?.();
                     }}
                     onScale={({ target, drag }) => {
                         target!.style.transform = drag.transform;
                     }}
                     onScaleEnd={({ lastEvent, target }) => {
-                        if (!lastEvent || !target) return;
+                        if (!lastEvent || !target || !activeId) return;
                         const isText = activeTextItems.some(t => t.id === activeId);
+                        const scaleFactor = lastEvent.scale[0];
 
-                        if (isText && onTextUpdate && activeId) {
+                        if (isText && onTextUpdate) {
                             const textItem = activeTextItems.find(t => t.id === activeId);
                             if (textItem) {
-                                const scaleFactor = lastEvent.scale[0];
                                 const currentSize = textItem.style?.fontSize || 24;
                                 const newSize = currentSize * scaleFactor;
 
-                                // OPTIMISTIC UPDATE for Scale
                                 if (target) {
-                                    target.style.fontSize = `${newSize * 1.5}px`; // Match render logic ((size * 1.5))
+                                    target.style.fontSize = `${newSize * 1.5}px`;
                                     target.style.transform = "translate(-50%, -50%)";
                                 }
-
-                                onTextUpdate(activeId, {
-                                    ...textItem.style,
-                                    fontSize: newSize
-                                });
+                                onTextUpdate(activeId, { ...textItem.style, fontSize: newSize });
                             }
                         } else if (onTransformUpdate && activeTransform) {
-                            onTransformUpdate({ ...activeTransform, scale: lastEvent.scale[0] });
+                            onTransformUpdate({
+                                ...activeTransform,
+                                scale: lastEvent.scale[0]
+                            });
                         }
+                    }}
+                    onRotateStart={() => {
+                        if (isPlaying) onPlayPause?.();
                     }}
                     onRotate={({ target, drag }) => {
                         target!.style.transform = drag.transform;
                     }}
                     onRotateEnd={({ lastEvent }) => {
-                        if (!lastEvent) return;
+                        if (!lastEvent || !activeId) return;
                         const isText = activeTextItems.some(t => t.id === activeId);
+
+                        // Text Rotation not supported in Data Model yet? 
+                        // Actually Text Item has no rotation prop in `textStyle` usually? 
+                        // Checked `TimelineItem`: `transform` is on the Item. 
+                        // But Text handles styles via `textStyle`.
+                        // Let's assume generic transform update should handle text rotation if feasible, 
+                        // but currently Text uses `textStyle` which has no rotation.
+                        // So exclude Text from rotation update for now until Phase 5?
+
                         if (!isText && onTransformUpdate && activeTransform) {
-                            onTransformUpdate({ ...activeTransform, rotation: lastEvent.rotation });
+                            onTransformUpdate({
+                                ...activeTransform,
+                                rotation: lastEvent.rotation
+                            });
                         }
                     }}
                 />
