@@ -889,8 +889,22 @@ export default function StudioPageClient() {
         }
     }, [projectId]);
 
+    const handleRequestAddLayer = useCallback(() => {
+        setManualLayerCount(prev => prev + 1);
+    }, []);
+
+    const handleLayerUpdate = useCallback((layerId: string, updates: Partial<TimelineLayer>) => {
+        setLayersState(prev => prev.map(l => l.id === layerId ? { ...l, ...updates } : l));
+    }, []);
+
     // 2. Timeline Persistence (videoTrackItems -> projects.blocks_json)
     const saveTimeline = useCallback(async (itemsToSave: TimelineItem[]) => {
+        // [Safety Guard] Prevent Empty Saves (Wipe Protection)
+        if (!itemsToSave.length && layersStateRef.current.length === 0) {
+            console.warn('[Timeline Save] Skipped empty timeline save (Safety Guard)');
+            return;
+        }
+
         // V2: Structure Data
         const structuredData = structureTimelineData(
             itemsToSave,
@@ -898,6 +912,12 @@ export default function StudioPageClient() {
             activePresetId,
             layersStateRef.current
         );
+
+        // [Safety Guard] Schema Assertion
+        if (structuredData.kind !== "projectData" || structuredData.version !== 2 || !Array.isArray(structuredData.layers)) {
+            console.error('[Timeline Save] Invalid timeline schema generated. Save aborted.', structuredData);
+            throw new Error('Invalid timeline schema assertion failed');
+        }
 
         console.log(`[Persistence] Saving Timeline V2 (${structuredData.layers.length} layers, ${itemsToSave.length} clips)`);
 
@@ -1973,6 +1993,9 @@ export default function StudioPageClient() {
                                 // Lifted Props
                                 zoomLevel={zoomLevel}
                                 manualLayerCount={manualLayerCount}
+                                layers={layersState}
+                                onLayerUpdate={handleLayerUpdate}
+                                onRequestAddLayer={handleRequestAddLayer}
                             />
                         </div>
                     </div>

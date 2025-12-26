@@ -1,6 +1,6 @@
 'use client';
 
-import { Voice, StudioBlock, TimelineItem } from '@/lib/types';
+import { Voice, StudioBlock, TimelineItem, TimelineLayer } from '@/lib/types';
 import { Play, Pause, ZoomIn, ZoomOut, Volume2, VolumeX, Eye, EyeOff, Lock, Unlock, Scissors, ChevronRight, ChevronLeft, Settings, SkipBack, SkipForward, Plus, Wand2, Trash2, Undo2, Redo2, MousePointer2, Layers } from 'lucide-react';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
@@ -147,6 +147,9 @@ interface TimelineProps {
     // New Props
     zoomLevel?: number;
     manualLayerCount?: number;
+    layers?: TimelineLayer[];
+    onLayerUpdate?: (layerId: string, updates: Partial<TimelineLayer>) => void;
+    onRequestAddLayer?: () => void;
 }
 
 export interface TimelineHandle {
@@ -162,7 +165,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
     activeBlockId, onActiveMediaChange, onTimeUpdate, onIsPlayingChange,
     activeVideoId, onVideoClick, onPlaybackRateChange, activeTool,
     onSplit, onToolChange, onDelete, onUndo, onRedo, canUndo, canRedo,
-    zoomLevel = 50, manualLayerCount = 2
+    zoomLevel = 50, manualLayerCount = 2, layers, onLayerUpdate, onRequestAddLayer
 }, ref) => {
 
     const [isPlaying, setIsPlaying] = useState(false);
@@ -298,10 +301,14 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
         const videoTracks: Track[] = [];
         // Loop is 0-indexed. If layerCount is 2, we want loops for 1 and 0.
         for (let i = layerCount - 1; i >= 0; i--) {
+            // Match layer by order (which equals index)
+            const layer = layers?.find(l => l.order === i);
             videoTracks.push({
                 id: `t-video-${i}`,
                 type: 'video',
-                name: `Video ${i + 1}`,
+                name: layer?.name || `Video ${i + 1}`,
+                isLocked: layer?.isLocked,
+                isHidden: layer ? !layer.isVisible : false, // UI prop is isHidden, data is isVisible
                 items: visualItems.filter(item => (item.layerIndex || 0) === i)
             });
         }
@@ -327,7 +334,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
                 items: videoTrackItems.filter(i => i.type === 'music')
             }
         ];
-    }, [displayVoiceItems, videoTrackItems, manualLayerCount]);
+    }, [displayVoiceItems, videoTrackItems, manualLayerCount, layers]);
 
     // --- Drag and Drop Handlers ---
     // --- Drag and Drop Handlers ---
@@ -418,6 +425,34 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
             if (!isValid) return;
 
             const data = JSON.parse(dataStr);
+
+            // Implicit Layer Creation for Visual Items
+            if (!trackType && onRequestAddLayer && onVideoTrackUpdate && (data.type === 'video' || data.type === 'image' || data.type === 'scene')) {
+                const rect = timelineScrollRef.current?.getBoundingClientRect();
+                if (rect) {
+                    const x = e.clientX - rect.left + scrollLeft;
+                    const dropTime = Math.max(0, x / zoomLevel);
+
+                    const newItem: TimelineItem = {
+                        id: uuidv4(),
+                        start: dropTime,
+                        duration: 5,
+                        content: data.content || data.name || 'New Item',
+                        type: data.type,
+                        layerIndex: manualLayerCount, // Assign to the new (upcoming) layer index
+                        // other props?
+                        src: data.url, // For visual items
+                        mediaStartOffset: 0
+                    };
+
+                    // 1. Request new layer
+                    onRequestAddLayer();
+                    // 2. Add item immediately
+                    onVideoTrackUpdate(prev => [...prev, newItem]);
+
+                    return;
+                }
+            }
 
             // Handle Audio Drop on Music Track
             if (trackType === 'music' && data.type?.startsWith('audio') && onVideoTrackUpdate) {
@@ -1088,6 +1123,31 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
     }, [isPlaying, currentTime, totalDuration, handlePlayPause, handleSeek]);
 
 
+
+    const handleToggleLock = (trackId: string) => {
+        if (!onLayerUpdate || !layers) return;
+        const match = trackId.match(/^t-video-(\d+)$/);
+        if (match) {
+            const index = parseInt(match[1]);
+            const layer = layers.find(l => l.order === index);
+            if (layer) {
+                onLayerUpdate(layer.id, { isLocked: !layer.isLocked });
+            }
+        }
+    };
+
+    const handleToggleVisibility = (trackId: string) => {
+        if (!onLayerUpdate || !layers) return;
+        const match = trackId.match(/^t-video-(\d+)$/);
+        if (match) {
+            const index = parseInt(match[1]);
+            const layer = layers.find(l => l.order === index);
+            if (layer) {
+                onLayerUpdate(layer.id, { isVisible: !layer.isVisible });
+            }
+        }
+    };
+
     // --- Render ---
 
     return (
@@ -1112,8 +1172,8 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
                                 key={track.id}
                                 track={track}
                                 onToggleMute={() => { }}
-                                onToggleHide={() => { }}
-                                onToggleLock={() => { }}
+                                onToggleHide={() => handleToggleVisibility(track.id)}
+                                onToggleLock={() => handleToggleLock(track.id)}
                             />
                         ))
                     }
@@ -1190,15 +1250,18 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
                                         const width = item.duration * zoomLevel;
                                         const left = item.start * zoomLevel;
                                         const isSelected = activeBlockId && item.blockId === activeBlockId;
+                                        const isDimmed = track.isHidden; // Visibility dimming
 
                                         return (
                                             <div
                                                 key={item.id}
-                                                draggable={activeTool !== 'razor'} // Disable drag if razor tool is active
-                                                onDragStart={(e) => activeTool !== 'razor' && handleDragStart(e, item.blockId || item.id, track.type)}
+                                                draggable={activeTool !== 'razor' && !track.isLocked} // Disable drag if locked
+                                                onDragStart={(e) => activeTool !== 'razor' && !track.isLocked && handleDragStart(e, item.blockId || item.id, track.type)}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     if (activeTool === 'razor' && onSplit) {
+                                                        if (track.isLocked) return; // Prevent split if locked
+
                                                         const isSelected = (track.type === 'voice' && activeBlockId === item.blockId) ||
                                                             ((track.type === 'video' || track.type === 'image' || track.type === 'text' || track.type === 'music') && activeVideoId === item.id);
 
@@ -1218,7 +1281,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
                                                 className={`absolute top-1 bottom-1 rounded-md overflow-hidden cursor-move group select-none transition-all ${(track.type === 'voice' && activeBlockId === item.blockId) || ((track.type === 'video' || track.type === 'image' || track.type === 'text' || track.type === 'music') && activeVideoId === item.id)
                                                     ? 'ring-2 ring-white z-20 shadow-xl'
                                                     : 'hover:ring-1 hover:ring-white/50 z-10'
-                                                    } ${draggingItemId === (item.blockId || item.id) ? 'opacity-50' : ''} ${activeTool === 'razor' ? 'cursor-crosshair' : ''}`}
+                                                    } ${draggingItemId === (item.blockId || item.id) ? 'opacity-50' : ''} ${isDimmed ? 'opacity-40 grayscale pointer-events-none' : ''} ${activeTool === 'razor' ? 'cursor-crosshair' : ''}`}
                                                 style={{
                                                     left: `${left}px`,
                                                     width: `${width}px`,
@@ -1228,7 +1291,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
                                                 {/* Item Content */}
                                                 <div className="h-full w-full relative">
                                                     {/* Delete Button for Video Items */}
-                                                    {track.type !== 'voice' && (
+                                                    {track.type !== 'voice' && !track.isLocked && ( // Hide delete if locked
                                                         <button
                                                             className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded opacity-0 group-hover/item:opacity-100 transition-opacity z-20 hover:bg-red-600"
                                                             onClick={(e) => {
