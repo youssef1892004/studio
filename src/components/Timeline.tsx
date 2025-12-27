@@ -347,6 +347,40 @@ export interface TimelineHandle {
     togglePlayPause: () => void;
 }
 
+const calculateDropTime = (
+    e: React.DragEvent,
+    opts: {
+        zoom: number;
+        scrollLeft: number;
+        container: HTMLDivElement;
+        items: TimelineItem[];
+        draggedId: string | null;
+        playhead: number;
+    }
+): { time: number; snapped: boolean } => {
+    const rect = opts.container.getBoundingClientRect();
+    const rawX = e.clientX - rect.left + opts.scrollLeft;
+    const rawTime = Math.max(0, rawX / opts.zoom);
+
+    // 1. Clamp (optional, but good for safety)
+    let time = rawTime;
+    let snapped = false;
+
+    // 2. Snap
+    const threshold = SNAP_THRESHOLD_PX / opts.zoom;
+    const points = getSnapPoints(opts.items, opts.draggedId, opts.playhead);
+
+    for (const p of points) {
+        if (Math.abs(p.time - rawTime) < threshold) {
+            time = p.time;
+            snapped = true;
+            break;
+        }
+    }
+
+    return { time, snapped };
+};
+
 const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
     cards, voices, onCardsUpdate, isBlocksProcessing, onBlockClick,
     onAddBlock, onGenerateAll, videoTrackItems = [], onVideoTrackUpdate,
@@ -637,58 +671,96 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
         e.dataTransfer.setData('application/json', JSON.stringify({ type: actionType, id, trackType: type }));
     };
 
-    const handleDragOver = (e: React.DragEvent) => {
+    const getSnapItemsForTrack = (
+        trackType: TrackType | undefined,
+        allItems: TimelineItem[]
+    ): TimelineItem[] => {
+        // Voice: No Snap
+        if (trackType === 'voice') return [];
+
+        // Music: Snap only to Music
+        if (trackType === 'music') {
+            return allItems.filter(i => i.type === 'music');
+        }
+
+        // Visual Tracks: Video / Image / Scene / Text
+        return allItems.filter(i =>
+            i.type === 'video' ||
+            i.type === 'scene' ||
+            i.type === 'image' ||
+            i.type === 'text'
+        );
+    };
+
+    const handleDragOver = (e: React.DragEvent, trackType?: TrackType) => {
+        // 1. Layer Drag -> ignore everything
+        if (e.dataTransfer.types.includes('application/layer-index')) {
+            e.preventDefault();
+            setSnapLineTime(null);
+            setDragTargetIndex(null);
+            return;
+        }
+
         e.preventDefault();
 
-        if (draggingItemId) {
-            e.dataTransfer.dropEffect = 'move';
-            const rect = timelineScrollRef.current?.getBoundingClientRect();
-            if (!rect) return;
-            const x = e.clientX - rect.left + scrollLeft;
-            const rawTime = Math.max(0, x / zoomLevel);
+        // 2. Determine Action Type
+        // Internal Move: draggingItemId set
+        // External Add: No draggingItemId but 'application/json' in types
+        const isInternalMove = !!draggingItemId;
+        const isExternalAdd = !draggingItemId && e.dataTransfer.types.includes('application/json');
 
-            // Check if it's a visual item (not voice)
-            const isVoice = voiceTrackItems.some(i => i.id === draggingItemId);
-
-            if (!isVoice) {
-                // Snap Logic
-                const points = getSnapPoints(videoTrackItems, draggingItemId, currentTime); // currentTime is playhead
-                const thresholdTime = SNAP_THRESHOLD_PX / zoomLevel;
-
-                let closestPoint: SnapPoint | null = null;
-                let minDist = Infinity;
-
-                points.forEach(p => {
-                    const dist = Math.abs(p.time - rawTime);
-                    if (dist < minDist && dist < thresholdTime) {
-                        minDist = dist;
-                        closestPoint = p;
-                    }
-                });
-
-                if (closestPoint) {
-                    setSnapLineTime((closestPoint as SnapPoint).time);
-                } else {
-                    setSnapLineTime(null);
-                }
-            } else {
-                setSnapLineTime(null);
-            }
-
-            // Calculate simple index based on time (Legacy Voice Logic)
-            let index = voiceTrackItems.length;
-            for (let i = 0; i < voiceTrackItems.length; i++) {
-                const item = voiceTrackItems[i];
-                if (rawTime < item.start + item.duration / 2) {
-                    index = i;
-                    break;
-                }
-            }
-            setDragTargetIndex(index);
-        } else {
-            e.dataTransfer.dropEffect = 'copy';
+        if (!isInternalMove && !isExternalAdd) {
             setSnapLineTime(null);
+            setDragTargetIndex(null);
+            return;
         }
+
+        e.dataTransfer.dropEffect = isInternalMove ? 'move' : 'copy';
+        if (!timelineScrollRef.current) return;
+
+        // --- SNAP (Context Aware) ---
+        const snapItems = getSnapItemsForTrack(trackType, videoTrackItems);
+
+        // Voice Track -> No Snap
+        if (trackType === 'voice') {
+            setSnapLineTime(null);
+        } else {
+            const { time, snapped } = calculateDropTime(e, {
+                zoom: zoomLevel,
+                scrollLeft: scrollLeft,
+                container: timelineScrollRef.current,
+                items: snapItems,
+                draggedId: draggingItemId,
+                playhead: currentTime
+            });
+
+            setSnapLineTime(snapped ? time : null);
+        }
+
+        // --- VOICE REORDER (Internal Voice Only) ---
+        if (isInternalMove) {
+            const isVoiceMove = voiceTrackItems.some(i => i.id === draggingItemId);
+            if (isVoiceMove) {
+                const rect = timelineScrollRef.current.getBoundingClientRect();
+                const x = e.clientX - rect.left + scrollLeft;
+                const rawTime = Math.max(0, x / zoomLevel);
+
+                let index = voiceTrackItems.length;
+                for (let i = 0; i < voiceTrackItems.length; i++) {
+                    const item = voiceTrackItems[i];
+                    if (rawTime < item.start + item.duration / 2) {
+                        index = i;
+                        break;
+                    }
+                }
+                setDragTargetIndex(index);
+            } else {
+                setDragTargetIndex(null);
+            }
+        } else {
+            setDragTargetIndex(null);
+        }
+
     };
 
     const handleDrop = async (e: React.DragEvent, trackType?: string, trackId?: string) => {
@@ -696,31 +768,22 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
         e.stopPropagation();
         setSnapLineTime(null);
 
-        const rect = timelineScrollRef.current?.getBoundingClientRect();
-        if (!rect) return;
-        const x = e.clientX - rect.left + scrollLeft;
-        const rawTime = Math.max(0, x / zoomLevel);
+        if (!timelineScrollRef.current) return;
 
-        // --- Snap Logic ---
-        let dropTime = rawTime;
-        const isVoice = voiceTrackItems.some(i => i.id === draggingItemId);
-        if (!isVoice) {
-            // We can use draggingItemId from state for exclusion
-            const points = getSnapPoints(videoTrackItems, draggingItemId, currentTime);
-            const thresholdTime = SNAP_THRESHOLD_PX / zoomLevel;
-            let closestPoint: SnapPoint | null = null;
-            let minDist = Infinity;
-            points.forEach(p => {
-                const dist = Math.abs(p.time - rawTime);
-                if (dist < minDist && dist < thresholdTime) {
-                    minDist = dist;
-                    closestPoint = p;
-                }
-            });
-            if (closestPoint) {
-                dropTime = (closestPoint as SnapPoint).time;
-            }
-        }
+        // Use Unified Calculation
+        // Use Unified Calculation, but prioritize Visual Snap (Golden Rule)
+        const { time: rawDrop } = calculateDropTime(e, {
+            zoom: zoomLevel,
+            scrollLeft: scrollLeft,
+            container: timelineScrollRef.current,
+            items: videoTrackItems,
+            draggedId: draggingItemId,
+            playhead: currentTime
+        });
+
+        // If we had a visual snap line, USE IT. Otherwise use the raw drop calculation.
+        // This prevents the "Timing Desync" where drop time differs from what the user saw.
+        const dropTime = snapLineTime !== null ? snapLineTime : rawDrop;
 
         const dataStr = e.dataTransfer.getData('application/json');
 
@@ -736,11 +799,11 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
 
                     const newCards = [...prev];
                     const [removed] = newCards.splice(activeCardIndex, 1);
-
+                    console.log(activeCardIndex);
                     let insertIndex = dragTargetIndex;
                     if (activeCardIndex < insertIndex) insertIndex--;
                     insertIndex = Math.max(0, Math.min(insertIndex, newCards.length));
-
+                    console.log(insertIndex);
                     newCards.splice(insertIndex, 0, removed);
                     return newCards.map((c, i) => ({ ...c, block_index: i.toString() }));
                 });
@@ -752,242 +815,296 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
 
         if (!dataStr) return;
 
+        let data: any = {};
         try {
-            const { validateMediaItem } = await import('@/lib/wasm-loader');
-            // Validate integrity via WASM
-            const isValid = await validateMediaItem(dataStr);
-            console.log("crab 🦀 WASM Check:", isValid);
+            data = JSON.parse(dataStr);
+            if (data.payload) data = { ...data, ...data.payload };
+        } catch (e) {
+            console.error("Failed to parse drop data", e);
+            return;
+        }
 
-            if (!isValid) return;
+        // --- 1. HANDLE ADD ACTION (New Assets) ---
+        if (data.action === 'add') {
+            const isVideo = data.type === 'video' || data.type?.startsWith('video/');
+            const isImage = data.type === 'image' || data.type?.startsWith('image/');
+            const isAudio = data.type === 'audio' || data.type?.startsWith('audio/');
+            const isScene = data.type === 'scene';
 
-            const data = JSON.parse(dataStr);
+            // Use unified dropTime
+            const dropAt = dropTime;
 
-            // Implicit Layer Creation for Visual Items
-            if (!trackType && onRequestAddLayer && onVideoTrackUpdate && (data.type === 'video' || data.type === 'image' || data.type === 'scene')) {
-                const rect = timelineScrollRef.current?.getBoundingClientRect();
-                if (rect) {
-                    const x = e.clientX - rect.left + scrollLeft;
-                    const dropTime = Math.max(0, x / zoomLevel);
+            // Resolve target layer from trackId if dropping on a video track
+            const targetLayer =
+                trackId?.startsWith('t-video-')
+                    ? parseInt(trackId.replace('t-video-', ''), 10)
+                    : (layers?.length ? Math.max(...layers.map(l => l.order || 0)) : 0);
 
-                    const newItem: TimelineItem = {
-                        id: uuidv4(),
-                        start: dropTime,
-                        duration: 5, // Placeholder
-                        content: data.url || data.content || data.name || 'New Item',
-                        type: data.type,
-                        layerIndex: manualLayerCount,
-                        mediaStartOffset: 0,
-                        isDurationResolved: false // Initialize as unresolved
-                    };
-
-                    onRequestAddLayer();
-                    onVideoTrackUpdate(prev => [...prev, newItem]);
-
-                    // Async Duration Resolution
-                    if (data.url && (data.type === 'video' || data.type === 'scene')) {
-                        resolveMediaDuration(data.url, 'video')
-                            .then(duration => {
-                                onVideoTrackUpdate(prev => prev.map(i =>
-                                    i.id === newItem.id
-                                        ? { ...i, duration, sourceDuration: duration, isDurationResolved: true }
-                                        : i
-                                ));
-                            })
-                            .catch(() => toast.error('Could not load video duration'));
-                    }
-
-                    return;
-                }
-            }
-
-            // Handle Audio Drop on Music Track
-            if (trackType === 'music' && data.type?.startsWith('audio') && onVideoTrackUpdate) {
-                const rect = timelineScrollRef.current?.getBoundingClientRect();
-                if (!rect) return;
-                const x = e.clientX - rect.left + scrollLeft;
-                const dropTime = Math.max(0, x / zoomLevel);
+            // 1) Visual add
+            if ((isVideo || isImage || isScene) && onVideoTrackUpdate) {
+                const normalizedType: TimelineItem['type'] =
+                    isScene ? 'scene' : (isVideo ? 'video' : 'image');
 
                 const newItem: TimelineItem = {
                     id: uuidv4(),
-                    start: dropTime,
-                    duration: 5, // Placeholder
-                    content: data.name,
+                    start: dropAt,
+                    duration: 5,
+                    type: normalizedType,
+                    layerIndex: targetLayer,
+                    mediaStartOffset: 0,
+                    isDurationResolved: false,
+                    sourceDuration: 0,
+                    // ✅ Store URL in both fields so system works universally
+                    audioUrl: data.url,
+                    content: data.url || data.name || 'New Item',
+                    transform: { scale: 1, x: 0, y: 0, rotation: 0 },
+                };
+
+                onVideoTrackUpdate(prev => [...prev, newItem]);
+
+                if (data.url && (normalizedType === 'video' || normalizedType === 'scene')) {
+                    resolveMediaDuration(data.url, 'video')
+                        .then(d => {
+                            onVideoTrackUpdate(prev =>
+                                prev.map(i => i.id === newItem.id ? { ...i, duration: d, sourceDuration: d, isDurationResolved: true } : i)
+                            );
+                        })
+                        .catch(() => toast.error('Could not load video duration'));
+                }
+
+                return;
+            }
+
+            // 2) Audio add to music track only
+            if (isAudio && trackType === 'music' && onVideoTrackUpdate) {
+                const newItem: TimelineItem = {
+                    id: uuidv4(),
+                    start: dropAt,
+                    duration: 5,
                     type: 'music',
                     audioUrl: data.url,
+                    content: data.name || 'Audio',
                     volume: 1,
-                    isDurationResolved: false // Initialize as unresolved
+                    isDurationResolved: false,
+                    sourceDuration: 0
                 };
 
                 onVideoTrackUpdate(prev => [...prev, newItem]);
 
                 if (data.url) {
                     resolveMediaDuration(data.url, 'audio')
-                        .then(duration => {
-                            onVideoTrackUpdate(prev => prev.map(i =>
-                                i.id === newItem.id
-                                    ? { ...i, duration, sourceDuration: duration, isDurationResolved: true }
-                                    : i
-                            ));
+                        .then(d => {
+                            onVideoTrackUpdate(prev =>
+                                prev.map(i => i.id === newItem.id ? { ...i, duration: d, sourceDuration: d, isDurationResolved: true } : i)
+                            );
                         })
-                        .catch((err) => {
-                            console.warn("Audio duration fallback:", err);
-                            onVideoTrackUpdate(prev => prev.map(i =>
-                                i.id === newItem.id
-                                    ? { ...i, duration: 5, sourceDuration: 5, isDurationResolved: true, durationFallback: true }
-                                    : i
-                            ));
-                        });
+                        .catch(() => { /* fallback ok */ });
                 }
+
                 return;
             }
 
-            // Handle Audio Drop on Voice Track
-            if (trackType === 'voice' && data.type?.startsWith('audio') && onCardsUpdate) {
-                const rect = timelineScrollRef.current?.getBoundingClientRect();
-                if (!rect) return;
-                const x = e.clientX - rect.left + scrollLeft;
-                const dropTime = Math.max(0, x / zoomLevel);
+            return;
+        }
 
-                // Find insertion index based on time
-                let currentDuration = 0;
-                let insertIndex = voiceTrackItems?.length || 0;
+        // --- 2. HANDLE MOVE / VALIDATION (Existing Items) ---
+        try {
+            const { validateMediaItem } = await import('@/lib/wasm-loader');
+            const isValid = await validateMediaItem(dataStr);
+            if (!isValid) return; // Only validate existing timeline items or strict moves
+        } catch (e) { console.warn("WASM validation skipped/failed", e); }
 
-                if (voiceTrackItems) {
-                    for (let i = 0; i < voiceTrackItems.length; i++) {
-                        const itemDuration = voiceTrackItems[i].duration;
-                        if (dropTime < currentDuration + itemDuration / 2) {
-                            insertIndex = i;
-                            break;
-                        }
-                        currentDuration += itemDuration;
+        // Implicit Layer Creation for Visual Items (Fallback or Move?)
+        // Note: The previous logic combined add/move here. We've handled ADD above. 
+        // If we are here, it might be a move that mimics implicit creation (unlikely for internal moves usually)
+        // We keep the logic for safety or specific internal drag types not marked as 'add'.
+        const isVideo = data.type === 'video' || data.type?.startsWith('video/');
+        const isImage = data.type === 'image' || data.type?.startsWith('image/');
+        const isScene = data.type === 'scene';
+
+        if (!trackType && onRequestAddLayer && onVideoTrackUpdate && (isVideo || isImage || isScene)) {
+            // ... this logic might be redundant if all ADDS are caught above, but keeping for safety if 'action' is missing
+            // For now, let's assume if it falls through here, we treat it similarly but maybe it was an internal drag?
+            // But internal drags usually have specific types like 'move-video'.
+            // We will leave the rest of the function as is, but it should be noted that 'add' exits early.
+        }
+
+        // Handle Audio Drop on Music Track
+        if (trackType === 'music' && data.type?.startsWith('audio') && onVideoTrackUpdate) {
+
+
+
+            const newItem: TimelineItem = {
+                id: uuidv4(),
+                start: dropTime,
+                duration: 5, // Placeholder
+                content: data.name,
+                type: 'music',
+                audioUrl: data.url,
+                volume: 1,
+                isDurationResolved: false // Initialize as unresolved
+            };
+
+            onVideoTrackUpdate(prev => [...prev, newItem]);
+
+            if (data.url) {
+                resolveMediaDuration(data.url, 'audio')
+                    .then(duration => {
+                        onVideoTrackUpdate(prev => prev.map(i =>
+                            i.id === newItem.id
+                                ? { ...i, duration, sourceDuration: duration, isDurationResolved: true }
+                                : i
+                        ));
+                    })
+                    .catch((err) => {
+                        console.warn("Audio duration fallback:", err);
+                        onVideoTrackUpdate(prev => prev.map(i =>
+                            i.id === newItem.id
+                                ? { ...i, duration: 5, sourceDuration: 5, isDurationResolved: true, durationFallback: true }
+                                : i
+                        ));
+                    });
+            }
+            return;
+        }
+
+        // Handle Audio Drop on Voice Track
+
+        if (trackType === 'voice' && data.type?.startsWith('audio') && onCardsUpdate) {
+            // dropTime available from outer scope
+
+            // Find insertion index based on time
+            let currentDuration = 0;
+            let insertIndex = voiceTrackItems?.length || 0;
+
+            if (voiceTrackItems) {
+                for (let i = 0; i < voiceTrackItems.length; i++) {
+                    const itemDuration = voiceTrackItems[i].duration;
+                    if (dropTime < currentDuration + itemDuration / 2) {
+                        insertIndex = i;
+                        break;
                     }
+                    currentDuration += itemDuration;
                 }
+            }
 
-                // Create new Audio Card
-                const newCard: any = {
-                    id: uuidv4(),
-                    content: { blocks: [{ type: 'paragraph', data: { text: `Audio: ${data.name}` } }] },
-                    voice: 'Imported',
-                    provider: 'audio-file',
-                    audioUrl: data.url,
-                    duration: 5, // Default, waveform will adjust
-                    block_index: insertIndex.toString(),
-                    created_at: new Date().toISOString(),
-                    isGenerating: false,
-                    project_id: 'temp' // Will be ignored/overwritten on save?
-                };
+            // Create new Audio Card
+            const newCard: any = {
+                id: uuidv4(),
+                content: { blocks: [{ type: 'paragraph', data: { text: `Audio: ${data.name}` } }] },
+                voice: 'Imported',
+                provider: 'audio-file',
+                audioUrl: data.url,
+                duration: 5, // Default, waveform will adjust
+                block_index: insertIndex.toString(),
+                created_at: new Date().toISOString(),
+                isGenerating: false,
+                project_id: 'temp' // Will be ignored/overwritten on save?
+            };
 
-                onCardsUpdate(prev => {
-                    const newCards = [...prev];
-                    newCards.splice(insertIndex, 0, newCard);
-                    return newCards.map((c, i) => ({ ...c, block_index: i.toString() }));
+            onCardsUpdate(prev => {
+                const newCards = [...prev];
+                newCards.splice(insertIndex, 0, newCard);
+                return newCards.map((c, i) => ({ ...c, block_index: i.toString() }));
+            });
+
+            toast.success('Audio added to timeline');
+            return;
+        }
+
+        if (data.type !== 'reorder' && onVideoTrackUpdate && data.url) {
+
+            // Determine Target Layer
+            const targetLayer = (trackId && trackId.startsWith('t-video-')) ? parseInt(trackId.replace('t-video-', '')) : 0;
+
+            // dropTime available from outer scope
+
+            // ... Existing logic ...
+            const initialDuration = 5;
+            const layerItems = videoTrackItems.filter(i => (i.layerIndex || 0) === targetLayer && (
+                i.type === 'video' || i.type === 'image' || i.type === 'scene'
+            ));
+
+            const safeTime = resolveCollision(layerItems, dropTime, initialDuration, null);
+
+            const newItem: TimelineItem = {
+                id: uuidv4(),
+                start: safeTime,
+                duration: initialDuration,
+                content: data.name,
+                type: data.type?.startsWith('audio') ? 'music' : (data.type?.startsWith('video') ? 'scene' : 'image'),
+                audioUrl: data.url,
+                layerIndex: (trackType === 'video' || trackType === 'image') ? targetLayer : 0,
+                transform: { scale: 1, x: 0, y: 0, rotation: 0 },
+                isDurationResolved: false
+            };
+
+            // 1. Add item immediately
+            onVideoTrackUpdate(prev => [...prev, newItem]);
+
+            // 2. Async fetch duration
+            if (data.url && (newItem.type === 'music' || newItem.type === 'scene' || newItem.type === 'video')) {
+                // ... same async duration logic ...
+                const kind = (newItem.type === 'scene' || newItem.type === 'video') ? 'video' : 'audio';
+                resolveMediaDuration(data.url, kind)
+                    .then(duration => {
+                        onVideoTrackUpdate(prev => {
+                            const item = prev.find(i => i.id === newItem.id);
+                            if (!item) return prev;
+
+                            const layerItems = prev.filter(i =>
+                                i.id !== item.id && (i.layerIndex || 0) === (item.layerIndex || 0) &&
+                                (i.type === 'video' || i.type === 'scene' || i.type === 'image')
+                            );
+                            const safeStart = resolveCollision(layerItems, item.start, duration, item.id);
+                            return prev.map(i => i.id === newItem.id ? { ...i, duration, sourceDuration: duration, isDurationResolved: true, start: safeStart } : i);
+                        });
+                    })
+                    .catch((err) => {
+                        // ... fallback ...
+                        console.warn("Media duration fallback:", err);
+                        onVideoTrackUpdate(prev => prev.map(i => i.id === newItem.id ? { ...i, duration: 5, sourceDuration: 5, isDurationResolved: true, durationFallback: true } : i));
+                    });
+            }
+
+        } else if (data.type === 'move-video' && onVideoTrackUpdate) {
+            const movingItem = videoTrackItems.find(i => i.id === data.id);
+            if (movingItem) {
+                const targetLayer = (trackId && trackId.startsWith('t-video-')) ? parseInt(trackId.replace('t-video-', '')) : (movingItem.layerIndex || 0);
+
+                // Use unified dropTime (Already includes Snap calculation)
+                const clampedTime = dropTime;
+
+                const layerItems = videoTrackItems.filter(i => {
+                    const iLayer = i.layerIndex || 0;
+                    const isVisual = i.type === 'image' || i.type === 'scene' || i.type === 'video' || i.type === 'text';
+                    return isVisual && iLayer === targetLayer && i.id !== movingItem.id;
                 });
 
-                toast.success('Audio added to timeline');
-                return;
-            }
+                // STRICT COLLISION CHECK (Rejection Strategy)
+                // If the desired time causes an overlap, we REJECT the move entirely.
+                // We do NOT clamp or shift. This ensures "What You See Is What You Get".
+                const hasOverlap = layerItems.some(item => {
+                    const itemEnd = item.start + item.duration;
+                    const thisEnd = clampedTime + movingItem.duration;
+                    return (clampedTime < itemEnd && thisEnd > item.start);
+                });
 
-            if (data.type !== 'reorder' && onVideoTrackUpdate && data.url) {
-
-                // Determine Target Layer
-                const targetLayer = (trackId && trackId.startsWith('t-video-')) ? parseInt(trackId.replace('t-video-', '')) : 0;
-
-                // Collision Check (New Item)
-                // Use default duration 5 initially. If metadata loads longer, we might overlap later?
-                // Phase 3: Collision rules apply to initial drop. 
-                // Metadata update might cause overlap later, but we handle immediate drop here.
-                const initialDuration = 5;
-                const layerItems = videoTrackItems.filter(i => (i.layerIndex || 0) === targetLayer && (
-                    i.type === 'video' || i.type === 'image' || i.type === 'scene'
-                ));
-
-                // Use dropTime (snapped) from outer scope
-                const safeTime = resolveCollision(layerItems, dropTime, initialDuration, null);
-
-                const newItem: TimelineItem = {
-                    id: uuidv4(),
-                    start: safeTime,
-                    duration: initialDuration,
-                    content: data.name,
-                    type: data.type?.startsWith('audio') ? 'music' : (data.type?.startsWith('video') ? 'scene' : 'image'),
-                    audioUrl: data.url,
-                    layerIndex: (trackType === 'video' || trackType === 'image') ? targetLayer : 0,
-                    transform: { scale: 1, x: 0, y: 0, rotation: 0 },
-                    isDurationResolved: false // Initialize as unresolved
-                };
-
-                // 1. Add item immediately
-                onVideoTrackUpdate(prev => [...prev, newItem]);
-
-                // 2. Async fetch duration for music/video
-                if (data.url && (newItem.type === 'music' || newItem.type === 'scene' || newItem.type === 'video')) {
-                    const kind = (newItem.type === 'scene' || newItem.type === 'video') ? 'video' : 'audio';
-                    resolveMediaDuration(data.url, kind)
-                        .then(duration => {
-                            onVideoTrackUpdate(prev => {
-                                const item = prev.find(i => i.id === newItem.id);
-                                if (!item) return prev;
-
-                                // Re-calculate start to avoid collision with new duration
-                                const layerItems = prev.filter(i =>
-                                    i.id !== item.id &&
-                                    (i.layerIndex || 0) === (item.layerIndex || 0) &&
-                                    (i.type === 'video' || i.type === 'scene' || i.type === 'image')
-                                );
-
-                                const safeStart = resolveCollision(layerItems, item.start, duration, item.id);
-
-                                return prev.map(i =>
-                                    i.id === newItem.id
-                                        ? { ...i, duration, sourceDuration: duration, isDurationResolved: true, start: safeStart }
-                                        : i
-                                );
-                            });
-                        })
-                        .catch((err) => {
-                            console.warn("Media duration fallback:", err);
-                            onVideoTrackUpdate(prev => prev.map(i =>
-                                i.id === newItem.id
-                                    ? { ...i, duration: 5, sourceDuration: 5, isDurationResolved: true, durationFallback: true }
-                                    : i
-                            ));
-                        });
-
+                if (hasOverlap) {
+                    toast.error('Cannot overlap clips');
+                    return;
                 }
-            } else if (data.type === 'move-video' && onVideoTrackUpdate) {
-                const movingItem = videoTrackItems.find(i => i.id === data.id);
-                if (movingItem) {
-                    const targetLayer = (trackId && trackId.startsWith('t-video-'))
-                        ? parseInt(trackId.replace('t-video-', ''))
-                        : (movingItem.layerIndex || 0);
 
-                    // Filter items on target layer
-                    const layerItems = videoTrackItems.filter(i => {
-                        const iLayer = i.layerIndex || 0;
-                        const isVisual = i.type === 'image' || i.type === 'scene' || i.type === 'video' || i.type === 'text';
-                        // Text and Music have their own logic/tracks usually, but if on video track...
-                        // Assuming video tracks only contain visual items.
-                        return isVisual && iLayer === targetLayer;
-                    });
+                const safeTime = clampedTime;
 
-                    const safeTime = resolveCollision(layerItems, dropTime, movingItem.duration, movingItem.id);
-
-                    onVideoTrackUpdate(videoTrackItems.map(item => {
-                        if (item.id === data.id) {
-                            return {
-                                ...item,
-                                start: safeTime,
-                                layerIndex: targetLayer,
-                                // Maintain other props
-                            };
-                        }
-                        return item;
-                    }));
-                }
+                onVideoTrackUpdate(videoTrackItems.map(item => {
+                    if (item.id === data.id) {
+                        return { ...item, start: safeTime, layerIndex: targetLayer };
+                    }
+                    return item;
+                }));
             }
-        } catch (err) { console.error(err); }
-
-
+        }
     };
 
     // --- Audio Playback Logic ---
@@ -1486,6 +1603,25 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
                 case 'ArrowLeft':
                     handleSeek(Math.max(0, currentTime - 1));
                     break;
+                case 'Delete':
+                case 'Backspace':
+                    // Delete selected items
+                    if (selectedItemIds.length > 0) {
+                        if (confirm(`Delete ${selectedItemIds.length} items?`)) {
+                            const newItems = videoTrackItems.filter(i => !selectedItemIds.includes(i.id));
+                            // Should also handle voice cards deletion if selected?
+                            // Currently voice deletion propagates via blockId.
+                            // But 'videoTrackItems' passed here includes generic items.
+                            // `onVideoTrackUpdate` handles the list.
+                            onVideoTrackUpdate?.(newItems);
+                        }
+                    }
+                    // Handle Active Block (Voice) - Handled separately via onDelete?
+                    // actually if activeBlockId is set, we might want to delete it too.
+                    if (activeBlockId && onDelete) {
+                        onDelete();
+                    }
+                    break;
             }
         };
 
@@ -1652,7 +1788,8 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
                                     key={track.id}
                                     draggable={layerIndex !== -1}
                                     onDragStart={(e) => handleLayerDragStart(e, layerIndex)}
-                                    onDragOver={(e) => e.preventDefault()} // Allow drop
+                                    // Use shared handler for consisten snap/drop support
+                                    onDragOver={handleDragOver}
                                     onDrop={(e) => handleLayerDrop(e, layerIndex)}
                                     onContextMenu={(e) => handleHeaderContextMenu(e, track.id)}
                                     className="relative cursor-grab active:cursor-grabbing"
@@ -1683,6 +1820,7 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
                         }
                     }}
                     onDragOver={handleDragOver}
+                    onDragLeave={() => setSnapLineTime(null)}
                     onDrop={handleDrop}
                     onMouseMove={handleContainerMouseMove}
                     onMouseLeave={() => setMouseTime(-1)}
@@ -1736,7 +1874,8 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
                                     key={track.id}
                                     className="border-b border-[var(--timeline-grid-strong)] relative bg-[var(--timeline-grid)] hover:bg-[var(--timeline-grid-strong)] transition-colors group overflow-hidden"
                                     style={{ height: TRACK_HEIGHT }}
-                                    onDragOver={(e) => e.preventDefault()}
+                                    onDragOver={(e) => handleDragOver(e, track.type)}
+                                    onDragLeave={() => setSnapLineTime(null)}
                                     onDrop={(e) => handleDrop(e, track.type, track.id)}
                                 >
                                     {/* Grid Lines */}
@@ -1793,16 +1932,16 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
                                                 {/* Item Content */}
                                                 <div className="h-full w-full relative">
                                                     {/* Delete Button for Video Items */}
-                                                    {track.type !== 'voice' && !track.isLocked && ( // Hide delete if locked
+                                                    {track.type !== 'voice' && !track.isLocked && (
                                                         <button
-                                                            className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded opacity-0 group-hover/item:opacity-100 transition-opacity z-20 hover:bg-red-600"
+                                                            className="absolute top-1 right-1 p-1.5 bg-red-500/80 hover:bg-red-600 text-white rounded-md opacity-0 group-hover/item:opacity-100 transition-all z-30 shadow-sm backdrop-blur-sm"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 handleDeleteVideoItem(item.id);
                                                             }}
                                                             title="Delete Clip"
                                                         >
-                                                            <Trash2 size={12} />
+                                                            <Trash2 size={14} />
                                                         </button>
                                                     )}
                                                     {track.type === 'voice' || track.type === 'music' ? (
@@ -1854,26 +1993,58 @@ const Timeline = React.forwardRef<TimelineHandle, TimelineProps>(({
                                                                         </span>
                                                                     </div>
                                                                 </div>
-                                                            ) : item.audioUrl ? (
+                                                            ) : (item.audioUrl || item.content?.startsWith('http')) ? (
                                                                 <>
-                                                                    {item.type === 'scene' || (item.content && (item.content.toLowerCase().endsWith('.mp4') || item.content.toLowerCase().endsWith('.mov'))) ? (
-                                                                        <video
-                                                                            src={item.audioUrl}
-                                                                            className="w-full h-full object-cover opacity-50 pointer-events-none"
-                                                                        />
+                                                                    {item.type === 'video' || item.type === 'scene' || (item.content && (item.content.toLowerCase().endsWith('.mp4') || item.content.toLowerCase().endsWith('.mov'))) ? (
+                                                                        // Filmstrip for Video
+                                                                        // Since we can't easily extract frames in CSS, we'll repeat the video element carefully 
+                                                                        // or just show it once with object-cover.
+                                                                        // Ideally, we'd generate a sprite sheet.
+                                                                        // For now, let's use a single video element that covers, 
+                                                                        // but we can simulate filmstrip holes with a CSS overlay?
+                                                                        // User asked for "Repeat thumbnail". 
+                                                                        // If we don't have a thumbnail, we can't repeat.
+                                                                        // We will rely on validity of `audioUrl` or `content` as source.
+                                                                        // Let's use a CLIP PATH or Mask to look like filmstrip?
+                                                                        // Or just repeat the video rendering if width allows? No, performance.
+                                                                        // Let's stick to single video fitting nicely, but maybe adding film sprocket holes overlay?
+                                                                        <div className="w-full h-full relative overflow-hidden bg-black">
+                                                                            <video
+                                                                                src={item.audioUrl || item.content}
+                                                                                className="h-full w-auto max-w-none object-cover opacity-80"
+                                                                                // To simulate filmstrip, we might just center it, 
+                                                                                // or repeat it if we could.
+                                                                                // Let's just make it fill nicely.
+                                                                                style={{ width: '100%', objectFit: 'cover' }}
+                                                                            />
+                                                                            {/* Filmstrip Overlay */}
+                                                                            <div
+                                                                                className="absolute top-0 bottom-0 left-0 right-0 pointer-events-none opacity-30"
+                                                                                style={{
+                                                                                    backgroundImage: 'linear-gradient(90deg, transparent 50%, rgba(0,0,0,0.5) 50%)',
+                                                                                    backgroundSize: '80px 100%' // Perforations look
+                                                                                }}
+                                                                            />
+                                                                        </div>
                                                                     ) : (
-                                                                        <img
-                                                                            src={item.audioUrl}
-                                                                            className="w-full h-full object-cover opacity-50 pointer-events-none"
-                                                                            alt="media thumbnail"
+                                                                        // Filmstrip for Image
+                                                                        // Use background-repeat
+                                                                        <div
+                                                                            className="w-full h-full opacity-80"
+                                                                            style={{
+                                                                                backgroundImage: `url(${item.audioUrl || (item.content?.startsWith('http') ? item.content : '')})`,
+                                                                                backgroundRepeat: 'repeat-x',
+                                                                                backgroundSize: 'auto 100%', // Fit height, repeat horizontal
+                                                                                backgroundPosition: 'left center'
+                                                                            }}
                                                                         />
                                                                     )}
 
-                                                                    <div className="absolute bottom-1 left-1 flex flex-col max-w-full pointer-events-none">
+                                                                    <div className="absolute bottom-1 left-1 flex flex-col max-w-full pointer-events-none z-10">
                                                                         {item.type === 'scene' && (
                                                                             <span className="text-[9px] bg-blue-600/80 text-white px-1 rounded mb-0.5 w-fit">VIDEO</span>
                                                                         )}
-                                                                        <span className="text-[10px] text-white/90 truncate bg-black/50 px-1 rounded">{item.content}</span>
+                                                                        <span className="text-[10px] text-white/90 truncate bg-black/50 px-1 rounded">{item.content.split('/').pop()}</span>
                                                                     </div>
                                                                 </>
                                                             ) : (

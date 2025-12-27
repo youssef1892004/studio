@@ -41,14 +41,34 @@ const MediaLayer: React.FC<{
             if (!vid) return;
 
             const offset = item.mediaStartOffset || 0;
-            const targetTime = Math.max(0, currentTime - item.start + offset);
+            // Calculate raw target time based on timeline position
+            let rawTargetTime = currentTime - item.start + offset;
+
+            // Phase 8.7: Media Hold Behavior (Freeze Last Frame)
+            // If item.sourceDuration is known, clamp checking
+            if (item.sourceDuration) {
+                // Clamp to sourceDuration - epsilon (0.04 for ~25fps) to prevent seeking past end
+                // This ensures the video stays visible (frozen) instead of going black/looping.
+                const epsilon = 0.04;
+                if (rawTargetTime >= item.sourceDuration) {
+                    rawTargetTime = Math.max(0, item.sourceDuration - epsilon);
+                }
+            }
+
+            const targetTime = Math.max(0, rawTargetTime);
 
             if (Math.abs(vid.currentTime - targetTime) > 0.25) {
                 vid.currentTime = targetTime;
             }
 
-            if (isPlaying && vid.paused) vid.play().catch(() => { });
-            else if (!isPlaying && !vid.paused) vid.pause();
+            // Playback Control: Only play if we are within valid source limits (not frozen state)
+            const isWithinSource = !item.sourceDuration || (rawTargetTime < item.sourceDuration - 0.05);
+
+            if (isPlaying && isWithinSource && vid.paused) {
+                vid.play().catch(() => { });
+            } else if ((!isPlaying || !isWithinSource) && !vid.paused) {
+                vid.pause();
+            }
 
             if (Math.abs(vid.playbackRate - playbackRate) > 0.01) {
                 vid.playbackRate = playbackRate;

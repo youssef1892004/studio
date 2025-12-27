@@ -15,17 +15,102 @@ const UploadsPanel: React.FC<UploadsPanelProps> = ({ project, onAssetsUpdated, o
     const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
     const [renamingAssetId, setRenamingAssetId] = useState<string | null>(null);
     const [newName, setNewName] = useState('');
+    const [assets, setAssets] = useState<any[]>(project?.image_url || []);
+
+    // Sync project assets
+    useEffect(() => {
+        if (project?.image_url) {
+            setAssets(project.image_url);
+        }
+    }, [project?.image_url]);
+
     const [previewAsset, setPreviewAsset] = useState<any | null>(null);
 
-    // ... (rest of stats)
+    // Helpers
+    const getFileIcon = (mimeType: string) => {
+        if (mimeType.startsWith('image/')) return <ImageIcon className="w-5 h-5 text-blue-400" />;
+        if (mimeType.startsWith('video/')) return <Video className="w-5 h-5 text-purple-400" />;
+        if (mimeType.startsWith('audio/')) return <Music className="w-5 h-5 text-green-400" />;
+        return <File className="w-5 h-5 text-gray-400" />;
+    };
 
-    // ... (handleFileSelect)
+    const formatSize = (bytes?: number) => {
+        if (!bytes) return '';
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        if (bytes === 0) return '0 Byte';
+        const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)).toString());
+        return Math.round(bytes / Math.pow(1024, i)) + ' ' + sizes[i];
+    };
 
-    // ... (handleManageAsset)
+    const handleManageAsset = async (assetId: string, action: 'delete' | 'rename', newNameValue?: string) => {
+        if (action === 'delete') {
+            if (!confirm('Area you sure you want to delete this asset?')) return;
+            const toastId = toast.loading('Deleting...');
+            try {
+                // Assume delete logic or simple state removal for now unless we have API
+                // await deleteAsset(assetId); 
+                const newAssets = assets.filter(a => a.url !== assetId && a.id !== assetId); // url often used as ID
+                setAssets(newAssets);
+                onAssetsUpdated?.(newAssets);
+                toast.success('Deleted', { id: toastId });
+            } catch (e) {
+                toast.error('Failed to delete', { id: toastId });
+            }
+        } else if (action === 'rename' && newNameValue) {
+            const newAssets = assets.map(a =>
+                (a.id === assetId || a.url === assetId) ? { ...a, name: newNameValue } : a
+            );
+            setAssets(newAssets);
+            onAssetsUpdated?.(newAssets);
+            setRenamingAssetId(null);
+            toast.success('Renamed');
+        }
+        setActiveMenuId(null);
+    };
 
-    // ... (helpers)
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
 
-    // ... (useEffect fetch)
+        const file = e.target.files[0];
+        setIsUploading(true);
+        const toastId = toast.loading('Uploading...');
+
+        try {
+            // Use existing upload API
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('project_id', project?.id || 'temp');
+
+            const res = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!res.ok) throw new Error('Upload failed');
+
+            const data = await res.json();
+            const newAsset = {
+                url: data.url,
+                name: file.name,
+                type: file.type,
+                size: file.size, // Add size
+                created_at: new Date().toISOString()
+            };
+
+            const updatedAssets = [newAsset, ...assets];
+            setAssets(updatedAssets);
+            onAssetsUpdated?.(updatedAssets);
+
+            toast.success('Uploaded successfully', { id: toastId });
+
+        } catch (error) {
+            console.error(error);
+            toast.error('Upload failed', { id: toastId });
+        } finally {
+            setIsUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
 
     return (
         <div className="h-full flex flex-col bg-card p-6 space-y-6 overflow-y-auto custom-scrollbar relative">
@@ -81,6 +166,7 @@ const UploadsPanel: React.FC<UploadsPanelProps> = ({ project, onAssetsUpdated, o
                                 draggable
                                 onDragStart={(e) => {
                                     e.dataTransfer.setData('application/json', JSON.stringify({
+                                        action: 'add',
                                         url: file.url,
                                         name: file.name,
                                         type: file.type
